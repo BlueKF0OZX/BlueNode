@@ -1,0 +1,26 @@
+[Unit]
+
+Description=NodeSmart AllStar Monitor
+
+Wants=network-online.target
+After=network-online.target asterisk.service
+
+
+[Service]
+
+Type=simple
+
+User=NODESMART_USER
+
+WorkingDirectory=/opt/nodesmart/core
+
+ExecStart=/usr/bin/python3 /opt/nodesmart/core/monitor.py
+
+Restart=always
+
+RestartSec=5
+
+
+[Install]
+
+WantedBy=multi-user.target

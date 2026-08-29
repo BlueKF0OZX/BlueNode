@@ -1,0 +1,16 @@
+
+#!/bin/bash
+
+
+
+CONFIG="/opt/nodesmart/config/nodesmart.json"
+
+
+
+NODE=$(python3 -c 'import json; print(json.load(open("'"$CONFIG"'"))["node"])')
+
+TARGET=$(python3 -c 'import json; d=json.load(open("'"$CONFIG"'")); print(next(k for k,v in d.get("friendly_nodes",{}).items() if str(v).upper()=="DODROPIN"))')
+
+
+
+asterisk -rx "rpt fun ${NODE} *3${TARGET}"

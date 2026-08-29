@@ -1,0 +1,30 @@
+
+# NodeSmart sudo permissions
+
+#
+
+# Replace NODESMART_USER with the Linux user that runs NodeSmart.
+
+#
+
+# NodeSmart requires:
+
+#   - Asterisk CLI access for status and node control
+
+#   - Permission to restart Asterisk for automatic recovery
+
+#   - Existing helper scripts for DODROPIN and Skywarn controls
+
+
+
+NODESMART_USER ALL=(root) NOPASSWD: /usr/sbin/asterisk -rx *
+
+NODESMART_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart asterisk
+
+NODESMART_USER ALL=(root) NOPASSWD: /usr/local/bin/dodropin
+
+NODESMART_USER ALL=(root) NOPASSWD: /usr/local/bin/dodropoff
+
+NODESMART_USER ALL=(root) NOPASSWD: /usr/local/bin/skywarnon
+
+NODESMART_USER ALL=(root) NOPASSWD: /usr/local/bin/skywarnoff

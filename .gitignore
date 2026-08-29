@@ -1,0 +1,45 @@
+
+# Python cache
+
+__pycache__/
+
+*.py[cod]
+
+
+
+# Development/local backups
+
+*.bak
+
+*.bak*
+
+*.backup
+
+*.backup*
+
+
+
+# Runtime state
+
+state/
+
+logs/
+
+history/
+
+events/
+
+
+
+# Temporary/editor files
+
+*.tmp
+
+*.swp
+
+*~
+
+.DS_Store
+
+config/nodesmart.json
+web/*.log

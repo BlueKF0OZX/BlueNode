@@ -1,0 +1,46 @@
+
+{
+
+  "node": "12345",
+
+  "callsign": "N0CALL",
+
+  "friendly_nodes": {
+
+    "54321": "Example Node"
+
+  },
+
+  "web": {
+
+    "host": "0.0.0.0",
+
+    "port": 8080
+
+  },
+
+  "health": {
+
+    "cpu_warning_c": 70,
+
+    "cpu_critical_c": 80,
+
+    "memory_warning_percent": 75,
+
+    "memory_critical_percent": 90,
+
+    "disk_warning_percent": 80,
+
+    "disk_critical_percent": 90
+
+  },
+
+  "recovery": {
+
+    "asterisk_enabled": true,
+
+    "asterisk_cooldown_seconds": 600
+
+  }
+
+}

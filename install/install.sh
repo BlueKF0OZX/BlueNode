@@ -1,0 +1,106 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INSTALL_ROOT="/opt/nodesmart"
+SERVICE_FILE="/etc/systemd/system/nodesmart.service"
+SUDOERS_FILE="/etc/sudoers.d/nodesmart"
+
+fail() {
+  echo "ERROR: $1" >&2
+  exit 1
+}
+
+if [[ ${EUID} -ne 0 ]]; then
+  fail "Run this installer with sudo."
+fi
+
+SERVICE_USER="${NODESMART_USER:-${SUDO_USER-}}"
+
+if [[ -z "${SERVICE_USER}" || "${SERVICE_USER}" == "root" ]]; then
+  fail "Unable to determine the NodeSmart service user. Run with sudo from the intended user account, or set NODESMART_USER."
+fi
+
+id "${SERVICE_USER}" >/dev/null 2>&1 || fail "User ${SERVICE_USER} does not exist."
+SERVICE_GROUP="$(id -gn "${SERVICE_USER}")"
+
+for cmd in /usr/bin/python3 /usr/sbin/asterisk /usr/bin/systemctl /usr/sbin/visudo; do
+  [[ -x "${cmd}" ]] || fail "Required command not found: ${cmd}"
+done
+
+[[ -f "${REPO_ROOT}/config/nodesmart.example.json" ]] || fail "Missing config/nodesmart.example.json"
+[[ -f "${REPO_ROOT}/systemd/nodesmart.service" ]] || fail "Missing systemd/nodesmart.service"
+[[ -f "${REPO_ROOT}/install/nodesmart.sudoers.example" ]] || fail "Missing install/nodesmart.sudoers.example"
+
+echo "Preparing NodeSmart files and directories..."
+mkdir -p "${INSTALL_ROOT}"
+
+if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
+  rm -rf "${INSTALL_ROOT}/core" "${INSTALL_ROOT}/web"
+  cp -a "${REPO_ROOT}/core" "${INSTALL_ROOT}/core"
+  cp -a "${REPO_ROOT}/web" "${INSTALL_ROOT}/web"
+  mkdir -p "${INSTALL_ROOT}/config" "${INSTALL_ROOT}/install/helpers" "${INSTALL_ROOT}/systemd"
+  cp -f "${REPO_ROOT}/config/nodesmart.example.json" "${INSTALL_ROOT}/config/"
+  cp -f "${REPO_ROOT}/install/nodesmart.sudoers.example" "${INSTALL_ROOT}/install/"
+  cp -a "${REPO_ROOT}/install/helpers/." "${INSTALL_ROOT}/install/helpers/"
+  cp -f "${REPO_ROOT}/systemd/nodesmart.service" "${INSTALL_ROOT}/systemd/"
+fi
+
+mkdir -p "${INSTALL_ROOT}/events" "${INSTALL_ROOT}/history" "${INSTALL_ROOT}/logs" "${INSTALL_ROOT}/state"
+
+echo "Installing helper commands..."
+for helper in dodropin dodropoff skywarnon skywarnoff; do
+  src="${INSTALL_ROOT}/install/helpers/${helper}"
+  [[ -f "${src}" ]] || fail "Missing helper: ${src}"
+  install -o root -g root -m 0755 "${src}" "/usr/local/bin/${helper}"
+done
+
+echo "Installing restricted sudo permissions..."
+tmp_sudoers="$(mktemp)"
+tmp_service=""
+trap 'rm -f "${tmp_sudoers:-}" "${tmp_service:-}"' EXIT
+sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/install/nodesmart.sudoers.example" > "${tmp_sudoers}"
+/usr/sbin/visudo -cf "${tmp_sudoers}" >/dev/null || fail "Generated sudoers file failed validation."
+install -o root -g root -m 0440 "${tmp_sudoers}" "${SUDOERS_FILE}"
+
+echo "Installing systemd service..."
+tmp_service="$(mktemp)"
+sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/systemd/nodesmart.service" > "${tmp_service}"
+install -o root -g root -m 0644 "${tmp_service}" "${SERVICE_FILE}"
+/usr/bin/systemctl daemon-reload
+
+if [[ ! -f "${INSTALL_ROOT}/config/nodesmart.json" ]]; then
+  cp "${INSTALL_ROOT}/config/nodesmart.example.json" "${INSTALL_ROOT}/config/nodesmart.json"
+  chown "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}/config/nodesmart.json"
+  chmod 0644 "${INSTALL_ROOT}/config/nodesmart.json"
+  chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}"
+  echo
+  echo "NodeSmart configuration created:"
+  echo "  ${INSTALL_ROOT}/config/nodesmart.json"
+  echo "Edit the node number, callsign, and friendly nodes, then rerun this installer."
+  echo "NodeSmart has NOT been started yet."
+  exit 0
+fi
+
+chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}"
+find "${INSTALL_ROOT}" -type d -exec chmod 0755 {} \;
+
+if [[ ! -e "/usr/local/bin/SkywarnPlus/SkyControl.py" ]]; then
+  echo "WARNING: SkywarnPlus was not detected. Skywarn controls will not work until it is installed."
+fi
+
+echo "Validating Python files..."
+/usr/bin/python3 -m py_compile "${INSTALL_ROOT}/core/config.py" "${INSTALL_ROOT}/core/monitor.py" || fail "Python syntax validation failed."
+
+echo "Enabling and starting NodeSmart..."
+/usr/bin/systemctl enable nodesmart
+/usr/bin/systemctl restart nodesmart
+
+if /usr/bin/systemctl is-active --quiet nodesmart; then
+  echo "NodeSmart installation complete."
+else
+  echo "NodeSmart is installed but the service is not running." >&2
+  /usr/bin/systemctl status nodesmart --no-pager || true
+  exit 1
+fi

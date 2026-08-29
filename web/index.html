@@ -1,0 +1,2419 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>NodeSmart</title>
+
+
+
+  <style>
+
+    body {
+
+      margin: 0;
+
+      font-family: Arial, sans-serif;
+
+      background: #111827;
+
+      color: #f3f4f6;
+
+    }
+
+
+
+    .wrap {
+
+      max-width: 900px;
+
+      margin: 0 auto;
+
+      padding: 30px 20px;
+
+    }
+
+
+
+    h1 {
+
+      margin-bottom: 5px;
+
+    }
+
+
+
+    .sub {
+
+      color: #9ca3af;
+
+      margin-bottom: 25px;
+
+    }
+
+
+
+    .grid {
+
+      display: grid;
+
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+
+      gap: 15px;
+
+    }
+
+
+
+    .card {
+
+      background: #1f2937;
+
+      border-radius: 12px;
+
+      padding: 16px 18px;
+
+    }
+
+
+
+    .label {
+
+      color: #9ca3af;
+
+      font-size: 14px;
+
+      margin-bottom: 8px;
+
+    }
+
+
+
+    .value {
+
+      font-size: 24px;
+
+      font-weight: bold;
+
+    }
+
+
+
+    .healthy,
+
+    .online,
+
+    .enabled,
+
+    .value.normal {
+
+      color: #22c55e;
+
+    }
+
+
+
+    .degraded,
+    .warning,
+    .value.warning {
+      color: #f59e0b;
+    }
+
+    .fault,
+    .critical,
+    .offline,
+    .disabled,
+    .value.critical {
+      color: #ef4444;
+    }
+
+    .unknown,
+    .value.unknown {
+      color: #9ca3af;
+    }
+
+    .health-reason {
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: normal;
+      color: #f59e0b;
+      line-height: 1.4;
+    }
+
+
+
+    .events-panel {
+
+      margin-top: 25px;
+
+      background: #1f2937;
+
+      border-radius: 12px;
+
+      padding: 20px;
+
+    }
+
+
+
+
+    #intelligence-panel.intelligence-normal {
+      border-color: rgba(46, 204, 113, 0.65);
+      box-shadow: 0 0 18px rgba(46, 204, 113, 0.10);
+    }
+
+    #intelligence-panel.intelligence-warning {
+      border-color: rgba(241, 196, 15, 0.75);
+      box-shadow: 0 0 18px rgba(241, 196, 15, 0.12);
+    }
+
+    #intelligence-panel.intelligence-critical {
+      border-color: rgba(231, 76, 60, 0.80);
+      box-shadow: 0 0 20px rgba(231, 76, 60, 0.14);
+    }
+
+    #intelligence-panel.intelligence-unknown {
+      opacity: 0.85;
+    }
+
+    .events-panel h2 {
+
+      margin-top: 0;
+
+      margin-bottom: 15px;
+
+      font-size: 20px;
+
+    }
+
+
+
+    .manual-node-control {
+
+      margin-top: 20px;
+
+      padding-top: 18px;
+
+      border-top: 1px solid #374151;
+
+    }
+
+
+
+    .manual-node-control h3 {
+
+      margin: 0 0 12px 0;
+
+      font-size: 16px;
+
+      color: #d1d5db;
+
+    }
+
+
+
+    .manual-node-row {
+
+      display: grid;
+
+      grid-template-columns: minmax(140px, 1fr) auto auto;
+
+      gap: 10px;
+
+    }
+
+
+
+    #manual-node-number {
+
+      min-width: 0;
+
+      border: 1px solid #4b5563;
+
+      border-radius: 8px;
+
+      padding: 12px 14px;
+
+      font-size: 16px;
+
+      background: #111827;
+
+      color: #f3f4f6;
+
+      outline: none;
+
+    }
+
+
+
+    #manual-node-number:focus {
+
+      border-color: #9ca3af;
+
+    }
+
+
+
+    @media (max-width: 600px) {
+
+      .manual-node-row {
+
+        grid-template-columns: 1fr 1fr;
+
+      }
+
+
+
+      #manual-node-number {
+
+        grid-column: 1 / -1;
+
+      }
+
+    }
+
+
+
+    .node-directory {
+
+      margin-top: 18px;
+
+      padding-top: 18px;
+
+      border-top: 1px solid #374151;
+
+    }
+
+
+
+    .node-directory h3 {
+
+      margin: 0 0 12px 0;
+
+      font-size: 16px;
+
+      color: #d1d5db;
+
+    }
+
+
+
+    .node-search-row {
+
+      display: grid;
+
+      grid-template-columns: 1fr auto;
+
+      gap: 10px;
+
+    }
+
+
+
+    #node-directory-search {
+
+      border: 1px solid #4b5563;
+
+      border-radius: 8px;
+
+      padding: 12px 14px;
+
+      font-size: 16px;
+
+      background: #111827;
+
+      color: #f3f4f6;
+
+      outline: none;
+
+    }
+
+
+
+    .node-directory-toolbar {
+
+      display: none;
+
+      justify-content: flex-end;
+
+      margin-top: 10px;
+
+    }
+
+
+
+    .node-directory-toolbar button {
+
+      padding: 8px 12px;
+
+      font-size: 13px;
+
+    }
+
+
+
+    #node-directory-frame {
+
+      display: none;
+
+      width: 100%;
+
+      height: 340px;
+
+      margin-top: 14px;
+
+      border: 1px solid #374151;
+
+      border-radius: 8px;
+
+      background: white;
+
+    }
+
+
+
+    .event-row {
+
+      padding: 10px 0;
+
+      border-bottom: 1px solid #374151;
+
+      font-family: monospace;
+
+      font-size: 14px;
+
+    }
+
+
+
+    .event-row:last-child {
+
+      border-bottom: none;
+
+    }
+
+
+
+    #error {
+
+      color: #f59e0b;
+
+      margin-top: 20px;
+
+    }
+
+
+    .controls-panel {
+      margin-top: 25px;
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .control-button {
+      border: none;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #374151;
+      color: #f3f4f6;
+    }
+
+    .control-button:hover {
+      background: #4b5563;
+    }
+
+    .control-button:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    #control-result {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .event-row {
+      display: flex;
+      gap: 14px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.03);
+      border-left: 4px solid #6b7280;
+    }
+
+    .event-time {
+      min-width: 92px;
+      font-size: 13px;
+      color: #9ca3af;
+      padding-top: 2px;
+    }
+
+    .event-content {
+      flex: 1;
+    }
+
+    .event-name {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.3px;
+    }
+
+    .event-message {
+      margin-top: 3px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .event-success {
+      border-left-color: #22c55e;
+    }
+
+    .event-warning {
+      border-left-color: #f59e0b;
+    }
+
+    .event-critical {
+      border-left-color: #ef4444;
+    }
+
+    .event-info {
+      border-left-color: #60a5fa;
+    }
+
+
+    .recovery-panel {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .recovery-panel h2 {
+      margin-top: 0;
+    }
+
+    .recovery-success {
+      border-left: 4px solid #22c55e;
+    }
+
+    .recovery-warning {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .recovery-critical {
+      border-left: 4px solid #ef4444;
+    }
+
+    #recovery-detail {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #9ca3af;
+      line-height: 1.5;
+    }
+
+
+
+    .grid .card {
+
+      min-height: 108px;
+
+      display: flex;
+
+      flex-direction: column;
+
+      justify-content: center;
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    .grid .label {
+
+      line-height: 1.2;
+
+    }
+
+
+
+    .grid .value {
+
+      line-height: 1.15;
+
+      overflow-wrap: anywhere;
+
+    }
+
+
+
+    .connection-summary-strip {
+
+      display: grid;
+
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+
+      gap: 15px;
+
+      margin-top: 15px;
+
+    }
+
+
+
+    .connection-summary-strip .card {
+
+      min-height: 92px;
+
+    }
+
+
+
+    @media (max-width: 1200px) {
+
+      .grid {
+
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+
+      }
+
+    }
+
+
+
+    @media (max-width: 750px) {
+
+      .grid,
+
+      .connection-summary-strip {
+
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+
+      }
+
+    }
+
+
+
+    @media (max-width: 480px) {
+
+      .grid,
+
+      .connection-summary-strip {
+
+        grid-template-columns: 1fr;
+
+      }
+
+    }
+
+
+
+
+
+    /* NodeSmart 5x3 card alignment fixes */
+
+    .grid .card {
+
+      justify-content: flex-start;
+
+      padding: 16px 18px;
+
+    }
+
+
+
+    .grid .label {
+
+      margin-top: 0;
+
+      margin-bottom: 8px;
+
+    }
+
+
+
+    #last-session {
+
+      font-size: 19px;
+
+      white-space: nowrap;
+
+    }
+
+
+
+
+    /* Final top-card spacing tune */
+
+    .grid .card {
+
+      padding: 13px 16px 14px;
+
+      min-height: 104px;
+
+      justify-content: flex-start;
+
+    }
+
+
+
+    .grid .label {
+
+      margin-top: 0;
+
+      margin-bottom: 6px;
+
+      font-size: 14px;
+
+      line-height: 1.15;
+
+    }
+
+
+
+    .grid .value {
+
+      font-size: 23px;
+
+      line-height: 1.12;
+
+    }
+
+
+
+    #last-session {
+
+      font-size: 17px;
+
+      line-height: 1.15;
+
+      white-space: nowrap;
+
+      letter-spacing: -0.2px;
+
+    }
+
+
+
+    #lastcheck {
+
+      font-size: 15px !important;
+
+      line-height: 1.15;
+
+    }
+
+
+
+
+    /* Give card values a little breathing room below titles */
+
+    .grid .value {
+
+      margin-top: 5px;
+
+    }
+
+
+
+    #last-session {
+
+      margin-top: 5px;
+
+    }
+
+
+
+
+    /* Clean Last Health Check display */
+
+    #lastcheck {
+
+      font-size: 15px !important;
+
+      line-height: 1.25;
+
+      white-space: normal;
+
+    }
+
+
+
+
+    /* Final top-card value position */
+
+    .grid .value {
+
+      margin-top: 12px;
+
+    }
+
+
+
+    #last-session {
+
+      margin-top: 12px;
+
+    }
+
+
+
+
+    /* Compact statistics inside Recent Sessions */
+
+    .session-stats {
+
+      display: grid;
+
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+
+      gap: 12px;
+
+      margin: 4px 0 16px;
+
+    }
+
+
+
+    .session-stat {
+
+      background: #273449;
+
+      border-radius: 9px;
+
+      padding: 12px 14px;
+
+      box-sizing: border-box;
+
+    }
+
+
+
+    .session-stat-label {
+
+      color: #9ca3af;
+
+      font-size: 13px;
+
+      margin-bottom: 7px;
+
+    }
+
+
+
+    .session-stat-value {
+
+      font-size: 18px;
+
+      font-weight: bold;
+
+      line-height: 1.2;
+
+    }
+
+
+
+    @media (max-width: 750px) {
+
+      .session-stats {
+
+        grid-template-columns: 1fr;
+
+      }
+
+    }
+
+
+
+
+    /* Center informational text in top dashboard cards */
+
+    .grid .card {
+
+      text-align: center;
+
+      align-items: center;
+
+    }
+
+
+
+    .grid .label,
+
+    .grid .value {
+
+      width: 100%;
+
+      text-align: center;
+
+    }
+
+
+
+
+    /* Lower centered content slightly within top cards */
+
+    .grid .card {
+
+      padding-top: 21px;
+
+    }
+
+
+</style>
+
+</head>
+
+
+
+<body>
+
+  <div class="wrap">
+
+    <h1>NodeSmart</h1>
+
+    <div id="node-identity" class="sub">Loading...</div>
+
+
+
+    <div class="grid">
+
+      <div class="card">
+
+        <div class="label">Overall Status</div>
+
+        <div id="status" class="value">Loading...</div>
+        <div id="healthreason" class="health-reason"></div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">Asterisk</div>
+
+        <div id="asterisk" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">Internet</div>
+
+        <div id="internet" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">SkywarnPlus</div>
+
+        <div id="skywarn" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">Connected Nodes</div>
+
+        <div id="nodes" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">Last Health Check</div>
+
+        <div id="lastcheck" class="value" style="font-size:16px;">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">CPU Temperature</div>
+
+        <div id="cputemp" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">System Uptime</div>
+
+        <div id="uptime" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">Memory Usage</div>
+
+        <div id="memory" class="value">Loading...</div>
+
+      </div>
+
+
+
+      <div class="card">
+
+        <div class="label">Disk Usage</div>
+
+        <div id="disk" class="value">Loading...</div>
+
+      </div>
+
+
+
+
+      <div class="card">
+        <div class="label">Connections Today</div>
+        <div id="connections-today" class="value">0</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Connected Time Today</div>
+        <div id="connected-time-today" class="value">0m</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Last Session</div>
+        <div id="last-session" class="value">None</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Active Connections</div>
+        <div id="active-connections" class="value">0</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Current Session</div>
+        <div id="current-session" class="value">None</div>
+      </div>
+
+    </div>
+
+
+
+
+
+    <div id="intelligence-panel" class="events-panel">
+      <h2>NodeSmart Intelligence</h2>
+      <div id="intelligence-summary">Loading intelligence...</div>
+      <div id="intelligence-details" style="margin-top:12px;font-size:14px;color:#9ca3af;"></div>
+      <div id="intelligence-recommendation" style="margin-top:10px;font-size:14px;"></div>
+
+
+
+      <div id="incident-history" style="margin-top:18px;">
+
+        <div style="font-size:13px;font-weight:600;color:#d1d5db;margin-bottom:8px;">
+
+          Recent Incidents
+
+        </div>
+
+        <div id="incident-list" style="font-size:14px;color:#9ca3af;">
+
+          No recent incidents.
+
+        </div>
+
+      </div>
+    </div>
+
+    <div class="controls-panel">
+      <h2>NodeSmart Controls</h2>
+
+      <div class="controls-grid">
+        <button id="btn-dodropin-connect" class="control-button" onclick="runControl('dodropin-connect', this)">DODROPIN Connect</button>
+        <button id="btn-dodropin-disconnect" class="control-button" onclick="runControl('dodropin-disconnect', this)">DODROPIN Disconnect</button>
+        <button id="btn-skywarn-on" class="control-button" onclick="runControl('skywarn-enable', this)">Skywarn On</button>
+        <button id="btn-skywarn-off" class="control-button" onclick="runControl('skywarn-disable', this)">Skywarn Off</button>
+      </div>
+
+      <div class="manual-node-control">
+
+        <h3>Manual Node Connection</h3>
+
+        <div class="manual-node-row">
+
+          <input
+
+            id="manual-node-number"
+
+            type="text"
+
+            inputmode="numeric"
+
+            maxlength="10"
+
+            placeholder="Enter node number"
+
+            autocomplete="off">
+
+
+
+          <button class="control-button"
+
+                  onclick="runNodeControl('node-connect', this)">
+
+            Connect
+
+          </button>
+
+
+
+          <button class="control-button"
+
+                  onclick="runNodeControl('node-disconnect', this)">
+
+            Disconnect
+
+          </button>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="node-directory">
+
+        <h3>Search AllStar Nodes</h3>
+
+
+
+        <div class="node-search-row">
+
+          <input
+
+            id="node-directory-search"
+
+            type="text"
+
+            placeholder="Node, callsign, location..."
+
+            autocomplete="off">
+
+
+
+          <button class="control-button"
+
+                  onclick="searchAllStarNodes()">
+
+            Search
+
+          </button>
+
+        </div>
+
+
+
+        <div id="node-directory-toolbar" class="node-directory-toolbar">
+
+          <button class="control-button" onclick="closeNodeDirectory()">
+
+            Close Results
+
+          </button>
+
+        </div>
+
+
+
+        <iframe
+
+          id="node-directory-frame"
+
+          title="AllStarLink Node Directory">
+
+        </iframe>
+
+      </div>
+
+
+
+      <div id="control-result"></div>
+    </div>
+
+    <div id="recovery-panel" class="recovery-panel recovery-success">
+      <h2>Automatic Recovery</h2>
+      <div id="recovery-status" class="value">Loading...</div>
+      <div id="recovery-detail"></div>
+    </div>
+
+    <div class="events-panel">
+      <h2>Recent Sessions</h2>
+
+      <div class="session-stats">
+        <div class="session-stat">
+          <div class="session-stat-label">Longest Session Today</div>
+          <div id="longest-session-today" class="session-stat-value">None</div>
+        </div>
+
+        <div class="session-stat">
+          <div class="session-stat-label">Completed Today</div>
+          <div id="completed-connections-today" class="session-stat-value">0</div>
+        </div>
+
+        <div class="session-stat">
+          <div class="session-stat-label">Completed Time Today</div>
+          <div id="completed-time-today" class="session-stat-value">0s</div>
+        </div>
+      </div>
+
+      <div id="recent-sessions">No connection history yet</div>
+    </div>
+
+    <div class="events-panel">
+
+      <h2>Recent Events</h2>
+
+      <div id="events">Loading events...</div>
+
+    </div>
+
+
+
+    <div id="error"></div>
+
+  </div>
+
+
+
+  <script>
+
+    async function runControl(action, button) {
+      const resultElement = document.getElementById('control-result');
+      const originalText = button.textContent;
+
+      button.disabled = true;
+      button.textContent = 'Working...';
+      resultElement.textContent = '';
+
+      try {
+        const response = await fetch('/api/control/' + action, {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || 'Control action failed');
+        }
+
+        resultElement.textContent = 'Command completed successfully.';
+
+        setTimeout(loadStatus, 1000);
+      } catch (error) {
+        resultElement.textContent = 'Error: ' + error.message;
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
+
+    async function runNodeControl(action, button) {
+
+      const input = document.getElementById('manual-node-number');
+
+      const resultElement = document.getElementById('control-result');
+
+      const node = input.value.trim();
+
+      const originalText = button.textContent;
+
+
+
+      if (!/^\d{1,10}$/.test(node)) {
+
+        resultElement.textContent = 'Enter a valid numeric node number.';
+
+        input.focus();
+
+        return;
+
+      }
+
+
+
+      button.disabled = true;
+
+      button.textContent = 'Working...';
+
+      resultElement.textContent = '';
+
+
+
+      try {
+
+        const response = await fetch('/api/control/' + action, {
+
+          method: 'POST',
+
+          headers: {
+
+            'Content-Type': 'application/json'
+
+          },
+
+          body: JSON.stringify({ node: node })
+
+        });
+
+
+
+        const result = await response.json();
+
+
+
+        if (!response.ok || !result.ok) {
+
+          throw new Error(result.error || 'Node control action failed');
+
+        }
+
+
+
+        resultElement.textContent = result.message;
+
+        setTimeout(loadStatus, 1000);
+
+
+
+      } catch (error) {
+
+        resultElement.textContent = 'Error: ' + error.message;
+
+
+
+      } finally {
+
+        button.disabled = false;
+
+        button.textContent = originalText;
+
+      }
+
+    }
+
+
+
+    function searchAllStarNodes() {
+
+      const input = document.getElementById('node-directory-search');
+
+      const frame = document.getElementById('node-directory-frame');
+
+      const query = input.value.trim();
+
+
+
+      if (!query) {
+
+        return;
+
+      }
+
+
+
+      frame.src =
+
+        'https://www.allstarlink.org/nodelist/?s=' +
+
+        encodeURIComponent(query);
+
+
+
+      frame.style.display = 'block';
+
+
+
+      const toolbar = document.getElementById('node-directory-toolbar');
+
+      if (toolbar) {
+
+        toolbar.style.display = 'flex';
+
+      }
+
+    }
+
+
+
+    function closeNodeDirectory() {
+
+      const frame = document.getElementById('node-directory-frame');
+
+      const toolbar = document.getElementById('node-directory-toolbar');
+
+
+
+      frame.style.display = 'none';
+
+      frame.src = '';
+
+
+
+      if (toolbar) {
+
+        toolbar.style.display = 'none';
+
+      }
+
+    }
+
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+      const searchInput = document.getElementById('node-directory-search');
+
+
+
+      if (searchInput) {
+
+        searchInput.addEventListener('keydown', event => {
+
+          if (event.key === 'Enter') {
+
+            searchAllStarNodes();
+
+          }
+
+        });
+
+      }
+
+    });
+
+
+
+    let connectedTimeSnapshotSeconds = 0;
+    let connectedTimeSnapshotAt = Date.now();
+    let activeConnectionCount = 0;
+    let currentSessionStartedAt = null;
+    let currentSessionName = null;
+
+
+    function formatConnectedTime(seconds) {
+      seconds = Number(seconds || 0);
+
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+
+      if (hours > 0) {
+        return hours + 'h ' + minutes + 'm';
+      }
+
+      return minutes + 'm';
+    }
+
+    function updateCurrentSession() {
+      const element = document.getElementById('current-session');
+
+      if (!element) return;
+
+      if (!currentSessionStartedAt || !currentSessionName) {
+        element.textContent = 'None';
+        return;
+      }
+
+      const started = new Date(currentSessionStartedAt).getTime();
+
+      if (Number.isNaN(started)) {
+        element.textContent = currentSessionName;
+        return;
+      }
+
+      const elapsed = Math.max(
+        0,
+        Math.floor((Date.now() - started) / 1000)
+      );
+
+      const hours = Math.floor(elapsed / 3600);
+      const minutes = Math.floor((elapsed % 3600) / 60);
+      const seconds = elapsed % 60;
+
+      let duration;
+
+      if (hours > 0) {
+        duration = hours + 'h ' + minutes + 'm ' + seconds + 's';
+      } else if (minutes > 0) {
+        duration = minutes + 'm ' + seconds + 's';
+      } else {
+        duration = seconds + 's';
+      }
+
+      element.textContent = currentSessionName + ' — ' + duration;
+    }
+
+    function updateLiveConnectedTime() {
+      const element = document.getElementById('connected-time-today');
+
+      if (!element) return;
+
+      let total = connectedTimeSnapshotSeconds;
+
+      if (activeConnectionCount > 0) {
+        const elapsed = Math.max(
+          0,
+          Math.floor((Date.now() - connectedTimeSnapshotAt) / 1000)
+        );
+
+        total += elapsed * activeConnectionCount;
+      }
+
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = Math.floor(total % 60);
+
+      if (hours > 0) {
+        element.textContent =
+          hours + 'h ' + minutes + 'm ' + seconds + 's';
+      } else if (minutes > 0) {
+        element.textContent =
+          minutes + 'm ' + seconds + 's';
+      } else {
+        element.textContent = seconds + 's';
+      }
+    }
+
+    function updateControlStates(data) {
+      const connectedNodes = (data.connected_nodes || []).map(String);
+      const friendlyNodes = data.friendly_nodes || {};
+
+      const dodropinNode = Object.keys(friendlyNodes).find(
+
+        node => String(friendlyNodes[node]).toUpperCase() === 'DODROPIN'
+
+      );
+
+      const dodropinConnected =
+
+        dodropinNode ? connectedNodes.includes(String(dodropinNode)) : false;
+
+      const connectButton = document.getElementById('btn-dodropin-connect');
+      const disconnectButton = document.getElementById('btn-dodropin-disconnect');
+      const skywarnOnButton = document.getElementById('btn-skywarn-on');
+      const skywarnOffButton = document.getElementById('btn-skywarn-off');
+
+      if (connectButton) connectButton.disabled = dodropinConnected;
+      if (disconnectButton) disconnectButton.disabled = !dodropinConnected;
+
+      const skywarnEnabled = data.skywarn === 'enabled';
+
+      if (skywarnOnButton) skywarnOnButton.disabled = skywarnEnabled;
+      if (skywarnOffButton) skywarnOffButton.disabled = !skywarnEnabled;
+    }
+
+    async function loadRecoveryStatus() {
+      const statusElement = document.getElementById('recovery-status');
+      const detailElement = document.getElementById('recovery-detail');
+      const recoveryPanel = document.getElementById('recovery-panel');
+
+
+      try {
+        const response = await fetch('/state/recovery.json?ts=' + Date.now());
+
+        if (!response.ok) {
+          throw new Error('Recovery state unavailable');
+        }
+
+        const data = await response.json();
+
+        const intelligenceResponse =
+          await fetch('/state/intelligence.json?ts=' + Date.now());
+
+        const intelligenceData =
+          await intelligenceResponse.json();
+
+        data.intelligence = intelligenceData;
+        const last = data.last_recovery;
+
+        // Successful recovery results remain prominent for 6 hours.
+        const recoveryDisplayResetHours = 6;
+
+        if (last && last.status === 'success' && last.timestamp) {
+          const recoveryTime = new Date(last.timestamp);
+
+          if (!Number.isNaN(recoveryTime.getTime())) {
+            const recoveryAgeHours =
+              (Date.now() - recoveryTime.getTime()) / 3600000;
+
+            if (recoveryAgeHours >= recoveryDisplayResetHours) {
+              statusElement.textContent = 'Ready';
+              statusElement.className = 'value normal';
+              detailElement.textContent = 'No recent recovery actions.';
+
+              if (recoveryPanel) {
+                recoveryPanel.classList.remove(
+                  'recovery-warning',
+                  'recovery-critical'
+                );
+                recoveryPanel.classList.add('recovery-success');
+              }
+
+              return;
+            }
+          }
+        }
+
+        if (recoveryPanel) {
+          recoveryPanel.classList.remove(
+            'recovery-success',
+            'recovery-warning',
+            'recovery-critical'
+          );
+        }
+
+        if (!last) {
+          statusElement.textContent = 'No recovery actions yet';
+          if (recoveryPanel) recoveryPanel.classList.add('recovery-success');
+          statusElement.className = 'value normal';
+          detailElement.textContent = '';
+          return;
+        }
+
+        statusElement.classList.remove(
+          'normal', 'warning', 'critical', 'unknown'
+        );
+
+        if (last.status === 'success') {
+          statusElement.textContent = 'Last recovery successful';
+          if (recoveryPanel) recoveryPanel.classList.add('recovery-success');
+          statusElement.classList.add('normal');
+        } else if (last.status === 'failed') {
+          statusElement.textContent = 'Recovery failed';
+          if (recoveryPanel) recoveryPanel.classList.add('recovery-critical');
+          statusElement.classList.add('critical');
+        } else {
+          statusElement.textContent = 'Recovery cancelled';
+          if (recoveryPanel) recoveryPanel.classList.add('recovery-warning');
+          statusElement.classList.add('warning');
+        }
+
+        let timestamp = '';
+
+        if (last.timestamp) {
+          const parsed = new Date(last.timestamp);
+          if (!Number.isNaN(parsed.getTime())) {
+            timestamp = parsed.toLocaleString();
+          }
+        }
+
+        const component =
+          last.component === 'asterisk' ? 'Asterisk' : last.component;
+
+        detailElement.textContent =
+          component + ': ' + last.message +
+          (timestamp ? ' — ' + timestamp : '');
+
+      } catch (error) {
+        statusElement.textContent = 'Recovery status unavailable';
+        statusElement.className = 'value unknown';
+        detailElement.textContent = '';
+      }
+    }
+
+    async function loadStatus() {
+
+      try {
+
+        const response = await fetch('/state/system.json?ts=' + Date.now());
+
+        const data = await response.json();
+
+
+
+        const identity = document.getElementById('node-identity');
+
+
+
+        if (identity) {
+
+          identity.textContent =
+
+            (data.node || 'Unknown Node') + ' — ' +
+
+            (data.callsign || 'Unknown Callsign');
+
+        }
+
+
+
+        setValue('status', data.status);
+
+        setValue('asterisk', data.asterisk);
+
+        setValue('internet', data.internet);
+
+        setValue('skywarn', data.skywarn);
+
+        updateControlStates(data);
+
+        const intelligenceElement =
+          document.getElementById('intelligence-summary');
+
+        const intelligenceDetails =
+          document.getElementById('intelligence-details');
+
+        const intelligence = data.intelligence || {};
+
+        const intelligenceRecommendation =
+          document.getElementById('intelligence-recommendation');
+
+        if (intelligenceRecommendation) {
+          const recommendation = intelligence.recommendation || {};
+
+          intelligenceRecommendation.textContent =
+            recommendation.message || 'No recommendation available.';
+
+          const priority =
+            String(recommendation.priority || 'normal').toLowerCase();
+
+          intelligenceRecommendation.style.fontWeight =
+            priority === 'critical' ? '600' : '400';
+
+          intelligenceRecommendation.style.color =
+            priority === 'critical' ? '#ef4444' :
+            priority === 'warning' ? '#f59e0b' : '#9ca3af';
+        }
+
+        if (intelligenceElement) {
+          intelligenceElement.textContent =
+            intelligence.summary ||
+            data.intelligence_summary ||
+            'Node intelligence is unavailable.';
+        }
+
+        if (intelligenceDetails) {
+          const level =
+            String(intelligence.level || 'unknown').toUpperCase();
+
+          const attention =
+            intelligence.attention_required ? 'YES' : 'NO';
+
+          const incidents =
+            intelligence.recent_incidents ?? 0;
+
+          const failures1h =
+            intelligence.asterisk_failures_1h ?? 0;
+
+          const failures24h =
+            intelligence.asterisk_failures_24h ?? 0;
+
+          const recoveries24h =
+            intelligence.recovery_successes_24h ?? 0;
+
+          const unresolved =
+            intelligence.unresolved_issues || [];
+
+          let details =
+            'Level: ' + level +
+            ' &nbsp;•&nbsp; Attention: ' + attention +
+            ' &nbsp;•&nbsp; Recent incidents: ' + incidents +
+            '<br>' +
+            'Asterisk failures: ' + failures1h + ' (1h), ' +
+            failures24h + ' (24h)' +
+            ' &nbsp;•&nbsp; Recoveries: ' + recoveries24h + ' (24h)';
+
+          if (unresolved.length) {
+            details += '<br>Unresolved: ' +
+              unresolved.map(item => String(item)).join('; ');
+          }
+
+          intelligenceDetails.innerHTML = details;
+        }
+
+
+        const incidentList =
+
+          document.getElementById('incident-list');
+
+
+
+        if (incidentList) {
+
+          const incidentRecords = intelligence.incidents || [];
+
+
+
+          if (!incidentRecords.length) {
+
+            incidentList.textContent = 'No recent incidents.';
+
+          } else {
+
+            incidentList.innerHTML = incidentRecords
+
+              .slice(-3)
+
+              .reverse()
+
+              .map(incident => {
+
+                const component =
+
+                  String(incident.component || 'system').toUpperCase();
+
+
+
+                const resolved = incident.resolved === true;
+
+                const outcome =
+
+                  String(incident.recovery_outcome || '').toLowerCase();
+
+
+
+                let statusText = 'Unresolved';
+
+                let statusColor = '#ef4444';
+
+
+
+                if (resolved && outcome === 'success') {
+
+                  statusText = 'Recovered automatically';
+
+                  statusColor = '#22c55e';
+
+                } else if (resolved) {
+
+                  statusText = 'Resolved';
+
+                  statusColor = '#22c55e';
+
+                } else if (outcome === 'failed') {
+
+                  statusText = 'Recovery failed';
+
+                }
+
+
+
+                let durationText = '';
+
+
+
+                if (incident.duration_seconds != null) {
+
+                  const seconds = Number(incident.duration_seconds);
+
+
+
+                  if (seconds >= 60) {
+
+                    const minutes = Math.floor(seconds / 60);
+
+                    const remainder = seconds % 60;
+
+                    durationText = minutes + 'm ' + remainder + 's';
+
+                  } else {
+
+                    durationText = seconds + ' seconds';
+
+                  }
+
+                }
+
+
+
+                let timeText = '';
+
+
+
+                if (incident.started_at) {
+
+                  const parsed = new Date(incident.started_at);
+
+
+
+                  if (!Number.isNaN(parsed.getTime())) {
+
+                    timeText = parsed.toLocaleString();
+
+                  }
+
+                }
+
+
+
+                const summary =
+
+                  incident.summary || 'Incident details unavailable.';
+
+
+
+                return `
+
+                  <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.08);">
+
+                    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+
+                      <strong style="color:#e5e7eb;">${component}</strong>
+
+                      <span style="color:${statusColor};font-size:12px;font-weight:600;">
+
+                        ${statusText}
+
+                      </span>
+
+                    </div>
+
+
+
+                    <div style="margin-top:5px;color:#d1d5db;">
+
+                      ${summary}
+
+                    </div>
+
+
+
+                    <div style="margin-top:4px;font-size:12px;color:#6b7280;">
+
+                      ${timeText}
+
+                      ${durationText ? ' • ' + durationText : ''}
+
+                    </div>
+
+                  </div>
+
+                `;
+
+              })
+
+              .join('');
+
+          }
+
+        }
+
+
+
+          const intelligencePanel =
+          document.getElementById('intelligence-panel');
+
+        if (intelligencePanel) {
+          const level = intelligence.level || 'unknown';
+
+          intelligencePanel.classList.remove(
+            'intelligence-normal',
+            'intelligence-warning',
+            'intelligence-critical',
+            'intelligence-unknown'
+          );
+
+          intelligencePanel.classList.add(
+            'intelligence-' + level
+          );
+        }
+
+        const connectionStats = data.connection_stats || {};
+
+        document.getElementById('connections-today').textContent =
+          connectionStats.connections_today ?? 0;
+
+        const completedConnectionsElement =
+          document.getElementById('completed-connections-today');
+
+        if (completedConnectionsElement) {
+          completedConnectionsElement.textContent =
+            connectionStats.completed_connections_today ?? 0;
+        }
+
+        const completedTimeElement =
+          document.getElementById('completed-time-today');
+
+        if (completedTimeElement) {
+          completedTimeElement.textContent = formatConnectedTime(
+            connectionStats.completed_connected_seconds_today || 0
+          );
+        }
+
+        connectedTimeSnapshotSeconds =
+          Number(connectionStats.connected_seconds_today || 0);
+
+        activeConnectionCount =
+          Number(connectionStats.active_connections || 0);
+
+        const activeElement =
+          document.getElementById('active-connections');
+
+        if (activeElement) {
+          activeElement.textContent = activeConnectionCount;
+        }
+
+        currentSessionStartedAt = null;
+        currentSessionName = null;
+
+        const activeNodes = (data.connected_nodes || []).map(String);
+        const connectedSince = data.connected_since || {};
+
+        if (activeNodes.length === 1) {
+          const node = activeNodes[0];
+
+          currentSessionName =
+            data.friendly_nodes?.[node] || 'Node ' + node;
+
+          currentSessionStartedAt = connectedSince[node] || null;
+        } else if (activeNodes.length > 1) {
+          currentSessionName = activeNodes.length + ' active links';
+        }
+
+        updateCurrentSession();
+
+        connectedTimeSnapshotAt = Date.now();
+
+        updateLiveConnectedTime();
+
+        const lastSession = document.getElementById('last-session');
+        if (connectionStats.last_session) {
+          const session = connectionStats.last_session;
+          const name = session.name || ('Node ' + session.node);
+          const duration = formatConnectedTime(session.duration_seconds);
+          lastSession.textContent = name + ' — ' + duration;
+        } else {
+          lastSession.textContent = 'None';
+        }
+
+        const longestSessionElement =
+          document.getElementById('longest-session-today');
+
+        const longestSession = connectionStats.longest_session_today;
+
+        if (longestSessionElement) {
+          if (longestSession) {
+            const node = String(longestSession.node || '');
+            const name =
+              longestSession.name ||
+              data.friendly_nodes?.[node] ||
+              ('Node ' + node);
+
+            const duration = formatConnectedTime(
+              longestSession.duration_seconds
+            );
+
+            longestSessionElement.textContent =
+              name + ' — ' + duration +
+              (longestSession.active ? ' (active)' : '');
+          } else {
+            longestSessionElement.textContent = 'None';
+          }
+        }
+
+        const recentSessionsElement =
+          document.getElementById('recent-sessions');
+
+        const recentSessions = connectionStats.recent_sessions || [];
+
+        if (recentSessionsElement) {
+          if (recentSessions.length) {
+            recentSessionsElement.innerHTML = recentSessions.map(session => {
+              const node = String(session.node || '');
+              const name =
+                session.name ||
+                data.friendly_nodes?.[node] ||
+                ('Node ' + node);
+
+              const duration = formatConnectedTime(
+                session.duration_seconds
+              );
+
+              let ended = '';
+
+              if (session.disconnected_at) {
+                const parsed = new Date(session.disconnected_at);
+
+                if (!Number.isNaN(parsed.getTime())) {
+                  ended = parsed.toLocaleString();
+                }
+              }
+
+              return (
+                '<div class="event-row event-info">' +
+                  '<div class="event-content">' +
+                    '<div class="event-name">' + name +
+                    ' (' + node + ')</div>' +
+                    '<div class="event-message">' +
+                    duration +
+                    (ended ? ' — ended ' + ended : '') +
+                    '</div>' +
+                  '</div>' +
+                '</div>'
+              );
+            }).join('');
+          } else {
+            recentSessionsElement.textContent =
+              'No connection history yet';
+          }
+        }
+        const health = data.health || {};
+
+        function applyHealthClass(id, state) {
+          const element = document.getElementById(id);
+
+          if (!element) return;
+
+          element.classList.remove(
+            'normal',
+            'warning',
+            'critical',
+            'unknown'
+          );
+
+          if (state) {
+            element.classList.add(state);
+          }
+        }
+
+        const healthReason = document.getElementById('healthreason');
+
+        if (healthReason) {
+          if (data.health_reasons && data.health_reasons.length) {
+            healthReason.innerHTML = data.health_reasons.join('<br>');
+          } else {
+            healthReason.textContent = '';
+          }
+        }
+
+
+
+        const nodeNames = data.friendly_nodes || {};
+
+
+
+        const nodesElement = document.getElementById('nodes');
+
+
+
+        if (data.connected_nodes.length) {
+
+          nodesElement.innerHTML = data.connected_nodes.map(node => {
+
+            const name = nodeNames[node] || `Node ${node}`;
+
+            const started = data.connected_since?.[node];
+
+
+
+            let duration = '';
+
+
+
+            if (started) {
+
+              const seconds = Math.max(
+
+                0,
+
+                Math.floor((Date.now() - new Date(started).getTime()) / 1000)
+
+              );
+
+
+
+              const hours = Math.floor(seconds / 3600);
+
+              const minutes = Math.floor((seconds % 3600) / 60);
+
+              const secs = seconds % 60;
+
+
+
+              const timer =
+
+                String(hours).padStart(2, '0') + ':' +
+
+                String(minutes).padStart(2, '0') + ':' +
+
+                String(secs).padStart(2, '0');
+
+
+
+              duration =
+
+                `<div style="font-size:14px;color:#9ca3af;margin-top:6px;">Connected ${timer}</div>`;
+
+            }
+
+
+
+            return `<div>${name} (${node})${duration}</div>`;
+
+          }).join('');
+
+        } else {
+
+          nodesElement.textContent = 'None';
+
+        }
+
+
+
+        document.getElementById('cputemp').textContent =
+
+          data.cpu_temp_c != null ? data.cpu_temp_c.toFixed(1) + ' °C' : 'N/A';
+
+
+
+        document.getElementById('memory').textContent =
+
+          data.memory_percent != null ? data.memory_percent.toFixed(1) + '%' : 'N/A';
+
+
+
+        document.getElementById('disk').textContent =
+
+          data.disk_percent != null ? data.disk_percent.toFixed(1) + '%' : 'N/A';
+
+        applyHealthClass('cputemp', health.cpu);
+        applyHealthClass('memory', health.memory);
+        applyHealthClass('disk', health.disk);
+
+
+
+        if (data.uptime_seconds != null) {
+
+          const days = Math.floor(data.uptime_seconds / 86400);
+
+          const hours = Math.floor((data.uptime_seconds % 86400) / 3600);
+
+          const minutes = Math.floor((data.uptime_seconds % 3600) / 60);
+
+
+
+          document.getElementById('uptime').textContent =
+
+            `${days}d ${hours}h ${minutes}m`;
+
+        } else {
+
+          document.getElementById('uptime').textContent = 'N/A';
+
+        }
+
+
+
+        {
+          const d = new Date(data.last_health_check);
+          const datePart = d.toLocaleDateString();
+          const timePart = d.toLocaleTimeString();
+          document.getElementById('lastcheck').innerHTML =
+            datePart + '<br>' + timePart;
+        }
+
+
+
+        document.getElementById('error').textContent = '';
+
+      } catch (err) {
+
+        document.getElementById('error').textContent =
+
+          'Unable to load NodeSmart system state.';
+
+      }
+
+    }
+
+
+
+    function setValue(id, value) {
+
+      const element = document.getElementById(id);
+
+      element.textContent = value.toUpperCase();
+
+      element.className = 'value ' + value;
+
+    }
+
+
+
+    let eventsExpanded = false;
+
+    function toggleEvents() {
+      eventsExpanded = !eventsExpanded;
+      loadEvents();
+    }
+
+    async function loadEvents() {
+
+      try {
+
+        const response = await fetch('/web/events.log?ts=' + Date.now());
+
+        const text = await response.text();
+
+
+
+        const allLines = text
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .reverse();
+
+        const lines = eventsExpanded
+          ? allLines
+          : allLines.slice(0, 10);
+
+
+
+        const container = document.getElementById('events');
+
+
+
+        if (!lines.length) {
+
+          container.textContent = 'No recent events.';
+
+          return;
+
+        }
+
+
+
+        container.innerHTML = lines
+          .map(line => {
+            const parts = line.split(' | ');
+            const timestamp = parts[0] || '';
+            const event = parts[1] || '';
+            const message = parts.slice(2).join(' | ');
+
+            let eventClass = 'event-info';
+
+            if (
+              event.includes('.FAILED') ||
+              event.includes('.FAULT') ||
+              event.includes('.CRITICAL') ||
+              event.includes('.OFFLINE')
+            ) {
+              eventClass = 'event-critical';
+            } else if (
+              event.includes('.DEGRADED') ||
+              event.includes('.WARNING') ||
+              event.includes('.CANCELLED')
+            ) {
+              eventClass = 'event-warning';
+            } else if (
+              event.includes('.SUCCESS') ||
+              event.includes('.HEALTHY') ||
+              event.includes('.NORMAL') ||
+              event.includes('.ONLINE') ||
+              event.includes('.ENABLED')
+            ) {
+              eventClass = 'event-success';
+            }
+
+            let displayTime = timestamp;
+            const parsedTime = new Date(timestamp);
+
+            if (!Number.isNaN(parsedTime.getTime())) {
+              displayTime = parsedTime.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              });
+            }
+
+            const label = event
+              .replaceAll('.', ' ')
+              .replaceAll('_', ' ');
+
+            return `
+              <div class="event-row ${eventClass}">
+                <div class="event-time">${displayTime}</div>
+                <div class="event-content">
+                  <div class="event-name">${label}</div>
+                  <div class="event-message">${message}</div>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+
+        if (allLines.length > 10) {
+          container.innerHTML += `
+            <div style="text-align:center; margin-top:16px;">
+              <button type="button" onclick="toggleEvents()"
+                style="padding:10px 18px; border:0; border-radius:8px; cursor:pointer;">
+                ${eventsExpanded ? 'Show Less' : 'Show More'}
+              </button>
+            </div>
+          `;
+        }
+
+
+
+      } catch (err) {
+
+        document.getElementById('events').textContent =
+
+          'Unable to load event history.';
+
+      }
+
+    }
+
+
+
+    loadStatus();
+    loadRecoveryStatus();
+
+    loadEvents();
+
+
+
+    setInterval(loadStatus, 5000);
+
+    setInterval(loadEvents, 5000);
+
+    setInterval(loadRecoveryStatus, 5000);
+    setInterval(updateLiveConnectedTime, 1000);
+    setInterval(updateCurrentSession, 1000);
+
+  </script>
+
+</body>
+
+</html>
