@@ -93,6 +93,32 @@ fi
 echo "Validating Python files..."
 /usr/bin/python3 -m py_compile "${INSTALL_ROOT}/core/config.py" "${INSTALL_ROOT}/core/monitor.py" || fail "Python syntax validation failed."
 
+echo "Configuring dashboard firewall access..."
+WEB_PORT="$("/usr/bin/python3" -c 'import json,sys; print(json.load(open(sys.argv[1]))["web"]["port"])' "${INSTALL_ROOT}/config/nodesmart.json")"
+
+[[ "${WEB_PORT}" =~ ^[0-9]+$ ]] || fail "Invalid web.port in nodesmart.json"
+(( WEB_PORT >= 1 && WEB_PORT <= 65535 )) || fail "web.port must be between 1 and 65535"
+
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+  DEFAULT_INTERFACE="$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')"
+  FIREWALL_ZONE=""
+
+  if [[ -n "${DEFAULT_INTERFACE}" ]]; then
+    FIREWALL_ZONE="$(firewall-cmd --get-zone-of-interface="${DEFAULT_INTERFACE}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${FIREWALL_ZONE}" || "${FIREWALL_ZONE}" == "no zone" ]]; then
+    FIREWALL_ZONE="$(firewall-cmd --get-default-zone)"
+  fi
+
+  firewall-cmd --permanent --zone="${FIREWALL_ZONE}" --add-port="${WEB_PORT}/tcp" >/dev/null
+  firewall-cmd --reload >/dev/null
+  echo "Allowed NodeSmart dashboard TCP port ${WEB_PORT} in firewalld zone ${FIREWALL_ZONE}."
+else
+  echo "WARNING: Active firewalld was not detected."
+  echo "Ensure TCP port ${WEB_PORT} is allowed on the host firewall for dashboard access."
+fi
+
 echo "Enabling and starting NodeSmart..."
 /usr/bin/systemctl enable nodesmart
 /usr/bin/systemctl restart nodesmart

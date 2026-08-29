@@ -43,3 +43,43 @@ For troubleshooting:
 ```bash
 journalctl -u nodesmart -n 100 --no-pager
 ```
+
+
+
+## Dashboard Network Access
+
+
+
+NodeSmart listens on the TCP port configured by `web.port` in `config/nodesmart.json` (default: `8080`).
+
+
+
+During installation, if an active `firewalld` installation is detected, the installer automatically allows the configured NodeSmart dashboard port through the firewall zone associated with the system's default network interface.
+
+
+
+After installation, the dashboard can normally be reached from another device on the same local network at:
+
+
+
+    http://NODE_IP:8080/web/
+
+
+
+Replace `NODE_IP` with the IP address of the AllStarLink node and `8080` if a different `web.port` has been configured.
+
+
+
+If `firewalld` is not available or active, the installer will display a warning and the firewall may need to be configured manually.
+
+
+
+### Security
+
+
+
+NodeSmart does not configure router port forwarding and does not intentionally expose the dashboard to the public Internet.
+
+
+
+Because the NodeSmart dashboard includes node control functions, directly forwarding the dashboard port from the Internet is not recommended. Remote access should be provided through a secure method such as a VPN or authenticated reverse proxy.
