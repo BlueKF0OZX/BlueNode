@@ -75,6 +75,10 @@ Runtime directories (`events/`, `history/`, `logs/`, `state/`) and the live `con
 
 This is an alpha release. Test it on a node you can access directly before relying on automatic recovery or remote controls.
 
+## Author
+
+NodeSmart was originally created and developed by **BlueKF0OZX**.
+
 ## License
 
 MIT. See `LICENSE`.
