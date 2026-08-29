@@ -72,6 +72,24 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
 
+        # Prevent /web/../ paths from escaping the public web directory.
+
+        if path.startswith("/web/"):
+
+            web_root = (ROOT / "web").resolve()
+
+            requested = (ROOT / path.lstrip("/")).resolve()
+
+
+
+            if requested != web_root and web_root not in requested.parents:
+
+                self.send_error(404, "Not Found")
+
+                return
+
+
+
         if path == "/":
 
             self.send_response(302)
@@ -103,6 +121,24 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
     def do_HEAD(self):
 
         path = self.path.split('?', 1)[0]
+
+
+
+        # Prevent /web/../ paths from escaping the public web directory.
+
+        if path.startswith('/web/'):
+
+            web_root = (ROOT / 'web').resolve()
+
+            requested = (ROOT / path.lstrip('/')).resolve()
+
+
+
+            if requested != web_root and web_root not in requested.parents:
+
+                self.send_error(404, 'Not Found')
+
+                return
 
         if path.startswith('/web/') or path in self.ALLOWED_STATIC_PATHS:
             return super().do_HEAD()
