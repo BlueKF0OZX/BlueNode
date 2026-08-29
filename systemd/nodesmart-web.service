@@ -1,0 +1,25 @@
+[Unit]
+
+Description=NodeSmart Web Dashboard
+
+After=network.target
+
+
+[Service]
+
+Type=simple
+
+User=NODESMART_USER
+
+WorkingDirectory=/opt/nodesmart
+
+ExecStart=/usr/bin/python3 /opt/nodesmart/core/web_server.py
+
+Restart=always
+
+RestartSec=5
+
+
+[Install]
+
+WantedBy=multi-user.target

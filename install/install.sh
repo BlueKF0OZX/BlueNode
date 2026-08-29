@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 INSTALL_ROOT="/opt/nodesmart"
 SERVICE_FILE="/etc/systemd/system/nodesmart.service"
+WEB_SERVICE_FILE="/etc/systemd/system/nodesmart-web.service"
 SUDOERS_FILE="/etc/sudoers.d/nodesmart"
 
 fail() {
@@ -31,6 +32,7 @@ done
 
 [[ -f "${REPO_ROOT}/config/nodesmart.example.json" ]] || fail "Missing config/nodesmart.example.json"
 [[ -f "${REPO_ROOT}/systemd/nodesmart.service" ]] || fail "Missing systemd/nodesmart.service"
+[[ -f "${REPO_ROOT}/systemd/nodesmart-web.service" ]] || fail "Missing systemd/nodesmart-web.service"
 [[ -f "${REPO_ROOT}/install/nodesmart.sudoers.example" ]] || fail "Missing install/nodesmart.sudoers.example"
 
 echo "Preparing NodeSmart files and directories..."
@@ -45,6 +47,7 @@ if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
   cp -f "${REPO_ROOT}/install/nodesmart.sudoers.example" "${INSTALL_ROOT}/install/"
   cp -a "${REPO_ROOT}/install/helpers/." "${INSTALL_ROOT}/install/helpers/"
   cp -f "${REPO_ROOT}/systemd/nodesmart.service" "${INSTALL_ROOT}/systemd/"
+  cp -f "${REPO_ROOT}/systemd/nodesmart-web.service" "${INSTALL_ROOT}/systemd/"
 fi
 
 mkdir -p "${INSTALL_ROOT}/events" "${INSTALL_ROOT}/history" "${INSTALL_ROOT}/logs" "${INSTALL_ROOT}/state"
@@ -59,15 +62,19 @@ done
 echo "Installing restricted sudo permissions..."
 tmp_sudoers="$(mktemp)"
 tmp_service=""
-trap 'rm -f "${tmp_sudoers:-}" "${tmp_service:-}"' EXIT
+tmp_web_service=""
+trap 'rm -f "${tmp_sudoers:-}" "${tmp_service:-}" "${tmp_web_service:-}"' EXIT
 sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/install/nodesmart.sudoers.example" > "${tmp_sudoers}"
 /usr/sbin/visudo -cf "${tmp_sudoers}" >/dev/null || fail "Generated sudoers file failed validation."
 install -o root -g root -m 0440 "${tmp_sudoers}" "${SUDOERS_FILE}"
 
-echo "Installing systemd service..."
+echo "Installing systemd services..."
 tmp_service="$(mktemp)"
 sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/systemd/nodesmart.service" > "${tmp_service}"
 install -o root -g root -m 0644 "${tmp_service}" "${SERVICE_FILE}"
+tmp_web_service="$(mktemp)"
+sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/systemd/nodesmart-web.service" > "${tmp_web_service}"
+install -o root -g root -m 0644 "${tmp_web_service}" "${WEB_SERVICE_FILE}"
 /usr/bin/systemctl daemon-reload
 
 if [[ ! -f "${INSTALL_ROOT}/config/nodesmart.json" ]]; then
@@ -120,10 +127,10 @@ else
 fi
 
 echo "Enabling and starting NodeSmart..."
-/usr/bin/systemctl enable nodesmart
-/usr/bin/systemctl restart nodesmart
+/usr/bin/systemctl enable nodesmart nodesmart-web
+/usr/bin/systemctl restart nodesmart nodesmart-web
 
-if /usr/bin/systemctl is-active --quiet nodesmart; then
+if /usr/bin/systemctl is-active --quiet nodesmart && /usr/bin/systemctl is-active --quiet nodesmart-web; then
   echo "NodeSmart installation complete."
 else
   echo "NodeSmart is installed but the service is not running." >&2

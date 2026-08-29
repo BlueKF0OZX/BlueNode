@@ -52,6 +52,63 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
 
+    ALLOWED_STATIC_PATHS = {
+
+        "/web/",
+
+        "/state/recovery.json",
+
+        "/state/intelligence.json",
+
+        "/state/system.json",
+
+    }
+
+
+
+    def do_GET(self):
+
+        path = self.path.split("?", 1)[0]
+
+
+
+        if path == "/":
+
+            self.send_response(302)
+
+            self.send_header("Location", "/web/")
+
+            self.end_headers()
+
+            return
+
+
+
+        if path.startswith("/web/"):
+
+            return super().do_GET()
+
+
+
+        if path in self.ALLOWED_STATIC_PATHS:
+
+            return super().do_GET()
+
+
+
+        self.send_error(404, "Not Found")
+
+
+
+    def do_HEAD(self):
+
+        path = self.path.split('?', 1)[0]
+
+        if path.startswith('/web/') or path in self.ALLOWED_STATIC_PATHS:
+            return super().do_HEAD()
+
+        self.send_error(404, 'Not Found')
+
     def send_json(self, status_code, data):
 
         body = json.dumps(data).encode("utf-8")
