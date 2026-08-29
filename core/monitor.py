@@ -16,4 +16,4 @@ while True:
         print(f"NodeSmart monitor error: {e}")
 
 
-    time.sleep(5)
+    time.sleep(2)

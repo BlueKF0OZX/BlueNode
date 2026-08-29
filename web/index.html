@@ -1557,6 +1557,7 @@
 
         const data = await response.json();
 
+
         const intelligenceResponse =
           await fetch('/state/intelligence.json?ts=' + Date.now());
 
@@ -1659,6 +1660,21 @@
         const response = await fetch('/state/system.json?ts=' + Date.now());
 
         const data = await response.json();
+
+        // Use the fast AllStar monitor state for live connection display.
+        try {
+          const allstarResponse =
+            await fetch('/events/allstar_state.json?ts=' + Date.now());
+
+          if (allstarResponse.ok) {
+            const allstarData = await allstarResponse.json();
+
+            data.connected_nodes = allstarData.links || [];
+            data.connected_since = allstarData.connected_since || {};
+          }
+        } catch (err) {
+          // Fall back to system.json if live AllStar state is unavailable.
+        }
 
 
 
