@@ -3,7 +3,9 @@
 NodeSmart is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
 
 **Status:** v0.1.0-alpha — early public testing release.
+## Dashboard
 
+![NodeSmart Dashboard](nodesmart-dashboard.png)
 ## Features
 
 - Live AllStar, Asterisk, Internet, CPU, memory, disk, and uptime monitoring
