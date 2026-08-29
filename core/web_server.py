@@ -8,6 +8,7 @@ import json
 import subprocess
 
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import unquote
 
 from pathlib import Path
 
@@ -89,7 +90,8 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
             web_root = (ROOT / "web").resolve()
 
-            requested = (ROOT / path.lstrip("/")).resolve()
+            decoded_path = unquote(path)
+            requested = (ROOT / decoded_path.lstrip("/")).resolve()
 
 
 
@@ -141,7 +143,8 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
             web_root = (ROOT / 'web').resolve()
 
-            requested = (ROOT / path.lstrip('/')).resolve()
+            decoded_path = unquote(path)
+            requested = (ROOT / decoded_path.lstrip('/')).resolve()
 
 
 
