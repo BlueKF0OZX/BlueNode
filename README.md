@@ -56,7 +56,7 @@ The dashboard does not provide Internet-facing authentication. Keep it on a trus
 
 Skywarn controls require an existing SkywarnPlus installation at `/usr/local/bin/SkywarnPlus/`.
 
-The DODROPIN helper searches `friendly_nodes` for an entry named `DODROPIN`.
+Friendly node controls can be configured using entries in friendly_nodes.
 
 ## Project layout
 
