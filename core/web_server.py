@@ -73,6 +73,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
         "/state/system.json",
         "/events/allstar_state.json",
+        "/logs/events.log",
 
     }
 

@@ -2298,7 +2298,7 @@
 
       try {
 
-        const response = await fetch('/web/events.log?ts=' + Date.now());
+        const response = await fetch('/logs/events.log?ts=' + Date.now());
 
         const text = await response.text();
 
