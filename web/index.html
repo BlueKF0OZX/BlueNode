@@ -1566,8 +1566,9 @@
         data.intelligence = intelligenceData;
         const last = data.last_recovery;
 
-        // Successful recovery results remain prominent for 6 hours.
-        const recoveryDisplayResetHours = 6;
+        // Successful recovery results remain prominent for the configured period.
+        const recoveryDisplayResetHours =
+          Number(data.display_reset_hours ?? 6);
 
         if (last && last.status === 'success' && last.timestamp) {
           const recoveryTime = new Date(last.timestamp);

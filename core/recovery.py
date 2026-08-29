@@ -26,6 +26,13 @@ CONFIG = load_config()
 
 RECOVERY_CONFIG = CONFIG.get("recovery", {})
 
+DISPLAY_RESET_HOURS = int(
+    RECOVERY_CONFIG.get(
+        "display_reset_hours",
+        6,
+    )
+)
+
 
 
 ASTERISK_RECOVERY_ENABLED = RECOVERY_CONFIG.get(
@@ -181,6 +188,8 @@ def load_recovery_state():
 
 
 def save_recovery_state(data):
+
+    data["display_reset_hours"] = DISPLAY_RESET_HOURS
 
     RECOVERY_STATE_FILE.parent.mkdir(
 

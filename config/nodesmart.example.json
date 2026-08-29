@@ -39,7 +39,8 @@
 
     "asterisk_enabled": true,
 
-    "asterisk_cooldown_seconds": 600
+    "asterisk_cooldown_seconds": 600,
+    "display_reset_hours": 6
 
   }
 
