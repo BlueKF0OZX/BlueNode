@@ -1786,6 +1786,8 @@ def build_intelligence(state=None):
     automation_mode = str(automation_state.get("mode", "active")).lower()
     connectivity_state = state.get("connectivity", {})
     connectivity_diagnosis = str(connectivity_state.get("diagnosis", "healthy"))
+    behavior_state = state.get("node_behavior", {})
+    behavior_assessment = str(behavior_state.get("assessment", "normal")).lower()
 
 
 
@@ -1873,7 +1875,17 @@ def build_intelligence(state=None):
         level = "warning"
         attention_required = False
 
-    if connectivity_diagnosis == "recovering" and state.get("asterisk") == "online":
+    if behavior_assessment == "warning" and not behavior_state.get("stale"):
+        if level in ("normal", "unknown"):
+            level = "warning"
+        attention_required = True
+        for finding in behavior_state.get("reasons", []):
+            summary = finding.get("summary")
+            if summary and summary not in reasons:
+                reasons.append(summary)
+
+    if (connectivity_diagnosis == "recovering" and state.get("asterisk") == "online"
+            and behavior_assessment != "warning"):
         level = "warning"
         attention_required = False
 
@@ -1927,6 +1939,7 @@ def build_intelligence(state=None):
 
         "automation": automation_state,
         "connectivity": connectivity_state,
+        "node_behavior": behavior_state,
 
     }
 
@@ -1995,6 +2008,16 @@ def build_intelligence(state=None):
                         "recovery actions are intentionally suspended."),
         }
 
+    if (behavior_assessment == "warning" and not behavior_state.get("stale")
+            and automation_mode not in ("recovering", "attention")
+            and not connectivity_state.get("sustained")):
+        detail = next((item.get("evidence") for item in behavior_state.get("reasons", [])
+                       if item.get("level") == "warning"), "Unusual node behavior was observed")
+        intelligence["recommendation"] = {
+            "priority": "warning", "action_required": True,
+            "message": f"{detail}. Operator review is recommended; BlueNode has taken no corrective action.",
+        }
+
 
 
     intelligence["recovery_display"] = recovery_display(state)
@@ -2009,6 +2032,9 @@ def build_intelligence(state=None):
         intelligence["summary"] += " Automatic recovery is backed off; operator attention is recommended."
     elif automation_state.get("maintenance_mode"):
         intelligence["summary"] += " Maintenance mode is intentionally suspending automatic actions."
+
+    if behavior_assessment == "warning" and not behavior_state.get("stale"):
+        intelligence["summary"] += " Unusual node behavior warrants operator review."
 
 
 

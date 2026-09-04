@@ -31,6 +31,7 @@ class MonitorTests(unittest.TestCase):
              patch.object(monitor, "build_state", return_value=state), \
              patch.object(monitor, "log_state_changes") as log_changes, \
              patch.object(monitor.automation, "observe_health", return_value={"mode": "active"}), \
+             patch.object(monitor.node_behavior, "observe", return_value={"assessment": "normal"}), \
              patch.object(monitor, "save_state", side_effect=lambda value: events.append(("save", dict(value)))), \
              patch.object(monitor, "build_intelligence", side_effect=lambda value: events.append(("intelligence", dict(value))) or {"summary": "ok"}):
             result = monitor.run_health_cycle(recovery)
@@ -43,6 +44,7 @@ class MonitorTests(unittest.TestCase):
         )
         self.assertNotIn("intelligence", events[0][1])
         self.assertEqual(events[0][1]["automation"]["mode"], "active")
+        self.assertEqual(events[0][1]["node_behavior"]["assessment"], "normal")
         self.assertEqual(result["intelligence_summary"], "ok")
 
     def test_fresh_health_survives_intelligence_failure(self):
@@ -53,12 +55,14 @@ class MonitorTests(unittest.TestCase):
              patch.object(monitor, "build_state", return_value=state), \
              patch.object(monitor, "log_state_changes"), \
              patch.object(monitor.automation, "observe_health", return_value={"mode": "active"}), \
+             patch.object(monitor.node_behavior, "observe", return_value={"assessment": "normal"}), \
              patch.object(monitor, "save_state", side_effect=lambda value: saved.append(dict(value))), \
              patch.object(monitor, "build_intelligence", side_effect=RuntimeError("broken")):
             with self.assertRaises(RuntimeError):
                 monitor.run_health_cycle(recovery)
 
-        self.assertEqual(saved, [{"asterisk": "online", "automation": {"mode": "active"}}])
+        self.assertEqual(saved, [{"asterisk": "online", "automation": {"mode": "active"},
+                                  "node_behavior": {"assessment": "normal"}}])
 
     def test_recovery_is_claimed_before_thread_start_and_cannot_overlap(self):
         observed = []

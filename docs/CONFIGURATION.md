@@ -18,6 +18,16 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `automation.maximum_backoff_seconds`: upper bound for escalation backoff
 - `automation.healthy_reset_seconds`: sustained healthy period required to clear escalation and attempt history
 - `radio_activity.stale_seconds`: maximum telemetry age before live radio activity clears as unavailable (default `6`, minimum `4`)
+- `node_behavior.evaluation_interval_seconds`: cached passive analysis interval (default `10`)
+- `node_behavior.event_window_seconds`: rolling window for link/control activity (default `300`)
+- `node_behavior.link_settle_seconds`: time allowed for an accepted connect command to produce a matching connection (default `20`)
+- `node_behavior.reconnect_notice_count` / `reconnect_warning_count`: same-node attempt thresholds (default `5` / `8`)
+- `node_behavior.churn_notice_count` / `churn_warning_count`: connection-transition thresholds (default `6` / `10`)
+- `node_behavior.failed_link_notice_count` / `failed_link_warning_count`: unconfirmed establishment thresholds (default `4` / `6`)
+- `node_behavior.local_key_notice_seconds` / `local_key_warning_seconds`: continuous authoritative local-COR thresholds (default `90` / `180`)
+- `node_behavior.rapid_key_notice_transitions` / `rapid_key_warning_transitions`: local key/unkey thresholds in the configured rapid-key window (default `10` / `16`)
+- `node_behavior.control_notice_count` / `control_warning_count`: BlueNode control activity thresholds (default `12` / `20`)
+- `node_behavior.automation_notice_count` / `automation_warning_count`: recovery-attempt thresholds in the automation window (default `2` / `3`)
 - `node_metadata.source_url`: structured AllStarLink public Node Directory source
 - `node_metadata.success_ttl_seconds`: successful directory cache lifetime (default `86400`)
 - `node_metadata.negative_ttl_seconds`: shorter cache lifetime for missing nodes (default `3600`)

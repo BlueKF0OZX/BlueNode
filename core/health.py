@@ -15,6 +15,7 @@ from intelligence import build_intelligence
 from config import load_config
 import radio_activity
 import connectivity
+import node_behavior
 
 
 
@@ -507,6 +508,7 @@ def build_state():
         "connected_since": connected_since,
         "connection_stats": connection_stats,
         "radio_activity": radio_activity.public_state(),
+        "node_behavior": node_behavior.public_state(),
 
         "nodesmart": "running",
 

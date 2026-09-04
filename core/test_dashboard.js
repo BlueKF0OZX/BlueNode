@@ -29,7 +29,8 @@ assert.ok(emergencyBanner > 0 && emergencyBanner < disk,
   'Emergency status must precede operational health content');
 assert.match(html, /body\.emergency-mode #status-grid\s*{\s*order:\s*1/);
 assert.match(html, /body\.emergency-mode #intelligence-panel\s*{\s*order:\s*2/);
-assert.match(html, /body\.emergency-mode #operational-events-panel\s*{\s*order:\s*3/);
+assert.match(html, /body\.emergency-mode #node-behavior-panel\s*{\s*order:\s*3/);
+assert.match(html, /body\.emergency-mode #operational-events-panel\s*{\s*order:\s*4/);
 assert.match(html, /skywarn-card/);
 assert.match(html, /connected-nodes-card/);
 assert.match(html, /@media \(max-width: 480px\)[\s\S]*\.emergency-banner-heading \.control-button \{ width: 100%; \}/,
@@ -71,6 +72,8 @@ for (const id of ['disk', 'connections-today', 'control-result',
   'emergency-banner', 'emergency-enter', 'emergency-exit', 'emergency-meta',
   'emergency-summary', 'status-grid', 'statistics-grid',
   'recent-sessions-panel', 'operational-events-panel',
+  'node-behavior-panel', 'node-behavior-title', 'node-behavior-summary',
+  'node-behavior-evidence',
   'btn-dodropin-connect', 'btn-dodropin-disconnect', 'btn-skywarn-on',
   'btn-skywarn-off', 'manual-node-number', 'node-directory-search']) {
   assert.equal(html.split('id="' + id + '"').length - 1, 1,
@@ -146,6 +149,22 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.equal(element('maintenance-toggle').textContent,'Disable Maintenance Mode');
   await context.toggleMaintenance(element('maintenance-toggle'));
   assert.equal(element('automation-title').textContent,'AUTOMATION — MAINTENANCE');
+  context.renderNodeBehavior({assessment:'normal',stale:false,reasons:[]});
+  assert.match(element('node-behavior-title').textContent,/NODE BEHAVIOR.*NORMAL/);
+  assert.equal(element('node-behavior-summary').textContent,
+    'No unusual local or network activity detected.');
+  context.renderNodeBehavior({assessment:'warning',stale:false,
+    operator_review_recommended:true,reasons:[{summary:'Repeated connection attempts observed',
+      evidence:'Node 12345: 8 attempts within 5 minutes'}]});
+  assert.match(element('node-behavior-title').textContent,/NODE BEHAVIOR.*WARNING/);
+  assert.match(element('node-behavior-evidence').textContent,
+    /Node 12345.*Operator review recommended.*no corrective action/);
+  context.renderNodeBehavior({assessment:'warning',stale:true,reasons:[]});
+  assert.match(element('node-behavior-title').textContent,/DATA UNAVAILABLE/);
+  context.renderNodeBehavior({assessment:'normal',stale:false,evidence_status:'partial',
+    ambiguity:'Local RF telemetry is unavailable or stale; RF behavior was not assessed',reasons:[]});
+  assert.match(element('node-behavior-title').textContent,/LIMITED DATA/);
+  assert.match(element('node-behavior-evidence').textContent,/RF behavior was not assessed/);
   context.renderEmergencyMode({active:true, mode:'emergency', elapsed_seconds:65,
     activated_at:new Date().toISOString()}, {status:'healthy',asterisk:'online',
     connectivity:{diagnosis:'healthy'},intelligence:{attention_required:false}});

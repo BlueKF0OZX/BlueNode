@@ -11,6 +11,7 @@ from intelligence import build_intelligence
 from recovery import recover_asterisk
 import automation
 import connectivity
+import node_behavior
 
 
 POLL_INTERVAL_SECONDS = 2
@@ -67,6 +68,9 @@ def run_health_cycle(recovery):
 
     # Preserve the observation even if Intelligence fails or takes extra time.
     state["automation"] = automation.observe_health(state)
+    state["node_behavior"] = node_behavior.observe(
+        state.get("radio_activity"), state["automation"], state.get("connectivity")
+    )
     save_state(state)
     recovery.start_if_needed(state)
 

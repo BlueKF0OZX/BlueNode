@@ -464,17 +464,24 @@
     body.emergency-mode #emergency-banner { display: block; order: -1; }
     body.emergency-mode #status-grid { order: 1; }
     body.emergency-mode #intelligence-panel { order: 2; }
-    body.emergency-mode #operational-events-panel { order: 3; }
-    body.emergency-mode #automation-panel { order: 4; }
-    body.emergency-mode #recent-sessions-panel { order: 5; }
-    body.emergency-mode #statistics-grid { order: 6; }
-    body.emergency-mode .controls-panel { order: 7; }
-    body.emergency-mode #remote-admin-panel { order: 8; }
-    body.emergency-mode #soft-radio-panel { order: 9; }
-    body.emergency-mode #error { order: 10; }
+    body.emergency-mode #node-behavior-panel { order: 3; }
+    body.emergency-mode #operational-events-panel { order: 4; }
+    body.emergency-mode #automation-panel { order: 5; }
+    body.emergency-mode #recent-sessions-panel { order: 6; }
+    body.emergency-mode #statistics-grid { order: 7; }
+    body.emergency-mode .controls-panel { order: 8; }
+    body.emergency-mode #remote-admin-panel { order: 9; }
+    body.emergency-mode #soft-radio-panel { order: 10; }
+    body.emergency-mode #error { order: 11; }
     body.emergency-mode #status-grid,
     body.emergency-mode #intelligence-panel,
     body.emergency-mode #operational-events-panel { margin-top: 15px; }
+
+    body.emergency-mode #node-behavior-panel.behavior-notice,
+    body.emergency-mode #node-behavior-panel.behavior-warning {
+      border: 1px solid #ef4444;
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.14);
+    }
 
     body.emergency-mode .skywarn-card,
     body.emergency-mode .connected-nodes-card {
@@ -582,6 +589,25 @@
       font-size: 14px;
     }
     .automation-action { margin-top: 12px; font-weight: 600; }
+
+    .behavior-panel {
+      margin-top: 18px;
+      padding: 13px 18px;
+      border-radius: 12px;
+      background: #1f2937;
+      border-left: 4px solid #22c55e;
+    }
+    .behavior-panel.behavior-notice { border-left-color: #f59e0b; }
+    .behavior-panel.behavior-warning { border-left-color: #ef4444; }
+    .behavior-panel.behavior-stale { border-left-color: #6b7280; }
+    .behavior-panel.behavior-limited { border-left-color: #6b7280; }
+    .behavior-panel h2 { margin: 0; font-size: 18px; }
+    .behavior-summary { margin-top: 6px; color: #d1d5db; }
+    .behavior-evidence { display: none; margin-top: 9px; color: #9ca3af; line-height: 1.45; }
+    .behavior-panel.behavior-notice .behavior-evidence,
+    .behavior-panel.behavior-warning .behavior-evidence,
+    .behavior-panel.behavior-stale .behavior-evidence,
+    .behavior-panel.behavior-limited .behavior-evidence { display: block; }
 
     .event-row {
       display: flex;
@@ -1303,6 +1329,12 @@
       </div>
       <div id="automation-action" class="automation-action">No operator action required</div>
     </div>
+
+    <section id="node-behavior-panel" class="behavior-panel behavior-stale" aria-live="polite">
+      <h2 id="node-behavior-title">NODE BEHAVIOR — CHECKING</h2>
+      <div id="node-behavior-summary" class="behavior-summary">Assessing local and network courtesy telemetry...</div>
+      <div id="node-behavior-evidence" class="behavior-evidence"></div>
+    </section>
 
     <div id="remote-admin-panel" class="remote-admin-panel">
       <h2>Remote Admin</h2>
@@ -2061,6 +2093,28 @@
       button.dataset.enabled = state.maintenance_mode ? 'true' : 'false';
     }
 
+    function renderNodeBehavior(state) {
+      state = state || {};
+      const panel = document.getElementById('node-behavior-panel');
+      const stale = state.stale || !state.assessment;
+      const limited = !stale && state.evidence_status === 'partial';
+      const assessment = stale ? 'unknown' : String(state.assessment).toLowerCase();
+      panel.className = 'behavior-panel behavior-' + (stale ? 'stale' : limited ? 'limited' : assessment);
+      document.getElementById('node-behavior-title').textContent =
+        'NODE BEHAVIOR — ' + (stale ? 'DATA UNAVAILABLE' : limited ? 'LIMITED DATA' : assessment.toUpperCase());
+      const reasons = Array.isArray(state.reasons) ? state.reasons : [];
+      document.getElementById('node-behavior-summary').textContent = stale
+        ? 'Behavior telemetry is stale or unavailable; no conclusion has been made.'
+        : limited ? 'No unusual behavior was found in the available telemetry.'
+        : assessment === 'normal'
+          ? 'No unusual local or network activity detected.'
+          : (reasons[0]?.summary || 'Unusual behavior detected.');
+      const evidence = reasons.map(item => item.evidence).filter(Boolean);
+      if (state.ambiguity) evidence.push(state.ambiguity);
+      if (state.operator_review_recommended) evidence.push('Operator review recommended. BlueNode has taken no corrective action.');
+      document.getElementById('node-behavior-evidence').textContent = evidence.join(' · ');
+    }
+
     async function toggleMaintenance(button) {
       const enable = button.dataset.enabled !== 'true';
       button.disabled = true;
@@ -2146,6 +2200,7 @@
 
         updateControlStates(data);
         renderAutomation(data.automation);
+        renderNodeBehavior(data.node_behavior);
 
         const intelligenceElement =
           document.getElementById('intelligence-summary');

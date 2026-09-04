@@ -255,5 +255,40 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(result["recommendation"]["action_required"])
         self.assertIn("verifying", result["recommendation"]["message"])
 
+    def test_behavior_notice_does_not_require_attention(self):
+        state = copy.deepcopy(NORMAL)
+        state["node_behavior"] = {
+            "assessment": "notice", "stale": False,
+            "reasons": [{"summary": "Extended local RF activity",
+                         "evidence": "Local receiver keyed for 95 seconds"}],
+        }
+        result = self.build(state, [])
+        self.assertEqual(result["level"], "normal")
+        self.assertFalse(result["attention_required"])
+        self.assertEqual(result["node_behavior"]["assessment"], "notice")
+
+    def test_behavior_warning_is_distinct_and_requires_review(self):
+        state = copy.deepcopy(NORMAL)
+        state["node_behavior"] = {
+            "assessment": "warning", "stale": False,
+            "operator_review_recommended": True,
+            "reasons": [{"level": "warning", "summary": "Repeated connection attempts observed",
+                         "evidence": "Node 12345: 8 attempts within 5 minutes"}],
+        }
+        result = self.build(state, [])
+        self.assertEqual(result["level"], "warning")
+        self.assertTrue(result["attention_required"])
+        self.assertTrue(result["recommendation"]["action_required"])
+        self.assertIn("taken no corrective action", result["recommendation"]["message"])
+        self.assertIn("Unusual node behavior", result["summary"])
+
+    def test_stale_behavior_warning_does_not_escalate(self):
+        state = copy.deepcopy(NORMAL)
+        state["node_behavior"] = {"assessment": "warning", "stale": True,
+                                  "operator_review_recommended": True, "reasons": []}
+        result = self.build(state, [])
+        self.assertEqual(result["level"], "normal")
+        self.assertFalse(result["attention_required"])
+
 if __name__ == '__main__':
     unittest.main()

@@ -21,6 +21,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 - Automatic Asterisk recovery with verification, cooldown, and lockout protection
 - Automated Operations status, persistent Maintenance Mode, and repeated-failure backoff
 - Deliberate persistent Emergency Mode for high-attention operational views
+- Passive Node Behavior and Network Courtesy monitoring with conservative operator-review thresholds
 - Desktop/mobile web dashboard
 - systemd startup and installer support
 - Python standard library only
@@ -72,6 +73,11 @@ layered RX-only design and activation gate.
 Emergency Mode reprioritizes existing health, connectivity, Skywarn, connected
 node, Intelligence, incident, recovery, and event information without changing
 radio or recovery behavior. See `docs/EMERGENCY_MODE.md`.
+
+Node Behavior monitoring passively analyzes bounded recent telemetry for link
+churn, unconfirmed connection attempts, extended or rapidly cycling local COR,
+frequent controls, and repeated BlueNode recovery activity. It never performs
+corrective actions. See `docs/NODE_BEHAVIOR.md`.
 
 ## Security
 

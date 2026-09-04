@@ -59,6 +59,29 @@
 
   },
 
+  "node_behavior": {
+    "evaluation_interval_seconds": 10,
+    "event_window_seconds": 300,
+    "stale_seconds": 60,
+    "link_settle_seconds": 20,
+    "reconnect_notice_count": 5,
+    "reconnect_warning_count": 8,
+    "churn_notice_count": 6,
+    "churn_warning_count": 10,
+    "failed_link_notice_count": 4,
+    "failed_link_warning_count": 6,
+    "local_key_notice_seconds": 90,
+    "local_key_warning_seconds": 180,
+    "rapid_key_window_seconds": 120,
+    "rapid_key_notice_transitions": 10,
+    "rapid_key_warning_transitions": 16,
+    "control_notice_count": 12,
+    "control_warning_count": 20,
+    "automation_window_seconds": 3600,
+    "automation_notice_count": 2,
+    "automation_warning_count": 3
+  },
+
   "node_metadata": {
     "source_url": "https://allmondb.allstarlink.org/allmondb.php",
     "success_ttl_seconds": 86400,
