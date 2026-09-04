@@ -17,6 +17,7 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `automation.minimum_cooldown_seconds`: minimum delay after an attempt; failed verification progressively increases it
 - `automation.maximum_backoff_seconds`: upper bound for escalation backoff
 - `automation.healthy_reset_seconds`: sustained healthy period required to clear escalation and attempt history
+- `radio_activity.stale_seconds`: maximum telemetry age before live radio activity clears as unavailable (default `6`, minimum `4`)
 
 The DODROPIN helper looks for a friendly node whose name is `DODROPIN` (case-insensitive).
 
@@ -54,6 +55,21 @@ period resets escalation and backoff without deleting incident or event history.
 Maintenance transitions, recovery starts, verification results, escalation,
 backoff entry, and reset are logged only on transitions—not every monitoring
 cycle.
+
+## Live radio activity
+
+The independent two-second AllStar monitor reads App_Rpt's `RPT_RXKEYED`,
+`RPT_TXKEYED`, and keyed-state suffixes in `RPT_ALINKS`. This distinguishes
+local receiver/COR activity, physical transmitter/PTT state, and inbound audio
+from a directly connected link without treating a connection as a transmission.
+Friendly names come only from `friendly_nodes`; otherwise BlueNode displays the
+node number. Multiple keyed links are shown as ambiguous rather than assigning
+an unsupported speaker identity.
+
+Current activity is written atomically to `state/radio_activity.json`. Start/end
+events are emitted only for local receiver and remote linked-audio transitions,
+not for every poll. Stale, missing, or malformed telemetry fails safely as
+unavailable.
 
 The shipped systemd service runs monitor.py, which owns health collection,
 AllStar monitoring, Intelligence updates, and automatic recovery. Do not schedule

@@ -13,6 +13,7 @@ from event_logger import emit
 from connection_stats import summarize_connections
 from intelligence import build_intelligence
 from config import load_config
+import radio_activity
 
 
 
@@ -492,6 +493,7 @@ def build_state():
         "connected_nodes": connected_nodes,
         "connected_since": connected_since,
         "connection_stats": connection_stats,
+        "radio_activity": radio_activity.public_state(),
 
         "nodesmart": "running",
 

@@ -10,13 +10,14 @@ assert.doesNotMatch(html, />NodeSmart(?: Intelligence| Controls)?</);
 const disk = html.indexOf('id="disk"');
 const controls = html.indexOf('<h2>BlueNode Controls</h2>');
 const connectionStats = html.indexOf('id="connections-today"');
+const radioActivity = html.indexOf('id="radio-activity-panel"');
 const intelligence = html.indexOf('<h2>BlueNode Intelligence</h2>');
 const sessions = html.indexOf('<h2>Recent Sessions</h2>');
 const events = html.indexOf('<h2>Recent Events</h2>');
 const recovery = html.indexOf('<h2>Automatic Recovery</h2>');
 const automation = html.indexOf('id="automation-title"');
-assert.ok(disk < connectionStats && connectionStats < controls,
-  'Status cards and connection statistics must remain together before Controls');
+assert.ok(disk < connectionStats && connectionStats < radioActivity && radioActivity < controls,
+  'Radio Activity must follow status/statistics and precede Controls');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
 assert.ok(controls < recovery && recovery < automation && automation < intelligence,
@@ -28,6 +29,8 @@ assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,
 assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
   'No section heading may appear between Intelligence and Recent Sessions');
 for (const id of ['disk', 'connections-today', 'control-result',
+  'radio-activity-panel', 'radio-activity-title', 'radio-activity-summary',
+  'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-duration',
   'recovery-panel', 'recovery-status', 'recovery-detail',
   'automation-panel', 'automation-title', 'automation-summary',
   'automation-recovery-armed', 'automation-protection',
@@ -86,6 +89,21 @@ vm.runInContext(html.slice(start,end),context);
   display=null;
   await context.loadRecoveryStatus();
   assert.equal(element('recovery-status').className,'value normal');
+  const radioStart=html.indexOf('    function radioDuration');
+  const radioEnd=html.indexOf('    function automationAge',radioStart);
+  vm.runInContext(html.slice(radioStart,radioEnd),context);
+  context.renderRadioActivity({status:'idle',local_rx:false,local_tx:false});
+  assert.match(element('radio-activity-title').textContent,/IDLE$/);
+  assert.equal(element('radio-activity-summary').textContent,'No active transmission');
+  context.renderRadioActivity({status:'local_rx',local_rx:true,local_tx:true,
+    node:'12345',started_at:new Date(Date.now()-2000).toISOString()});
+  assert.match(element('radio-activity-title').textContent,/LOCAL RX$/);
+  assert.equal(element('radio-local-tx').textContent,'Keyed');
+  context.renderRadioActivity({status:'remote_tx',local_rx:false,local_tx:true,
+    node:'54321',friendly_name:'Example Link',started_at:new Date().toISOString()});
+  assert.match(element('radio-node-detail').textContent,/54321.*Example Link/);
+  context.renderRadioActivity({status:'remote_tx',stale:true});
+  assert.match(element('radio-activity-title').textContent,/UNAVAILABLE$/);
   const automationStart=html.indexOf('    function automationAge');
   const automationEnd=html.indexOf('    let statusLoading',automationStart);
   context.fetch=async()=>({ok:true,json:async()=>({automation:{mode:'maintenance',maintenance_mode:true}})});

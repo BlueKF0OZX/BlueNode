@@ -52,6 +52,11 @@
     "maximum_backoff_seconds": 3600,
     "healthy_reset_seconds": 900
 
+  },
+
+  "radio_activity": {
+    "stale_seconds": 6
+
   }
 
 }

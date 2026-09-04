@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from event_logger import emit
 from config import load_config
+import radio_activity
 
 
 
@@ -48,37 +49,27 @@ def friendly_name(node):
 
 
 
-def get_links():
+def get_telemetry():
 
     result = subprocess.run(
 
-        ["sudo", "-n", "asterisk", "-rx", f"rpt lstats {NODE}"],
+        ["sudo", "-n", "asterisk", "-rx", f"rpt show variables {NODE}"],
 
         capture_output=True,
 
-        text=True
-
+        text=True,
+        timeout=5,
     )
+    if result.returncode != 0:
+        return None
+    return radio_activity.parse_variables(result.stdout)
 
 
-
-    links = set()
-
-
-
-    for line in result.stdout.splitlines()[2:]:
-
-        parts = line.split()
-
-
-
-        if parts and parts[0].isdigit():
-
-            links.add(parts[0])
-
-
-
-    return links
+def get_links(sample=None):
+    sample = get_telemetry() if sample is None else sample
+    if sample is None:
+        return set()
+    return {link["node"] for link in sample["links"]}
 
 
 
@@ -261,8 +252,12 @@ def save_connection_history(node, started, ended):
 
 
 def check_changes():
-
-    current = get_links()
+    sample = get_telemetry()
+    if sample is None:
+        radio_activity.update(None)
+        return
+    current = get_links(sample)
+    radio_activity.update(sample)
 
 
 
