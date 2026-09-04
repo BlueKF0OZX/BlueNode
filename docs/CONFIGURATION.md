@@ -23,11 +23,13 @@ warning or critical state. Missing closing events can be reconciled from a newer
 normal health observation, explicitly marked with an unknown exact recovery time.
 Raw event and connection history is preserved.
 
-The monitor samples connections and rebuilds Intelligence every 2 seconds plus
-processing time. The dashboard polls status every 2 seconds, with overlapping
-status requests suppressed; events and recovery display refresh every 5 seconds.
-Skywarn and system health still depend on the health collector's cadence.
+The monitor runs independent AllStar and system-health loops every 2 seconds.
+Each fresh health observation is saved before Intelligence is rebuilt, and
+automatic Asterisk recovery runs in a single non-overlapping background worker.
+Slow or failed work in one loop does not stop the other loop. The dashboard polls
+status every 2 seconds, with overlapping status requests suppressed; events and
+recovery display refresh every 5 seconds.
 
-The shipped systemd service runs monitor.py only. It does not schedule health.py
-or recovery.py. Existing installations may schedule these externally; inspect
-that scheduling before enabling additional collectors or automatic recovery.
+The shipped systemd service runs monitor.py, which owns health collection,
+AllStar monitoring, Intelligence updates, and automatic recovery. Do not schedule
+health.py or recovery.py separately when this service is active.

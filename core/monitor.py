@@ -1,19 +1,116 @@
+#!/usr/bin/env python3
+
+"""Run NodeSmart's independent monitoring and recovery workloads."""
+
+import threading
 import time
 
 from allstar_status import check_changes
+from health import build_state, load_previous_state, log_state_changes, save_state
 from intelligence import build_intelligence
+from recovery import recover_asterisk
 
 
-while True:
+POLL_INTERVAL_SECONDS = 2
+
+
+class RecoveryCoordinator:
+    """Allow at most one background recovery attempt at a time."""
+
+    def __init__(self, worker=recover_asterisk, thread_factory=threading.Thread):
+        self._worker = worker
+        self._thread_factory = thread_factory
+        self._lock = threading.Lock()
+
+    def start_if_needed(self, state):
+        if state.get("asterisk") != "offline":
+            return False
+
+        # Claim recovery before creating the thread. A second health pass can
+        # never observe an unlocked interval between start() and worker entry.
+        if not self._lock.acquire(blocking=False):
+            return False
+
+        try:
+            thread = self._thread_factory(
+                target=self._run,
+                name="nodesmart-recovery",
+                daemon=True,
+            )
+            thread.start()
+        except Exception:
+            self._lock.release()
+            raise
+
+        return True
+
+    def _run(self):
+        try:
+            self._worker()
+        except Exception as exc:
+            print(f"NodeSmart recovery worker error: {exc}", flush=True)
+        finally:
+            self._lock.release()
+
+
+def run_health_cycle(recovery):
+    """Collect, persist, enrich, and repersist one health observation."""
+    previous_state = load_previous_state()
+    state = build_state()
+    log_state_changes(previous_state, state)
+
+    # Preserve the observation even if Intelligence fails or takes extra time.
+    save_state(state)
+    recovery.start_if_needed(state)
+
+    state["intelligence"] = build_intelligence(state)
+    state["intelligence_summary"] = state["intelligence"]["summary"]
+    save_state(state)
+    return state
+
+
+def run_periodic(name, operation, stop_event, interval=POLL_INTERVAL_SECONDS):
+    """Run a workload repeatedly without allowing one failure to end its loop."""
+    while not stop_event.is_set():
+        started = time.monotonic()
+        try:
+            operation()
+        except Exception as exc:
+            print(f"NodeSmart {name} loop error: {exc}", flush=True)
+
+        remaining = max(0, interval - (time.monotonic() - started))
+        stop_event.wait(remaining)
+
+
+def main():
+    stop_event = threading.Event()
+    recovery = RecoveryCoordinator()
+    threads = [
+        threading.Thread(
+            target=run_periodic,
+            args=("health", lambda: run_health_cycle(recovery), stop_event),
+            name="nodesmart-health",
+        ),
+        threading.Thread(
+            target=run_periodic,
+            args=("AllStar", check_changes, stop_event),
+            name="nodesmart-allstar",
+        ),
+    ]
+
+    for thread in threads:
+        thread.start()
 
     try:
+        while all(thread.is_alive() for thread in threads):
+            stop_event.wait(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop_event.set()
+        for thread in threads:
+            thread.join()
 
-        check_changes()
-        build_intelligence()
 
-    except Exception as e:
-
-        print(f"NodeSmart monitor error: {e}")
-
-
-    time.sleep(2)
+if __name__ == "__main__":
+    main()

@@ -3,6 +3,8 @@
 
 
 
+import tempfile
+
 from pathlib import Path
 
 
@@ -13,7 +15,9 @@ from intelligence import build_intelligence
 
 
 
-intelligence.INTELLIGENCE_FILE = Path("/tmp/nodesmart-test-intelligence.json")
+intelligence.INTELLIGENCE_FILE = (
+    Path(tempfile.gettempdir()) / "nodesmart-test-intelligence.json"
+)
 
 
 
