@@ -1684,9 +1684,11 @@ def reconcile_incidents(records, state, previous=None):
         return records
     for record in records:
         component = record["component"]
-        normal = (state.get(component) == "online" if component in
-                  ("asterisk", "internet") else
-                  state.get("health", {}).get(component) == "normal")
+        normal = (
+            str(state.get(component)).strip().lower() == "online"
+            if component in ("asterisk", "internet")
+            else state.get("health", {}).get(component) == "normal"
+        )
         if record["resolved"] or not normal:
             continue
         started = datetime.fromisoformat(record["started_at"])

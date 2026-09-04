@@ -100,6 +100,37 @@ class LifecycleTests(unittest.TestCase):
                          events[-1]['timestamp'].isoformat())
         self.assertEqual(current['level'], 'critical')
 
+    def test_live_online_state_durably_resolves_stale_internet_outage(self):
+        events = [event('INTERNET.OFFLINE', -90)]
+        online = copy.deepcopy(NORMAL)
+        # Status presentation is case-insensitive; reconciliation must be too.
+        online['internet'] = 'ONLINE'
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(intel, 'INTELLIGENCE_FILE', Path(directory)/'intelligence.json'), \
+             patch.object(intel, 'load_events', side_effect=lambda: events), \
+             patch.object(intel, 'load_recovery_state', return_value={}):
+            recovered = intel.build_intelligence(online)
+            repeated = intel.build_intelligence(online)
+
+            events.append(event('INTERNET.OFFLINE', 30))
+            outage = copy.deepcopy(NORMAL)
+            outage.update(status='fault', internet='offline')
+            outage['health']['internet'] = 'critical'
+            outage['last_health_check'] = (NOW+timedelta(seconds=30)).isoformat()
+            current = intel.build_intelligence(outage)
+
+        for result in (recovered, repeated):
+            self.assertEqual(result['level'], 'normal')
+            self.assertFalse(result['attention_required'])
+            self.assertEqual(len(result['incidents']), 1)
+            self.assertTrue(result['incidents'][0]['resolved'])
+            self.assertEqual(result['incidents'][0]['resolution_source'],
+                             'health_observation')
+        self.assertEqual(len(current['incidents']), 2)
+        self.assertTrue(current['incidents'][0]['resolved'])
+        self.assertFalse(current['incidents'][1]['resolved'])
+        self.assertEqual(current['level'], 'critical')
+
     def test_unknown_measurement_does_not_resolve_warning(self):
         state = copy.deepcopy(NORMAL)
         state['status'] = 'degraded'
