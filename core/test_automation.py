@@ -74,7 +74,9 @@ class AutomationTests(unittest.TestCase):
         self.assertEqual(json.loads(self.state_file.read_text())["version"], 1)
 
     def test_connectivity_failure_never_requests_asterisk_recovery(self):
-        for domain in ("local_network", "gateway", "dns", "external_internet", "allstar"):
+        for domain in ("local_network", "gateway", "dns", "external_internet",
+                       "allstar_services", "allstar_registration", "asterisk",
+                       "iax", "remote_link"):
             with self.subTest(domain=domain):
                 health = {"asterisk": "online", "connectivity": {
                     "status": "offline", "failure_domain": domain}}

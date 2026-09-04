@@ -28,6 +28,7 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `connectivity.timeout_seconds`: timeout for each lightweight probe (default `1.5`)
 - `connectivity.failure_threshold` / `recovery_threshold`: consecutive observations required to confirm failure or recovery (default `2`)
 - `connectivity.stale_seconds`: maximum cached diagnostic age (default `120`)
+- `connectivity.allstar_service_host` / `allstar_service_port`: official AllStar endpoint used for the service-layer TCP probe (default `register.allstarlink.org:443`)
 
 The DODROPIN helper looks for a friendly node whose name is `DODROPIN` (case-insensitive).
 
@@ -109,10 +110,18 @@ assigning fabricated map coordinates.
 ## Smart connectivity diagnostics
 
 A separate cached monitor checks the active IPv4 default-route interface, its
-gateway, DNS resolution, a direct-IP external TCP endpoint, and App_Rpt HTTP
-registration status. These checks default to every 30 seconds and never run in
-the two-second health or browser polling paths. Two consecutive failures are
-required before escalation, and two successful observations verify recovery.
+gateway, DNS resolution, a direct-IP external TCP endpoint, the official
+AllStar registration service endpoint, App_Rpt registration, Asterisk, the IAX
+module, and App_Rpt's explicit link connection states. These checks default to
+every 30 seconds and never run in the two-second health or browser polling
+paths. Two consecutive failures are required before escalation, and two
+successful observations verify recovery.
+
+Each layer is `ok`, `fail`, `unknown`, or `blocked_by_upstream`. A downstream
+layer is never called failed merely because an earlier dependency prevented a
+meaningful probe. Remote-link diagnosis is limited to App_Rpt explicitly
+reporting a requested link as non-established; BlueNode does not invent the
+remote cause and does not treat an ordinary disconnected node as a failure.
 
 The resulting `state/connectivity.json` is published atomically. BlueNode keeps
 the established `internet` field for compatibility while exposing the diagnosed

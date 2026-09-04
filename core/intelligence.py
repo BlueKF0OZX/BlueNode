@@ -1961,7 +1961,11 @@ def build_intelligence(state=None):
     elif connectivity_state.get("sustained"):
         remains = {
             "dns": "The LAN, gateway, and direct-IP Internet path remain operational.",
-            "allstar": "The LAN and general Internet path remain operational.",
+            "allstar_services": "The LAN, DNS, and general Internet path remain operational.",
+            "allstar_registration": "The network, AllStar service endpoint, and Asterisk remain operational.",
+            "asterisk": "The network and AllStar service path remain operational.",
+            "iax": "The network and Asterisk core remain operational.",
+            "remote_link": "Core network, registration, Asterisk, and IAX remain operational.",
             "gateway": "Local BlueNode monitoring remains operational.",
             "external_internet": "The LAN and default gateway remain operational.",
             "local_network": "BlueNode continues local system monitoring.",

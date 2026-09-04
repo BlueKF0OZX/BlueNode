@@ -343,7 +343,7 @@ def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent,
         reasons.append("Internet connectivity diagnostics are unavailable")
     elif connectivity_state and connectivity_state.get("sustained"):
         domain = connectivity_state.get("failure_domain")
-        if domain in ("dns", "allstar"):
+        if domain in ("dns", "allstar_services", "allstar_registration", "iax", "remote_link"):
             health["internet"] = "warning"
             reasons.append(connectivity_state.get("message", "Connectivity is degraded"))
 

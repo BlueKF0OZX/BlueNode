@@ -12,7 +12,9 @@ from config import load_config
 from event_logger import emit
 
 
-CONFIG = load_config().get("connectivity", {})
+ROOT_CONFIG = load_config()
+CONFIG = ROOT_CONFIG.get("connectivity", {})
+NODE = str(ROOT_CONFIG["node"])
 INTERVAL_SECONDS = max(10, int(CONFIG.get("interval_seconds", 30)))
 TIMEOUT_SECONDS = max(0.5, float(CONFIG.get("timeout_seconds", 1.5)))
 FAILURE_THRESHOLD = max(2, int(CONFIG.get("failure_threshold", 2)))
@@ -21,6 +23,8 @@ STALE_SECONDS = max(INTERVAL_SECONDS * 3, int(CONFIG.get("stale_seconds", 120)))
 DNS_HOST = str(CONFIG.get("dns_test_host", "example.com"))
 EXTERNAL_HOST = str(CONFIG.get("external_test_host", "1.1.1.1"))
 EXTERNAL_PORT = int(CONFIG.get("external_test_port", 443))
+ALLSTAR_HOST = str(CONFIG.get("allstar_service_host", "register.allstarlink.org"))
+ALLSTAR_PORT = int(CONFIG.get("allstar_service_port", 443))
 STATE_FILE = Path("/opt/nodesmart/state/connectivity.json")
 
 
@@ -85,6 +89,48 @@ def external_reachable():
         return False
 
 
+def tcp_reachable(host, port):
+    try:
+        connection = socket.create_connection((host, port), TIMEOUT_SECONDS)
+        connection.close()
+        return True
+    except OSError:
+        return False
+
+
+def asterisk_available():
+    result = _run(["sudo", "-n", "asterisk", "-rx", "core show uptime seconds"])
+    return None if result is None else result.returncode == 0 and "uptime" in result.stdout.lower()
+
+
+def iax_available():
+    result = _run(["sudo", "-n", "asterisk", "-rx", "module show like chan_iax2"])
+    if result is None or result.returncode != 0:
+        return None
+    output = result.stdout.lower()
+    if "chan_iax2.so" not in output:
+        return False
+    return "running" in output
+
+
+def remote_link_states():
+    result = _run(["sudo", "-n", "asterisk", "-rx", f"rpt lstats {NODE}"])
+    if result is None or result.returncode != 0:
+        return None
+    links = []
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 6 or not parts[0].isdigit():
+            continue
+        state = parts[-1].lower()
+        if state not in ("established", "connecting"):
+            continue
+        links.append({"node": parts[0], "state": state,
+                      "direction": parts[-3].lower(),
+                      "evidence": f"App_Rpt reports {state}"})
+    return links
+
+
 def allstar_registered():
     result = _run(["sudo", "-n", "asterisk", "-rx", "rpt show registrations"])
     if result is None or result.returncode != 0:
@@ -100,14 +146,27 @@ def allstar_registered():
 def run_checks():
     interface, gateway = default_route()
     local = interface_available(interface)
+    gateway_ok = gateway_reachable(gateway) if local else None
+    dns = dns_resolves() if gateway_ok else None
+    internet = external_reachable() if gateway_ok else None
+    allstar_service = (tcp_reachable(ALLSTAR_HOST, ALLSTAR_PORT)
+                       if dns is True and internet is True else None)
+    asterisk = asterisk_available()
+    registration = allstar_registered() if asterisk is True else None
+    iax = iax_available() if asterisk is True else None
+    remote_links = remote_link_states() if asterisk is True and iax is True else None
     return {
         "interface": local,
         "interface_name": interface,
-        "gateway": gateway_reachable(gateway) if local else False,
+        "gateway": gateway_ok,
         "gateway_address": gateway,
-        "dns": dns_resolves() if local else False,
-        "internet": external_reachable() if local else False,
-        "allstar": allstar_registered(),
+        "dns": dns,
+        "internet": internet,
+        "allstar_services": allstar_service,
+        "allstar": registration,
+        "asterisk": asterisk,
+        "iax": iax,
+        "remote_links": remote_links,
     }
 
 
@@ -120,10 +179,24 @@ def failure_domain(checks):
         return "external_internet"
     if checks.get("dns") is False:
         return "dns"
+    if checks.get("allstar_services") is False:
+        return "allstar_services"
+    if checks.get("asterisk") is False:
+        return "asterisk"
     if checks.get("allstar") is False:
-        return "allstar"
+        return "allstar_registration"
+    if checks.get("iax") is False:
+        return "iax"
+    remote_links = checks.get("remote_links")
+    if isinstance(remote_links, list) and any(
+            link.get("state") in ("connecting", "failed", "terminated", "unreachable")
+            for link in remote_links if isinstance(link, dict)):
+        return "remote_link"
     required = ("interface", "gateway", "dns", "internet")
     if any(checks.get(name) is None for name in required):
+        return "unavailable"
+    optional = ("allstar_services", "allstar", "asterisk", "iax")
+    if any(name in checks and checks.get(name) is None for name in optional):
         return "unavailable"
     return "healthy"
 
@@ -154,14 +227,120 @@ def save_state(state):
         raise
 
 
+def _layer(status, evidence):
+    return {"status": status, "evidence": evidence}
+
+
+def diagnostic_layers(checks):
+    """Build a truthful chain, marking untested downstream layers as blocked."""
+    layers = {}
+    local = checks.get("interface")
+    layers["local_network"] = _layer(
+        "ok" if local is True else "fail" if local is False else "unknown",
+        (f"Default-route interface {checks.get('interface_name')} is available"
+         if local is True else "No usable default-route interface was observed"
+         if local is False else "Interface state could not be read"))
+
+    gateway = checks.get("gateway")
+    if local is not True:
+        layers["gateway"] = _layer("blocked_by_upstream", "Requires a usable local interface")
+    else:
+        layers["gateway"] = _layer(
+            "ok" if gateway is True else "fail" if gateway is False else "unknown",
+            "Default gateway is reachable" if gateway is True else
+            "Default gateway did not answer ping or neighbor checks" if gateway is False else
+            "Gateway reachability could not be determined")
+
+    upstream_gateway = local is True and gateway is True
+    for key, label in (("dns", "DNS resolution"), ("internet", "Direct-IP Internet probe")):
+        value = checks.get(key)
+        if not upstream_gateway:
+            layers[key] = _layer("blocked_by_upstream", "Requires a reachable default gateway")
+        else:
+            layers[key] = _layer(
+                "ok" if value is True else "fail" if value is False else "unknown",
+                f"{label} succeeded" if value is True else
+                f"{label} failed" if value is False else f"{label} was unavailable")
+
+    services = checks.get("allstar_services")
+    if not upstream_gateway or checks.get("internet") is not True:
+        layers["allstar_services"] = _layer(
+            "blocked_by_upstream", "Requires working gateway and Internet connectivity")
+    elif checks.get("dns") is not True:
+        layers["allstar_services"] = _layer(
+            "blocked_by_upstream", "AllStar hostname access is blocked by DNS")
+    else:
+        layers["allstar_services"] = _layer(
+            "ok" if services is True else "fail" if services is False else "unknown",
+            f"{ALLSTAR_HOST}:{ALLSTAR_PORT} is reachable" if services is True else
+            "The configured AllStar service endpoint is unreachable" if services is False else
+            "AllStar service reachability was unavailable")
+
+    asterisk = checks.get("asterisk")
+    layers["asterisk"] = _layer(
+        "ok" if asterisk is True else "fail" if asterisk is False else "unknown",
+        "Asterisk CLI is responsive" if asterisk is True else
+        "Asterisk CLI is unavailable" if asterisk is False else
+        "Asterisk availability was not determined")
+
+    service_ok = layers["allstar_services"]["status"] == "ok"
+    registration = checks.get("allstar")
+    if asterisk is not True:
+        layers["allstar_registration"] = _layer(
+            "blocked_by_upstream", "Registration state requires responsive Asterisk")
+    elif registration is True:
+        layers["allstar_registration"] = _layer("ok", "App_Rpt reports registered")
+    elif not service_ok:
+        layers["allstar_registration"] = _layer(
+            "blocked_by_upstream", "Current registration health depends on AllStar service access")
+    else:
+        layers["allstar_registration"] = _layer(
+            "ok" if registration is True else "fail" if registration is False else "unknown",
+            "App_Rpt reports registered" if registration is True else
+            "App_Rpt does not report a registered node" if registration is False else
+            "Registration state was unavailable")
+
+    iax = checks.get("iax")
+    if asterisk is not True:
+        layers["iax"] = _layer("blocked_by_upstream", "IAX requires responsive Asterisk")
+    else:
+        layers["iax"] = _layer(
+            "ok" if iax is True else "fail" if iax is False else "unknown",
+            "Asterisk chan_iax2 is loaded and running" if iax is True else
+            "Asterisk chan_iax2 is not running" if iax is False else
+            "IAX module state was unavailable")
+
+    links = checks.get("remote_links")
+    if iax is not True:
+        layers["remote_links"] = _layer("blocked_by_upstream", "Remote links require IAX")
+    elif links is None:
+        layers["remote_links"] = _layer("unknown", "Remote link state was unavailable")
+    else:
+        troubled = [link for link in links if isinstance(link, dict)
+                    and link.get("state") != "established"]
+        layers["remote_links"] = _layer(
+            "fail" if troubled else "ok",
+            ("App_Rpt reports non-established link state for " +
+             ", ".join(str(link.get("node", "unknown")) for link in troubled))
+            if troubled else
+            (f"App_Rpt reports {len(links)} established remote link(s)" if links
+             else "App_Rpt reports no current remote link records"))
+        layers["remote_links"]["links"] = links
+    return layers
+
+
 def _message(domain, checks):
     messages = {
-        "healthy": "LAN, gateway, DNS, Internet, and AllStar registration are healthy",
+        "healthy": "LAN, gateway, DNS, Internet, AllStar, Asterisk, and IAX checks are healthy",
         "local_network": "No usable default network interface is available",
         "gateway": "The local interface is available but its default gateway is unreachable",
         "dns": "The gateway and external Internet are reachable, but DNS resolution failed",
         "external_internet": "The LAN and gateway are reachable, but the external Internet probe failed",
-        "allstar": "General Internet access is healthy, but AllStar registration is unavailable",
+        "allstar_services": "General Internet access works, but the AllStar service endpoint is unreachable",
+        "allstar_registration": "AllStar services and Asterisk are available, but App_Rpt is not registered",
+        "asterisk": "Network connectivity works, but the local Asterisk service is unavailable",
+        "iax": "Asterisk is available, but its IAX link layer is not running",
+        "remote_link": "Core services are healthy, but App_Rpt reports a remote link is not established",
         "unavailable": "Connectivity diagnostics are incomplete or unavailable",
     }
     return messages[domain]
@@ -210,8 +389,27 @@ def update(checks=None, now=None):
         "consecutive_failures": failures, "consecutive_successes": successes,
         "last_check": now.isoformat(), "stale_after_seconds": STALE_SECONDS,
         "message": _message(domain, checks),
+        "layers": diagnostic_layers(checks),
         "recovering_from": previous.get("failure_domain") if recovering else None,
     }
+    if domain == "healthy":
+        state["operator_action"] = "No operator action required"
+    elif diagnosis == "transient":
+        state["operator_action"] = "BlueNode is waiting for confirmation before escalating"
+    elif domain in ("local_network", "gateway"):
+        state["operator_action"] = "Check the local interface, cable/Wi-Fi, and router"
+    elif domain == "dns":
+        state["operator_action"] = "Check the configured DNS resolver; direct-IP Internet remains available"
+    elif domain == "external_internet":
+        state["operator_action"] = "Check the upstream Internet connection or ISP"
+    elif domain in ("allstar_services", "allstar_registration"):
+        state["operator_action"] = "Check AllStar service status and node registration"
+    elif domain in ("asterisk", "iax"):
+        state["operator_action"] = "Inspect the local Asterisk service and IAX module"
+    elif domain == "remote_link":
+        state["operator_action"] = "Inspect the named link; BlueNode cannot infer the remote cause"
+    else:
+        state["operator_action"] = "Wait for fresh diagnostics or inspect unavailable probes"
     previous_diagnosis = previous.get("diagnosis")
     if previous_diagnosis and previous_diagnosis != diagnosis:
         emit(f"CONNECTIVITY.{diagnosis.upper()}", state["message"])
@@ -232,7 +430,9 @@ def public_state(now=None):
         return {"status": "unavailable", "diagnosis": "unavailable",
                 "failure_domain": "unavailable", "checks": {}, "stale": True,
                 "last_check": state.get("last_check"),
-                "message": "Cached connectivity diagnostics are stale"}
+                "message": "Cached connectivity diagnostics are stale",
+                "operator_action": "Wait for the next diagnostic refresh",
+                "layers": {}}
     state["stale"] = False
     return state
 

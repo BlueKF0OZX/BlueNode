@@ -1006,6 +1006,7 @@
 
         <div id="internet" class="value">Loading...</div>
         <div id="connectivity-summary" class="connectivity-summary">Diagnostics loading...</div>
+        <div id="connectivity-details" class="connectivity-summary" style="display:none"></div>
 
       </div>
 
@@ -1748,14 +1749,38 @@
         recovering: 'Verifying recovery', local_network_failure: 'Local interface failure',
         gateway_failure: 'Gateway failure', dns_failure: 'DNS failure',
         external_internet_failure: 'External Internet failure',
-        allstar_failure: 'AllStar connectivity failure', unavailable: 'Diagnostics unavailable'
+        allstar_services_failure: 'AllStar service failure',
+        allstar_registration_failure: 'AllStar registration failure',
+        asterisk_failure: 'Asterisk failure', iax_failure: 'IAX failure',
+        remote_link_failure: 'Remote link failure', unavailable: 'Diagnostics unavailable'
       };
       const flag = value => value === true ? 'OK' : value === false ? 'FAIL' : '\u2014';
+      const checkedAt = new Date(state.last_check || '');
+      const checkedAge = Number.isNaN(checkedAt.getTime()) ? '' :
+        ' \u00b7 checked ' + Math.max(0, Math.floor((Date.now() - checkedAt.getTime()) / 1000)) + 's ago';
       document.getElementById('connectivity-summary').textContent =
         (labels[state.diagnosis] || labels.unavailable) + ' \u00b7 ' +
         'LAN ' + flag(checks.interface) + ' \u00b7 Gateway ' + flag(checks.gateway) +
         ' \u00b7 DNS ' + flag(checks.dns) + ' \u00b7 Internet ' + flag(checks.internet) +
-        ' \u00b7 AllStar ' + flag(checks.allstar);
+        ' \u00b7 AllStar ' + flag(checks.allstar) + checkedAge;
+      const details = document.getElementById('connectivity-details');
+      if (state.diagnosis === 'healthy') {
+        details.textContent = '';
+        details.style.display = 'none';
+        return;
+      }
+      const layerNames = {
+        local_network: 'LAN', gateway: 'Gateway', dns: 'DNS', internet: 'Internet',
+        allstar_services: 'AllStar services', allstar_registration: 'Registration',
+        asterisk: 'Asterisk', iax: 'IAX', remote_links: 'Remote links'
+      };
+      const layerText = Object.entries(state.layers || {}).map(([name, layer]) =>
+        (layerNames[name] || name) + ' ' + String(layer.status || 'unknown').toUpperCase()
+      ).join(' \u00b7 ');
+      details.textContent = (state.message || 'Failure boundary unavailable') +
+        (layerText ? ' | ' + layerText : '') +
+        (state.operator_action ? ' | Action: ' + state.operator_action : '');
+      details.style.display = '';
     }
 
     function radioDuration(timestamp) {

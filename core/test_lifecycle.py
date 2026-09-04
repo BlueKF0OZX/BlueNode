@@ -224,7 +224,11 @@ class LifecycleTests(unittest.TestCase):
             "gateway": ("offline", "gateway_failure", "Local BlueNode monitoring"),
             "dns": ("degraded", "dns_failure", "direct-IP Internet"),
             "external_internet": ("offline", "external_internet_failure", "default gateway"),
-            "allstar": ("degraded", "allstar_failure", "general Internet"),
+            "allstar_services": ("degraded", "allstar_services_failure", "general Internet"),
+            "allstar_registration": ("degraded", "allstar_registration_failure", "AllStar service"),
+            "asterisk": ("degraded", "asterisk_failure", "network"),
+            "iax": ("degraded", "iax_failure", "Asterisk core"),
+            "remote_link": ("degraded", "remote_link_failure", "Core network"),
             "local_network": ("offline", "local_network_failure", "local system monitoring"),
         }
         for domain, (status, diagnosis, expected) in scenarios.items():

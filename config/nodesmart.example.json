@@ -77,7 +77,9 @@
     "stale_seconds": 120,
     "dns_test_host": "example.com",
     "external_test_host": "1.1.1.1",
-    "external_test_port": 443
+    "external_test_port": 443,
+    "allstar_service_host": "register.allstarlink.org",
+    "allstar_service_port": 443
 
   }
 

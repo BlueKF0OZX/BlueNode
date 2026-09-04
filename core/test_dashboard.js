@@ -29,7 +29,7 @@ assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,
 assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
   'No section heading may appear between Intelligence and Recent Sessions');
 for (const id of ['disk', 'connections-today', 'control-result',
-  'connectivity-summary',
+  'connectivity-summary', 'connectivity-details',
   'radio-activity-panel', 'radio-activity-title', 'radio-activity-summary',
   'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-callsign-detail',
   'radio-location-detail', 'radio-duration',
@@ -94,12 +94,20 @@ vm.runInContext(html.slice(start,end),context);
   const connectivityStart=html.indexOf('    function renderConnectivity');
   const connectivityEnd=html.indexOf('    function radioDuration',connectivityStart);
   vm.runInContext(html.slice(connectivityStart,connectivityEnd),context);
-  context.renderConnectivity({diagnosis:'healthy',checks:{interface:true,gateway:true,
-    dns:true,internet:true,allstar:true}});
+  context.renderConnectivity({diagnosis:'healthy',last_check:new Date().toISOString(),
+    checks:{interface:true,gateway:true,dns:true,internet:true,allstar:true}});
   assert.match(element('connectivity-summary').textContent,/Healthy.*Gateway OK.*DNS OK.*AllStar OK/);
+  assert.match(element('connectivity-summary').textContent,/checked \d+s ago/);
+  assert.equal(element('connectivity-details').style.display,'none');
   context.renderConnectivity({diagnosis:'dns_failure',checks:{interface:true,gateway:true,
-    dns:false,internet:true,allstar:true}});
+    dns:false,internet:true,allstar:true},message:'DNS resolution failed',
+    operator_action:'Check DNS',layers:{local_network:{status:'ok'},gateway:{status:'ok'},
+      dns:{status:'fail'},internet:{status:'ok'},
+      allstar_services:{status:'blocked_by_upstream'}}});
   assert.match(element('connectivity-summary').textContent,/DNS failure.*DNS FAIL.*Internet OK/);
+  assert.match(element('connectivity-details').textContent,
+    /DNS resolution failed.*DNS FAIL.*Internet OK.*AllStar services BLOCKED_BY_UPSTREAM.*Action: Check DNS/);
+  assert.equal(element('connectivity-details').style.display,'');
   const radioStart=html.indexOf('    function radioDuration');
   const radioEnd=html.indexOf('    function automationAge',radioStart);
   vm.runInContext(html.slice(radioStart,radioEnd),context);
