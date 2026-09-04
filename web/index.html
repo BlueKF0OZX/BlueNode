@@ -196,9 +196,9 @@
 
     .manual-node-control {
 
-      margin-top: 20px;
+      margin-top: 14px;
 
-      padding-top: 18px;
+      padding-top: 12px;
 
       border-top: 1px solid #374151;
 
@@ -208,7 +208,7 @@
 
     .manual-node-control h3 {
 
-      margin: 0 0 12px 0;
+      margin: 0 0 8px 0;
 
       font-size: 16px;
 
@@ -224,7 +224,7 @@
 
       grid-template-columns: minmax(140px, 1fr) auto auto;
 
-      gap: 10px;
+      gap: 8px;
 
     }
 
@@ -238,7 +238,7 @@
 
       border-radius: 8px;
 
-      padding: 12px 14px;
+      padding: 10px 12px;
 
       font-size: 16px;
 
@@ -282,9 +282,9 @@
 
     .node-directory {
 
-      margin-top: 18px;
+      margin-top: 14px;
 
-      padding-top: 18px;
+      padding-top: 12px;
 
       border-top: 1px solid #374151;
 
@@ -294,7 +294,7 @@
 
     .node-directory h3 {
 
-      margin: 0 0 12px 0;
+      margin: 0 0 8px 0;
 
       font-size: 16px;
 
@@ -310,7 +310,7 @@
 
       grid-template-columns: 1fr auto;
 
-      gap: 10px;
+      gap: 8px;
 
     }
 
@@ -322,7 +322,7 @@
 
       border-radius: 8px;
 
-      padding: 12px 14px;
+      padding: 10px 12px;
 
       font-size: 16px;
 
@@ -410,23 +410,27 @@
 
 
     .controls-panel {
-      margin-top: 25px;
+      margin-top: 18px;
       background: #1f2937;
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px 18px;
+    }
+
+    .controls-panel h2 {
+      margin: 0;
     }
 
     .controls-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin-top: 15px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
     }
 
     .control-button {
       border: none;
       border-radius: 8px;
-      padding: 14px 16px;
+      padding: 10px 12px;
       font-size: 15px;
       font-weight: bold;
       cursor: pointer;
@@ -444,9 +448,13 @@
     }
 
     #control-result {
-      margin-top: 12px;
+      margin-top: 8px;
       font-size: 14px;
       color: #9ca3af;
+    }
+
+    #control-result:empty {
+      display: none;
     }
 
     .event-row {
@@ -604,7 +612,9 @@
 
       .grid,
 
-      .connection-summary-strip {
+      .connection-summary-strip,
+
+      .controls-grid {
 
         grid-template-columns: repeat(2, minmax(0, 1fr));
 
@@ -618,7 +628,9 @@
 
       .grid,
 
-      .connection-summary-strip {
+      .connection-summary-strip,
+
+      .controls-grid {
 
         grid-template-columns: 1fr;
 
@@ -999,6 +1011,42 @@
 
     </div>
 
+    <div class="grid">
+
+
+
+
+      <div class="card">
+        <div class="label">Connections Today</div>
+        <div id="connections-today" class="value">0</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Connected Time Today</div>
+        <div id="connected-time-today" class="value">0m</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Last Session</div>
+        <div id="last-session" class="value">None</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Active Connections</div>
+        <div id="active-connections" class="value">0</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Current Session</div>
+        <div id="current-session" class="value">None</div>
+      </div>
+
+    </div>
+
+
+
+
+
     <div class="controls-panel">
       <h2>BlueNode Controls</h2>
 
@@ -1114,48 +1162,6 @@
       <div id="control-result"></div>
     </div>
 
-    <div class="grid">
-
-
-
-
-      <div class="card">
-        <div class="label">Connections Today</div>
-        <div id="connections-today" class="value">0</div>
-      </div>
-
-      <div class="card">
-        <div class="label">Connected Time Today</div>
-        <div id="connected-time-today" class="value">0m</div>
-      </div>
-
-      <div class="card">
-        <div class="label">Last Session</div>
-        <div id="last-session" class="value">None</div>
-      </div>
-
-      <div class="card">
-        <div class="label">Active Connections</div>
-        <div id="active-connections" class="value">0</div>
-      </div>
-
-      <div class="card">
-        <div class="label">Current Session</div>
-        <div id="current-session" class="value">None</div>
-      </div>
-
-    </div>
-
-
-
-
-
-    <div id="recovery-panel" class="recovery-panel recovery-success">
-      <h2>Automatic Recovery</h2>
-      <div id="recovery-status" class="value">Loading...</div>
-      <div id="recovery-detail"></div>
-    </div>
-
     <div id="intelligence-panel" class="events-panel">
       <h2>BlueNode Intelligence</h2>
       <div id="intelligence-summary">Loading intelligence...</div>
@@ -1210,6 +1216,14 @@
 
       <div id="events">Loading events...</div>
 
+    </div>
+
+
+
+    <div id="recovery-panel" class="recovery-panel recovery-success">
+      <h2>Automatic Recovery</h2>
+      <div id="recovery-status" class="value">Loading...</div>
+      <div id="recovery-detail"></div>
     </div>
 
 

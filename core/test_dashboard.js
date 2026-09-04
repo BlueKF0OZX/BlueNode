@@ -13,17 +13,39 @@ const connectionStats = html.indexOf('id="connections-today"');
 const intelligence = html.indexOf('<h2>BlueNode Intelligence</h2>');
 const sessions = html.indexOf('<h2>Recent Sessions</h2>');
 const events = html.indexOf('<h2>Recent Events</h2>');
-assert.ok(disk < controls && controls < connectionStats,
-  'Controls must follow the top status cards and precede connection statistics');
+const recovery = html.indexOf('<h2>Automatic Recovery</h2>');
+assert.ok(disk < connectionStats && connectionStats < controls,
+  'Status cards and connection statistics must remain together before Controls');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
+assert.ok(controls < intelligence && events < recovery,
+  'Controls must precede Intelligence and remaining content must follow Events');
 assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
   'No section heading may appear between Intelligence and Recent Sessions');
 for (const id of ['disk', 'connections-today', 'control-result',
-  'intelligence-panel', 'recent-sessions', 'events']) {
+  'intelligence-panel', 'recent-sessions', 'events',
+  'btn-dodropin-connect', 'btn-dodropin-disconnect', 'btn-skywarn-on',
+  'btn-skywarn-off', 'manual-node-number', 'node-directory-search']) {
   assert.equal(html.split('id="' + id + '"').length - 1, 1,
     'Moved element ID must remain unique: ' + id);
 }
+for (const handler of ["runControl('dodropin-connect', this)",
+  "runControl('dodropin-disconnect', this)",
+  "runControl('skywarn-enable', this)",
+  "runControl('skywarn-disable', this)",
+  "runNodeControl('node-connect', this)",
+  "runNodeControl('node-disconnect', this)", 'searchAllStarNodes()']) {
+  assert.ok(html.includes('onclick="' + handler + '"'),
+    'Control handler must remain wired: ' + handler);
+}
+assert.match(html, /fetch\('\/api\/control\/' \+ action/,
+  'Control API endpoint must remain unchanged');
+assert.match(html, /\.controls-grid\s*{[^}]*grid-template-columns:\s*repeat\(4,/s,
+  'Quick actions must use a four-column desktop row');
+assert.match(html, /@media \(max-width: 750px\)[\s\S]*?\.controls-grid\s*{[\s\S]*?repeat\(2,/,
+  'Quick actions must collapse to two columns on smaller screens');
+assert.match(html, /@media \(max-width: 480px\)[\s\S]*?\.controls-grid\s*{[\s\S]*?1fr/,
+  'Quick actions must collapse to one column on narrow screens');
 const start = html.indexOf('    async function loadRecoveryStatus()');
 const end = html.indexOf('    let statusLoading', start);
 const elements = {};
