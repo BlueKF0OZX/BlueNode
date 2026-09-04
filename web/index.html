@@ -582,39 +582,6 @@
     }
 
 
-    .recovery-panel {
-      margin-top: 18px;
-      padding: 18px;
-      border-radius: 12px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .recovery-panel h2 {
-      margin-top: 0;
-    }
-
-    .recovery-success {
-      border-left: 4px solid #22c55e;
-    }
-
-    .recovery-warning {
-      border-left: 4px solid #f59e0b;
-    }
-
-    .recovery-critical {
-      border-left: 4px solid #ef4444;
-    }
-
-    #recovery-detail {
-      margin-top: 8px;
-      font-size: 13px;
-      color: #9ca3af;
-      line-height: 1.5;
-    }
-
-
-
     .grid .card {
 
       min-height: 108px;
@@ -1264,12 +1231,6 @@
       <div id="control-result"></div>
     </div>
 
-    <div id="recovery-panel" class="recovery-panel recovery-success">
-      <h2>Automatic Recovery</h2>
-      <div id="recovery-status" class="value">Loading...</div>
-      <div id="recovery-detail"></div>
-    </div>
-
     <div id="automation-panel" class="automation-panel">
       <div class="automation-heading">
         <h2 id="automation-title">AUTOMATION — LOADING</h2>
@@ -1763,88 +1724,6 @@
 
       if (skywarnOnButton) skywarnOnButton.disabled = skywarnEnabled;
       if (skywarnOffButton) skywarnOffButton.disabled = !skywarnEnabled;
-    }
-
-    async function loadRecoveryStatus() {
-      const statusElement = document.getElementById('recovery-status');
-      const detailElement = document.getElementById('recovery-detail');
-      const recoveryPanel = document.getElementById('recovery-panel');
-
-
-      try {
-        const response = await fetch('/state/recovery.json?ts=' + Date.now());
-
-        if (!response.ok) {
-          throw new Error('Recovery state unavailable');
-        }
-
-        const data = await response.json();
-
-
-        const intelligenceResponse = await fetch('/state/intelligence.json?ts=' + Date.now());
-        if (!intelligenceResponse.ok) throw new Error('Intelligence unavailable');
-        const intelligenceData = await intelligenceResponse.json();
-        const last = Object.prototype.hasOwnProperty.call(intelligenceData, 'recovery_display')
-          ? intelligenceData.recovery_display : data.last_recovery;
-
-        if (recoveryPanel) {
-          recoveryPanel.classList.remove(
-            'recovery-success',
-            'recovery-warning',
-            'recovery-critical'
-          );
-        }
-
-        if (!last) {
-          statusElement.textContent = 'Ready';
-          if (recoveryPanel) recoveryPanel.classList.add('recovery-success');
-          statusElement.className = 'value normal';
-          detailElement.textContent = '';
-          return;
-        }
-
-        statusElement.classList.remove(
-          'normal', 'warning', 'critical', 'unknown'
-        );
-
-        if (last.status === 'success') {
-          statusElement.textContent = 'Last recovery successful';
-          if (recoveryPanel) recoveryPanel.classList.add('recovery-success');
-          statusElement.classList.add('normal');
-        } else if (last.status === 'failed' || last.status === 'lockout') {
-          statusElement.textContent = last.status === 'lockout' ? 'Recovery locked out' : 'Recovery failed';
-          if (recoveryPanel) recoveryPanel.classList.add('recovery-critical');
-          statusElement.classList.add('critical');
-        } else {
-          statusElement.textContent = 'Recovery cancelled';
-          if (recoveryPanel) recoveryPanel.classList.add('recovery-warning');
-          statusElement.classList.add('warning');
-        }
-
-        let timestamp = '';
-
-        if (last.timestamp) {
-          const parsed = new Date(last.timestamp);
-          if (!Number.isNaN(parsed.getTime())) {
-            timestamp = parsed.toLocaleString();
-          }
-        }
-
-        const component =
-          last.component === 'asterisk' ? 'Asterisk' : last.component;
-
-        detailElement.textContent =
-          component + ': ' + last.message +
-          (timestamp ? ' — ' + timestamp : '');
-
-      } catch (error) {
-        if (recoveryPanel) recoveryPanel.classList.remove(
-          'recovery-success', 'recovery-warning', 'recovery-critical'
-        );
-        statusElement.textContent = 'Recovery status unavailable';
-        statusElement.className = 'value unknown';
-        detailElement.textContent = '';
-      }
     }
 
     function renderConnectivity(state) {
@@ -2820,8 +2699,6 @@
 
     loadStatus();
     loadAdminSession();
-    loadRecoveryStatus();
-
     loadEvents();
 
 
@@ -2830,7 +2707,6 @@
 
     setInterval(loadEvents, 5000);
 
-    setInterval(loadRecoveryStatus, 5000);
     setInterval(updateLiveConnectedTime, 1000);
     setInterval(updateCurrentSession, 1000);
 

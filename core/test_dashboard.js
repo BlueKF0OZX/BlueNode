@@ -14,15 +14,16 @@ const radioActivity = html.indexOf('id="radio-activity-panel"');
 const intelligence = html.indexOf('<h2>BlueNode Intelligence</h2>');
 const sessions = html.indexOf('<h2>Recent Sessions</h2>');
 const events = html.indexOf('<h2>Recent Events</h2>');
-const recovery = html.indexOf('<h2>Automatic Recovery</h2>');
 const automation = html.indexOf('id="automation-title"');
 const remoteAdmin = html.indexOf('id="remote-admin-panel"');
 assert.ok(disk < connectionStats && connectionStats < radioActivity && radioActivity < controls,
   'Radio Activity must follow status/statistics and precede Controls');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
-assert.ok(controls < recovery && recovery < automation && automation < remoteAdmin && remoteAdmin < intelligence,
-  'Operational order must be Controls, Recovery, Automation, optional Admin, Intelligence');
+assert.ok(controls < automation && automation < remoteAdmin && remoteAdmin < intelligence,
+  'Operational order must be Controls, Automation, optional Admin, Intelligence');
+assert.doesNotMatch(html, /<h2>Automatic Recovery<\/h2>|id="recovery-panel"|loadRecoveryStatus/,
+  'The redundant standalone recovery presentation must remain removed');
 assert.match(html, /async function loadAdminSession\(\)/);
 assert.match(html, /Type RESTART ASTERISK/);
 assert.match(html, /adminHeaders\(\{'Content-Type': 'application\/json'\}\)/);
@@ -37,7 +38,6 @@ for (const id of ['disk', 'connections-today', 'control-result',
   'radio-activity-panel', 'radio-activity-title', 'radio-activity-summary',
   'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-callsign-detail',
   'radio-location-detail', 'radio-duration',
-  'recovery-panel', 'recovery-status', 'recovery-detail',
   'automation-panel', 'automation-title', 'automation-summary',
   'automation-recovery-armed', 'automation-protection',
   'automation-maintenance', 'automation-last-check', 'automation-attempts',
@@ -67,34 +67,16 @@ assert.match(html, /@media \(max-width: 750px\)[\s\S]*?\.controls-grid\s*,[\s\S]
   'Quick actions must collapse to two columns on smaller screens');
 assert.match(html, /@media \(max-width: 480px\)[\s\S]*?\.controls-grid\s*,[\s\S]*?1fr/,
   'Quick actions must collapse to one column on narrow screens');
-const start = html.indexOf('    async function loadRecoveryStatus()');
-const end = html.indexOf('    let statusLoading', start);
 const elements = {};
 function element(id) {
   return elements[id] ||= {textContent:'', className:'', dataset:{}, style:{},
     classList:{add(){}, remove(){}}};
 }
-let display;
 const context = vm.createContext({Date, Number, Object, Error,
   document: {getElementById:element},
-  fetch: async url => ({ok:true, json:async()=>url.includes('intelligence')
-    ? {recovery_display:display} : {last_recovery:{status:'failed'}}})
+  fetch: async()=>({ok:true, json:async()=>({})})
 });
-vm.runInContext(html.slice(start,end),context);
 (async()=>{
-  display=null;
-  await context.loadRecoveryStatus();
-  assert.equal(element('recovery-status').textContent,'Ready');
-  assert.equal(element('recovery-detail').textContent,'');
-  display={status:'failed', component:'asterisk', message:'Restart failed'};
-  await context.loadRecoveryStatus();
-  assert.equal(element('recovery-status').textContent,'Recovery failed');
-  display={status:'lockout',component:'asterisk',message:'Rate limited'};
-  await context.loadRecoveryStatus();
-  assert.equal(element('recovery-status').textContent,'Recovery locked out');
-  display=null;
-  await context.loadRecoveryStatus();
-  assert.equal(element('recovery-status').className,'value normal');
   const connectivityStart=html.indexOf('    function renderConnectivity');
   const connectivityEnd=html.indexOf('    function radioDuration',connectivityStart);
   vm.runInContext(html.slice(connectivityStart,connectivityEnd),context);
@@ -180,5 +162,5 @@ vm.runInContext(html.slice(start,end),context);
   assert.equal(calls,2,'Refresh guard must reset after failure');
   resolveFetch({json:async()=>{throw new Error('Fixture failure');}});
   await next;
-  console.log('Dashboard recovery transitions and polling guard passed.');
+  console.log('Dashboard presentation and polling guard passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
