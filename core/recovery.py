@@ -1,764 +1,183 @@
 #!/usr/bin/env python3
 
-
+"""Automatic Asterisk recovery with verified completion."""
 
 import json
-
 import subprocess
-
 import time
-
 from datetime import datetime, timezone
-
 from pathlib import Path
 
-
-
+import automation
+from config import load_config
 from event_logger import emit
 
-from config import load_config
-
-
-
-
-
 CONFIG = load_config()
-
 RECOVERY_CONFIG = CONFIG.get("recovery", {})
-
-DISPLAY_RESET_HOURS = int(
-    RECOVERY_CONFIG.get(
-        "display_reset_hours",
-        6,
-    )
-)
-
-
-
-ASTERISK_RECOVERY_ENABLED = RECOVERY_CONFIG.get(
-
-    "asterisk_enabled",
-
-    True,
-
-)
-
-
-
-COOLDOWN_SECONDS = int(
-
-    RECOVERY_CONFIG.get(
-
-        "asterisk_cooldown_seconds",
-
-        600,
-
-    )
-
-)
-
-
-
-MAX_ATTEMPTS = int(
-
-    RECOVERY_CONFIG.get(
-
-        "asterisk_max_attempts",
-
-        3,
-
-    )
-
-)
-
-
-
-ATTEMPT_WINDOW_SECONDS = int(
-
-    RECOVERY_CONFIG.get(
-
-        "asterisk_attempt_window_seconds",
-
-        3600,
-
-    )
-
-)
-
-
-
-LOCKOUT_SECONDS = int(
-
-    RECOVERY_CONFIG.get(
-
-        "asterisk_lockout_seconds",
-
-        3600,
-
-    )
-
-)
-
-
-
+NODE = str(CONFIG.get("node", ""))
+DISPLAY_RESET_HOURS = int(RECOVERY_CONFIG.get("display_reset_hours", 6))
+ASTERISK_RECOVERY_ENABLED = RECOVERY_CONFIG.get("asterisk_enabled", True)
+VERIFY_TIMEOUT_SECONDS = int(RECOVERY_CONFIG.get("verification_timeout_seconds", 30))
+VERIFY_STABLE_CHECKS = int(RECOVERY_CONFIG.get("verification_stable_checks", 2))
+VERIFY_INTERVAL_SECONDS = int(RECOVERY_CONFIG.get("verification_interval_seconds", 2))
 STATE_FILE = Path("/opt/nodesmart/state/system.json")
-
+INTELLIGENCE_FILE = Path("/opt/nodesmart/state/intelligence.json")
+ALLSTAR_STATE_FILE = Path("/opt/nodesmart/events/allstar_state.json")
 RECOVERY_STATE_FILE = Path("/opt/nodesmart/state/recovery.json")
 
 
-
-
-
 def asterisk_online():
-
     try:
-
         result = subprocess.run(
-
-            [
-
-                "sudo",
-
-                "-n",
-
-                "asterisk",
-
-                "-rx",
-
-                "core show version",
-
-            ],
-
-            capture_output=True,
-
-            text=True,
-
-            timeout=5,
-
+            ["sudo", "-n", "asterisk", "-rx", "core show version"],
+            capture_output=True, text=True, timeout=5,
         )
-
-
-
         return result.returncode == 0
-
-
-
     except (subprocess.SubprocessError, OSError):
-
         return False
 
 
-
-
-
-def load_system_state():
-
+def allstar_reachable():
+    if not NODE.isdigit():
+        return False
     try:
+        result = subprocess.run(
+            ["sudo", "-n", "asterisk", "-rx", f"rpt lstats {NODE}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, OSError):
+        return False
 
-        with STATE_FILE.open() as file:
 
-            return json.load(file)
-
-
-
-    except (OSError, json.JSONDecodeError):
-
+def load_json(path):
+    try:
+        with path.open(encoding="utf-8") as file:
+            value = json.load(file)
+        return value if isinstance(value, dict) else None
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return None
 
 
-
+def load_system_state():
+    return load_json(STATE_FILE)
 
 
 def load_recovery_state():
-
-    try:
-
-        with RECOVERY_STATE_FILE.open() as file:
-
-            return json.load(file)
-
-
-
-    except (OSError, json.JSONDecodeError):
-
-        return {}
-
-
-
+    return load_json(RECOVERY_STATE_FILE) or {}
 
 
 def save_recovery_state(data):
-
     data["display_reset_hours"] = DISPLAY_RESET_HOURS
-
-    RECOVERY_STATE_FILE.parent.mkdir(
-
-        parents=True,
-
-        exist_ok=True,
-
-    )
-
-
-
-    temp_file = RECOVERY_STATE_FILE.with_suffix(".tmp")
-
-
-
-    with temp_file.open("w") as file:
-
+    RECOVERY_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = RECOVERY_STATE_FILE.with_suffix(".tmp")
+    with temporary.open("w", encoding="utf-8") as file:
         json.dump(data, file, indent=2)
-
-
-
-    temp_file.replace(RECOVERY_STATE_FILE)
-
-
-
+    temporary.replace(RECOVERY_STATE_FILE)
 
 
 def record_recovery_result(status, message):
-
-    recovery_state = load_recovery_state()
-
-
-
-    recovery_state["last_recovery"] = {
-
-        "component": "asterisk",
-
-        "status": status,
-
-        "message": message,
-
-        "timestamp": datetime.now(
-
-            timezone.utc
-
-        ).isoformat(),
-
+    state = load_recovery_state()
+    state["last_recovery"] = {
+        "component": "asterisk", "status": status, "message": message,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-
-
-
-    save_recovery_state(recovery_state)
-
-
-
+    save_recovery_state(state)
 
 
 def clear_recovery_limits():
-
-    recovery_state = load_recovery_state()
-
-
-
-    recovery_state["asterisk_attempt_history"] = []
-
-    recovery_state["asterisk_lockout_until"] = 0
+    state = load_recovery_state()
+    state["asterisk_attempt_history"] = []
+    state["asterisk_lockout_until"] = 0
+    save_recovery_state(state)
 
 
+def verify_recovery(started_at, timeout=None):
+    """Require fresh BlueNode state and stable Asterisk health after restart."""
+    timeout = VERIFY_TIMEOUT_SECONDS if timeout is None else timeout
+    deadline = time.monotonic() + timeout
+    stable = 0
+    last_reason = "Waiting for post-recovery health state"
+    while time.monotonic() <= deadline:
+        if not asterisk_online():
+            stable = 0
+            last_reason = "Asterisk CLI is not reachable"
+        else:
+            system = load_json(STATE_FILE)
+            intelligence = load_json(INTELLIGENCE_FILE)
+            allstar_valid = not ALLSTAR_STATE_FILE.exists() or load_json(ALLSTAR_STATE_FILE) is not None
+            try:
+                observed = datetime.fromisoformat(system["last_health_check"]).timestamp()
+            except (TypeError, KeyError, ValueError, AttributeError):
+                observed = 0
+            intelligence_fresh = (
+                intelligence is not None and INTELLIGENCE_FILE.exists()
+                and INTELLIGENCE_FILE.stat().st_mtime >= started_at
+            )
+            component_normal = (system or {}).get("health", {}).get("asterisk") == "normal"
+            if (system and system.get("asterisk") == "online" and component_normal
+                    and allstar_reachable() and observed >= started_at
+                    and intelligence_fresh and allstar_valid):
+                stable += 1
+                if stable >= max(1, VERIFY_STABLE_CHECKS):
+                    return True, "Asterisk and fresh BlueNode state passed post-recovery verification"
+                last_reason = "First healthy observation passed; checking for immediate recurrence"
+            else:
+                stable = 0
+                last_reason = "Fresh health, Intelligence, or AllStar state is not yet verified"
+        time.sleep(max(0, VERIFY_INTERVAL_SECONDS))
+    return False, last_reason
 
-    save_recovery_state(recovery_state)
 
-
-
+def _failed(message):
+    emit("RECOVERY.ASTERISK.FAILED", message)
+    record_recovery_result("failed", message)
+    automation.finish_recovery(False, message)
 
 
 def recover_asterisk():
-
     if not ASTERISK_RECOVERY_ENABLED:
-
         return
-
-
-
     state = load_system_state()
-
-
-
-    if not state:
-
+    if not state or state.get("asterisk") != "offline":
         return
-
-
-
-    if state.get("asterisk") != "offline":
-
-        return
-
-
-
-    # Health already detected a failure.
-
-    # Wait and independently confirm before acting.
-
     time.sleep(5)
-
-
-
     if asterisk_online():
-
-        emit(
-
-            "RECOVERY.ASTERISK.CANCELLED",
-
-            (
-
-                "Asterisk responded during verification; "
-
-                "restart not required"
-
-            ),
-
-        )
-
-
-
-        record_recovery_result(
-
-            "cancelled",
-
-            (
-
-                "Asterisk responded during verification; "
-
-                "restart not required"
-
-            ),
-
-        )
-
-
-
+        message = "Asterisk responded during verification; restart not required"
+        emit("RECOVERY.ASTERISK.CANCELLED", message)
+        record_recovery_result("cancelled", message)
         return
-
-
-
-    recovery_state = load_recovery_state()
-
-    now = int(time.time())
-
-
-
-    # --------------------------------------------------------
-
-    # Circuit-breaker lockout
-
-    # --------------------------------------------------------
-
-
-
-    lockout_until = int(
-
-        recovery_state.get(
-
-            "asterisk_lockout_until",
-
-            0,
-
-        )
-
-        or 0
-
-    )
-
-
-
-    if lockout_until > now:
-
+    if not automation.recovery_allowed(state):
         return
-
-
-
-    if lockout_until:
-
-        recovery_state["asterisk_lockout_until"] = 0
-
-
-
-    # --------------------------------------------------------
-
-    # Standard cooldown
-
-    # --------------------------------------------------------
-
-
-
-    last_attempt = int(
-
-        recovery_state.get(
-
-            "asterisk_last_attempt",
-
-            0,
-
-        )
-
-        or 0
-
-    )
-
-
-
-    if now - last_attempt < COOLDOWN_SECONDS:
-
-        save_recovery_state(recovery_state)
-
+    attempt = automation.begin_recovery()
+    if attempt is None:
         return
-
-
-
-    # --------------------------------------------------------
-
-    # Attempt-rate protection
-
-    # --------------------------------------------------------
-
-
-
-    history = recovery_state.get(
-
-        "asterisk_attempt_history",
-
-        [],
-
-    )
-
-
-
-    history = [
-
-        int(timestamp)
-
-        for timestamp in history
-
-        if now - int(timestamp)
-
-        < ATTEMPT_WINDOW_SECONDS
-
-    ]
-
-
-
-    if len(history) >= MAX_ATTEMPTS:
-
-        lockout_until = now + LOCKOUT_SECONDS
-
-
-
-        recovery_state[
-
-            "asterisk_attempt_history"
-
-        ] = history
-
-
-
-        recovery_state[
-
-            "asterisk_lockout_until"
-
-        ] = lockout_until
-
-
-
-        save_recovery_state(recovery_state)
-
-
-
-        message = (
-
-            f"Automatic recovery locked out after "
-
-            f"{len(history)} attempts within "
-
-            f"{ATTEMPT_WINDOW_SECONDS // 60} minutes"
-
-        )
-
-
-
-        emit(
-
-            "RECOVERY.ASTERISK.LOCKOUT",
-
-            message,
-
-        )
-
-
-
-        record_recovery_result(
-
-            "lockout",
-
-            message,
-
-        )
-
-
-
-        return
-
-
-
-    history.append(now)
-
-
-
-    recovery_state[
-
-        "asterisk_attempt_history"
-
-    ] = history
-
-
-
-    recovery_state[
-
-        "asterisk_last_attempt"
-
-    ] = now
-
-
-
-    save_recovery_state(recovery_state)
-
-
-
-    emit(
-
-        "RECOVERY.ASTERISK.ATTEMPT",
-
-        (
-
-            "Confirmed Asterisk offline; "
-
-            "attempting service restart"
-
-        ),
-
-    )
-
-
-
+    emit("RECOVERY.ASTERISK.ATTEMPT",
+         f"Confirmed Asterisk offline; recovery attempt {attempt} started")
+    started_at = time.time()
     try:
-
         result = subprocess.run(
-
-            [
-
-                "sudo",
-
-                "-n",
-
-                "systemctl",
-
-                "restart",
-
-                "asterisk",
-
-            ],
-
-            capture_output=True,
-
-            text=True,
-
-            timeout=20,
-
+            ["sudo", "-n", "systemctl", "restart", "asterisk"],
+            capture_output=True, text=True, timeout=20,
         )
-
-
-
     except subprocess.TimeoutExpired:
-
-        emit(
-
-            "RECOVERY.ASTERISK.FAILED",
-
-            "Asterisk restart command timed out",
-
-        )
-
-
-
-        record_recovery_result(
-
-            "failed",
-
-            "Asterisk restart command timed out",
-
-        )
-
-
-
+        _failed("Asterisk restart command timed out")
         return
-
-
-
     except OSError as exc:
-
-        message = (
-
-            f"Unable to execute restart: {exc}"
-
-        )
-
-
-
-        emit(
-
-            "RECOVERY.ASTERISK.FAILED",
-
-            message,
-
-        )
-
-
-
-        record_recovery_result(
-
-            "failed",
-
-            message,
-
-        )
-
-
-
+        _failed(f"Unable to execute restart: {exc}")
         return
-
-
-
     if result.returncode != 0:
-
-        message = (
-
-            result.stderr.strip()
-
-            or result.stdout.strip()
-
-            or (
-
-                "systemctl exited with status "
-
-                f"{result.returncode}"
-
-            )
-
-        )
-
-
-
-        emit(
-
-            "RECOVERY.ASTERISK.FAILED",
-
-            message,
-
-        )
-
-
-
-        record_recovery_result(
-
-            "failed",
-
-            message,
-
-        )
-
-
-
+        _failed(result.stderr.strip() or result.stdout.strip()
+                or f"systemctl exited with status {result.returncode}")
         return
-
-
-
-    # Give Asterisk time to finish starting before
-
-    # independently verifying the result.
-
-    time.sleep(8)
-
-
-
-    if asterisk_online():
-
-        emit(
-
-            "RECOVERY.ASTERISK.SUCCESS",
-
-            (
-
-                "Asterisk restarted and passed "
-
-                "verification"
-
-            ),
-
-        )
-
-
-
-        record_recovery_result(
-
-            "success",
-
-            (
-
-                "Asterisk restarted and passed "
-
-                "verification"
-
-            ),
-
-        )
-
-
-
-        # A successful recovery resets the circuit breaker.
-
-        clear_recovery_limits()
-
-
-
-    else:
-
-        emit(
-
-            "RECOVERY.ASTERISK.FAILED",
-
-            (
-
-                "Restart completed but Asterisk "
-
-                "still did not respond"
-
-            ),
-
-        )
-
-
-
-        record_recovery_result(
-
-            "failed",
-
-            (
-
-                "Restart completed but Asterisk "
-
-                "still did not respond"
-
-            ),
-
-        )
-
-
-
+    verified, message = verify_recovery(started_at)
+    if not verified:
+        _failed(f"Restart completed but verification failed: {message}")
+        return
+    emit("RECOVERY.ASTERISK.SUCCESS", message)
+    record_recovery_result("success", message)
+    automation.finish_recovery(True, message)
 
 
 if __name__ == "__main__":
-
     recover_asterisk()

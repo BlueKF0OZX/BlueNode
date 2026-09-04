@@ -9,6 +9,7 @@ from allstar_status import check_changes
 from health import build_state, load_previous_state, log_state_changes, save_state
 from intelligence import build_intelligence
 from recovery import recover_asterisk
+import automation
 
 
 POLL_INTERVAL_SECONDS = 2
@@ -17,13 +18,17 @@ POLL_INTERVAL_SECONDS = 2
 class RecoveryCoordinator:
     """Allow at most one background recovery attempt at a time."""
 
-    def __init__(self, worker=recover_asterisk, thread_factory=threading.Thread):
+    def __init__(self, worker=recover_asterisk, thread_factory=threading.Thread,
+                 recovery_policy=automation.recovery_allowed):
         self._worker = worker
         self._thread_factory = thread_factory
+        self._recovery_policy = recovery_policy
         self._lock = threading.Lock()
 
     def start_if_needed(self, state):
         if state.get("asterisk") != "offline":
+            return False
+        if not self._recovery_policy(state):
             return False
 
         # Claim recovery before creating the thread. A second health pass can
@@ -60,6 +65,7 @@ def run_health_cycle(recovery):
     log_state_changes(previous_state, state)
 
     # Preserve the observation even if Intelligence fails or takes extra time.
+    state["automation"] = automation.observe_health(state)
     save_state(state)
     recovery.start_if_needed(state)
 

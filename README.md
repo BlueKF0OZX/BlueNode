@@ -16,6 +16,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 - Event logging and incident correlation
 - BlueNode Intelligence summaries and recommendations
 - Automatic Asterisk recovery with verification, cooldown, and lockout protection
+- Automated Operations status, persistent Maintenance Mode, and repeated-failure backoff
 - Desktop/mobile web dashboard
 - systemd startup and installer support
 - Python standard library only

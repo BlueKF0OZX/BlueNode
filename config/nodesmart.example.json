@@ -39,8 +39,18 @@
 
     "asterisk_enabled": true,
 
-    "asterisk_cooldown_seconds": 600,
-    "display_reset_hours": 6
+    "display_reset_hours": 6,
+    "verification_timeout_seconds": 30,
+    "verification_stable_checks": 2,
+    "verification_interval_seconds": 2
+  },
+
+  "automation": {
+    "attempt_window_seconds": 3600,
+    "max_attempts": 3,
+    "minimum_cooldown_seconds": 600,
+    "maximum_backoff_seconds": 3600,
+    "healthy_reset_seconds": 900
 
   }
 

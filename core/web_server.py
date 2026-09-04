@@ -14,6 +14,7 @@ from pathlib import Path
 
 from event_logger import emit
 from config import load_config
+import automation
 
 
 
@@ -72,6 +73,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
         "/state/intelligence.json",
 
         "/state/system.json",
+        "/state/automation.json",
         "/events/allstar_state.json",
         "/logs/events.log",
 
@@ -203,6 +205,17 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
         action = self.path[len(prefix):].strip("/")
+
+        if action in ("maintenance-enable", "maintenance-disable"):
+            enabled = action == "maintenance-enable"
+            state = automation.set_maintenance(enabled)
+            self.send_json(200, {
+                "ok": True,
+                "action": action,
+                "message": "Maintenance mode enabled" if enabled else "Maintenance mode disabled",
+                "automation": state,
+            })
+            return
 
 
 

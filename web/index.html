@@ -463,6 +463,36 @@
       display: none;
     }
 
+    .automation-panel {
+      margin-top: 18px;
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 18px;
+      border-left: 4px solid #22c55e;
+    }
+    .automation-panel.automation-recovering { border-left-color: #3b82f6; }
+    .automation-panel.automation-recovered { border-left-color: #22c55e; }
+    .automation-panel.automation-maintenance { border-left-color: #f59e0b; }
+    .automation-panel.automation-attention { border-left-color: #ef4444; }
+    .automation-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .automation-heading h2 { margin: 0; }
+    .automation-summary { margin-top: 8px; color: #d1d5db; }
+    .automation-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px 18px;
+      margin-top: 12px;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+    .automation-action { margin-top: 12px; font-weight: 600; }
+
     .event-row {
       display: flex;
       gap: 14px;
@@ -620,7 +650,9 @@
 
       .connection-summary-strip,
 
-      .controls-grid {
+      .controls-grid,
+
+      .automation-grid {
 
         grid-template-columns: repeat(2, minmax(0, 1fr));
 
@@ -636,7 +668,9 @@
 
       .connection-summary-strip,
 
-      .controls-grid {
+      .controls-grid,
+
+      .automation-grid {
 
         grid-template-columns: 1fr;
 
@@ -1174,6 +1208,24 @@
       <div id="recovery-detail"></div>
     </div>
 
+    <div id="automation-panel" class="automation-panel">
+      <div class="automation-heading">
+        <h2 id="automation-title">AUTOMATION — LOADING</h2>
+        <button id="maintenance-toggle" class="control-button"
+                onclick="toggleMaintenance(this)">Maintenance Mode</button>
+      </div>
+      <div id="automation-summary" class="automation-summary">Loading automated operations...</div>
+      <div class="automation-grid">
+        <div>Automatic recovery: <span id="automation-recovery-armed">—</span></div>
+        <div>Repeated-failure protection: <span id="automation-protection">—</span></div>
+        <div>Maintenance mode: <span id="automation-maintenance">—</span></div>
+        <div>Last automation check: <span id="automation-last-check">—</span></div>
+        <div>Recovery attempts today: <span id="automation-attempts">0</span></div>
+        <div id="automation-backoff">Cooldown: None</div>
+      </div>
+      <div id="automation-action" class="automation-action">No operator action required</div>
+    </div>
+
     <div id="intelligence-panel" class="events-panel">
       <h2>BlueNode Intelligence</h2>
       <div id="intelligence-summary">Loading intelligence...</div>
@@ -1644,6 +1696,75 @@
       }
     }
 
+    function automationAge(timestamp) {
+      const parsed = new Date(timestamp || '');
+      if (Number.isNaN(parsed.getTime())) return 'Unavailable';
+      const seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
+      if (seconds < 5) return 'Just now';
+      if (seconds < 60) return seconds + ' seconds ago';
+      return Math.floor(seconds / 60) + ' minutes ago';
+    }
+
+    function renderAutomation(state) {
+      state = state || {};
+      const panel = document.getElementById('automation-panel');
+      const mode = String(state.mode || 'active').toLowerCase();
+      const labels = {
+        active: 'ACTIVE', recovering: 'RECOVERING', recovered: 'RECOVERED',
+        attention: 'ATTENTION', maintenance: 'MAINTENANCE'
+      };
+      panel.className = 'automation-panel automation-' + mode;
+      document.getElementById('automation-title').textContent =
+        'AUTOMATION — ' + (labels[mode] || 'UNKNOWN');
+      const summaries = {
+        active: 'Monitoring continuously',
+        recovering: (state.last_action || 'Asterisk became unavailable') +
+          ' — ' + (state.last_result || 'Verifying service health...'),
+        recovered: state.last_result || 'Monitoring resumed',
+        attention: state.escalation_reason || 'Repeated instability detected',
+        maintenance: 'Monitoring continues; automatic actions are intentionally paused'
+      };
+      document.getElementById('automation-summary').textContent =
+        summaries[mode] || 'Automation state unavailable';
+      document.getElementById('automation-recovery-armed').textContent =
+        state.automation_armed ? 'Armed' :
+          (state.mode === 'attention' ? 'Backed off' : 'Suspended');
+      document.getElementById('automation-protection').textContent =
+        state.repeated_failure_protection === false ? 'Unavailable' : 'Armed';
+      document.getElementById('automation-maintenance').textContent =
+        state.maintenance_mode ? 'On' : 'Off';
+      document.getElementById('automation-last-check').textContent =
+        automationAge(state.last_automation_check);
+      document.getElementById('automation-attempts').textContent =
+        String(state.recovery_attempts_today || 0);
+      const until = state.backoff_until_iso || state.cooldown_until_iso;
+      document.getElementById('automation-backoff').textContent =
+        until ? 'Backoff/cooldown until: ' + new Date(until).toLocaleString() : 'Cooldown: None';
+      document.getElementById('automation-action').textContent =
+        state.operator_attention_required ? 'Operator attention recommended' :
+        mode === 'maintenance' ? 'Automation intentionally paused' : 'No operator action required';
+      const button = document.getElementById('maintenance-toggle');
+      button.textContent = state.maintenance_mode ? 'Disable Maintenance Mode' : 'Enable Maintenance Mode';
+      button.dataset.enabled = state.maintenance_mode ? 'true' : 'false';
+    }
+
+    async function toggleMaintenance(button) {
+      const enable = button.dataset.enabled !== 'true';
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/control/maintenance-' + (enable ? 'enable' : 'disable'), {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Maintenance control failed');
+        renderAutomation(result.automation);
+      } catch (error) {
+        document.getElementById('automation-action').textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     let statusLoading = false;
     async function loadStatus() {
       if (statusLoading) return;
@@ -1708,6 +1829,7 @@
         setValue('skywarn', data.skywarn);
 
         updateControlStates(data);
+        renderAutomation(data.automation);
 
         const intelligenceElement =
           document.getElementById('intelligence-summary');

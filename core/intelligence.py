@@ -1782,6 +1782,9 @@ def build_intelligence(state=None):
 
     recovery_failures_day = incident_stats["recovery_failures_day"]
 
+    automation_state = state.get("automation", {})
+    automation_mode = str(automation_state.get("mode", "active")).lower()
+
 
 
     repeated_failure_warning = failures_day >= 2
@@ -1858,6 +1861,16 @@ def build_intelligence(state=None):
     else:
         level, attention_required = "unknown", True
 
+    if automation_mode == "attention":
+        level = "critical" if state.get("asterisk") == "offline" else "warning"
+        attention_required = True
+        escalation = automation_state.get("escalation_reason") or "Automated recovery is backed off"
+        if escalation not in reasons:
+            reasons.append(escalation)
+    elif automation_mode == "recovering":
+        level = "warning"
+        attention_required = False
+
     recent_activity = recent_activity_stats()
 
 
@@ -1906,6 +1919,8 @@ def build_intelligence(state=None):
 
         "inferred_resolutions": inferred_resolutions,
 
+        "automation": automation_state,
+
     }
 
 
@@ -1924,10 +1939,36 @@ def build_intelligence(state=None):
 
     )
 
+    if automation_mode == "recovering":
+        intelligence["recommendation"] = {
+            "priority": "warning", "action_required": False,
+            "message": "BlueNode is actively recovering Asterisk and verifying service health.",
+        }
+    elif automation_mode == "attention":
+        intelligence["recommendation"] = {
+            "priority": level, "action_required": True,
+            "message": (automation_state.get("escalation_reason") or
+                        "Repeated instability requires operator attention."),
+        }
+    elif automation_state.get("maintenance_mode"):
+        intelligence["recommendation"] = {
+            "priority": "warning" if attention_required else "normal",
+            "action_required": attention_required,
+            "message": ("Maintenance mode is active. Monitoring continues, but automatic "
+                        "recovery actions are intentionally suspended."),
+        }
+
 
 
     intelligence["recovery_display"] = recovery_display(state)
     intelligence["summary"] = build_summary(state)
+
+    if automation_mode == "recovering":
+        intelligence["summary"] += " BlueNode automation is handling recovery and verification."
+    elif automation_mode == "attention":
+        intelligence["summary"] += " Automatic recovery is backed off; operator attention is recommended."
+    elif automation_state.get("maintenance_mode"):
+        intelligence["summary"] += " Maintenance mode is intentionally suspending automatic actions."
 
 
 

@@ -184,5 +184,31 @@ class LifecycleTests(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text()), {'level':'normal'})
             self.assertEqual(list(Path(directory).iterdir()), [path])
 
+    def test_active_automation_recovery_explains_no_operator_action(self):
+        state = copy.deepcopy(NORMAL)
+        state["automation"] = {"mode": "recovering", "last_result": "Verifying"}
+        result = self.build(state, [])
+        self.assertEqual(result["level"], "warning")
+        self.assertFalse(result["attention_required"])
+        self.assertFalse(result["recommendation"]["action_required"])
+        self.assertIn("actively recovering", result["recommendation"]["message"])
+
+    def test_maintenance_is_intentional_not_malfunction(self):
+        state = copy.deepcopy(NORMAL)
+        state["automation"] = {"mode": "maintenance", "maintenance_mode": True}
+        result = self.build(state, [])
+        self.assertEqual(result["level"], "normal")
+        self.assertFalse(result["attention_required"])
+        self.assertIn("intentionally suspended", result["recommendation"]["message"])
+
+    def test_automation_escalation_requires_attention(self):
+        state = copy.deepcopy(NORMAL)
+        state["automation"] = {"mode": "attention", "escalation_reason": "Repeated instability"}
+        result = self.build(state, [])
+        self.assertEqual(result["level"], "warning")
+        self.assertTrue(result["attention_required"])
+        self.assertTrue(result["recommendation"]["action_required"])
+        self.assertIn("Repeated instability", result["recommendation"]["message"])
+
 if __name__ == '__main__':
     unittest.main()
