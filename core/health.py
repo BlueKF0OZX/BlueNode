@@ -499,14 +499,6 @@ def build_state():
 
     }
 
-    intelligence = build_intelligence(state)
-
-    state["intelligence"] = intelligence
-    state["intelligence_summary"] = intelligence.get(
-        "summary",
-        "Node intelligence is unavailable."
-    )
-
     return state
 
 
@@ -712,6 +704,9 @@ if __name__ == "__main__":
     log_state_changes(previous_state, state)
 
 
+
+    state["intelligence"] = build_intelligence(state)
+    state["intelligence_summary"] = state["intelligence"]["summary"]
 
     save_state(state)
 

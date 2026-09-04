@@ -4,6 +4,8 @@
 
 
 import json
+import os
+import tempfile
 
 from datetime import datetime, timedelta, timezone
 
@@ -410,12 +412,16 @@ def save_intelligence(data):
 
 
 
-    with INTELLIGENCE_FILE.open("w") as file:
-
-        json.dump(data, file, indent=2)
-
-
-
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=INTELLIGENCE_FILE.parent,
+                                         delete=False, suffix=".tmp") as file:
+            temporary = Path(file.name)
+            json.dump(data, file, indent=2)
+        os.replace(temporary, INTELLIGENCE_FILE)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
 
 def classify_event(event):
@@ -670,6 +676,22 @@ def build_incident_records(events):
 
 
 
+    active_outages = set()
+    transitions = []
+    for item in events:
+        event = item["event"]
+        component = event.split(".")[0].lower()
+        if event in ("ASTERISK.OFFLINE", "INTERNET.OFFLINE"):
+            if component in active_outages:
+                continue
+            active_outages.add(component)
+        elif event in ("ASTERISK.ONLINE", "INTERNET.ONLINE"):
+            active_outages.discard(component)
+        elif event in ("HEALTH.ASTERISK.NORMAL", "HEALTH.INTERNET.NORMAL"):
+            active_outages.discard(event.split(".")[1].lower())
+        transitions.append(item)
+    events = transitions
+
     # ------------------------------------------------------------
 
     # Asterisk incidents
@@ -720,7 +742,7 @@ def build_incident_records(events):
 
 
 
-        for item in events:
+        for item in events[events.index(offline) + 1:]:
 
             event = item["event"]
 
@@ -770,7 +792,7 @@ def build_incident_records(events):
 
 
 
-            elif event == "HEALTH.ASTERISK.NORMAL":
+            elif event in ("HEALTH.ASTERISK.NORMAL", "ASTERISK.ONLINE"):
 
                 record["resolved"] = True
 
@@ -914,7 +936,7 @@ def build_incident_records(events):
 
 
 
-        for item in events:
+        for item in events[events.index(offline) + 1:]:
 
             event = item["event"]
 
@@ -922,7 +944,7 @@ def build_incident_records(events):
 
 
 
-            if event_time <= start_time:
+            if event_time < start_time:
 
                 continue
 
@@ -936,11 +958,15 @@ def build_incident_records(events):
 
 
 
-            if event == "INTERNET.ONLINE":
+            if event in ("INTERNET.ONLINE", "HEALTH.INTERNET.NORMAL"):
 
                 record["resolved"] = True
 
                 record["resolved_at"] = event_time.isoformat()
+
+                if item.get("resolution_source"):
+
+                    record["resolution_source"] = item["resolution_source"]
 
                 record["duration_seconds"] = int(
 
@@ -1161,6 +1187,55 @@ def build_incident_records(events):
 
 
     return records
+
+
+
+def restore_inferred_resolutions(events, previous):
+    """Restore inferred outage boundaries saved by the preceding build.
+
+    Raw events deliberately remain immutable.  A prior health-observation
+    resolution is replayed as a derived normal transition only when its
+    original outage is still present in the event stream.
+    """
+    restored = list(events)
+    starts = {
+        (item["event"].split(".")[0].lower(), item["timestamp"].isoformat())
+        for item in events
+        if item["event"] in ("ASTERISK.OFFLINE", "INTERNET.OFFLINE")
+    }
+    prior_records = previous.get(
+        "inferred_resolutions", previous.get("incidents", [])
+    )
+    for record in prior_records:
+        component = record.get("component")
+        started_at = record.get("started_at")
+        resolved_at = record.get("resolved_at")
+        if (component not in ("asterisk", "internet")
+                or record.get("resolution_source") != "health_observation"
+                or not record.get("resolved")
+                or (component, started_at) not in starts):
+            continue
+        try:
+            resolved = datetime.fromisoformat(resolved_at)
+            started = datetime.fromisoformat(started_at)
+            if resolved.tzinfo is None:
+                resolved = resolved.replace(tzinfo=timezone.utc)
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            if resolved < started:
+                continue
+        except (TypeError, ValueError):
+            continue
+        transition = {
+            "timestamp": resolved,
+            "event": f"HEALTH.{component.upper()}.NORMAL",
+            "message": "",
+            "resolution_source": "health_observation",
+        }
+        position = next((index for index, item in enumerate(restored)
+                         if item["timestamp"] >= resolved), len(restored))
+        restored.insert(position, transition)
+    return restored
 
 
 
@@ -1445,6 +1520,10 @@ def build_recommendation(
 
 
 
+    if level == "unknown":
+        return {"action_required": True, "priority": "warning",
+                "message": "Current health is unavailable; check the health collector."}
+
     if level == "critical":
 
         return {
@@ -1571,6 +1650,88 @@ def build_recommendation(
 
 
 
+def reconcile_incidents(records, state, previous=None):
+    """Use a newer normal observation when a closing event is missing.
+
+    This changes derived records only. The original event log is untouched.
+    The observation time is an upper bound, not an exact recovery time.
+    """
+    prior_records = (previous or {}).get(
+        "inferred_resolutions", (previous or {}).get("incidents", [])
+    )
+    inferred = {
+        (item.get("component"), item.get("started_at")): item
+        for item in prior_records
+        if item.get("resolved")
+        and item.get("resolution_source") == "health_observation"
+    }
+    for record in records:
+        prior = inferred.get((record.get("component"), record.get("started_at")))
+        if prior:
+            record.update(
+                resolved=True,
+                resolved_at=prior.get("resolved_at"),
+                resolution_source="health_observation",
+                duration_seconds=None,
+                summary=prior.get("summary", record.get("summary")),
+            )
+
+    try:
+        observed = datetime.fromisoformat(state["last_health_check"])
+        if observed.tzinfo is None:
+            observed = observed.replace(tzinfo=timezone.utc)
+    except (KeyError, TypeError, ValueError):
+        return records
+    for record in records:
+        component = record["component"]
+        normal = (state.get(component) == "online" if component in
+                  ("asterisk", "internet") else
+                  state.get("health", {}).get(component) == "normal")
+        if record["resolved"] or not normal:
+            continue
+        started = datetime.fromisoformat(record["started_at"])
+        if observed < started:
+            continue
+        record.update(resolved=True, resolved_at=observed.isoformat(),
+                      resolution_source="health_observation", duration_seconds=None)
+        record["summary"] = (
+            f"{component.capitalize()} returned to normal by the latest health check. "
+            "The exact recovery time was not recorded."
+        )
+    return records
+
+
+def recovery_display(state, recovery_state=None, now=None):
+    """Expire presentation only; retain recovery history and safety limits."""
+    recovery_state = load_recovery_state() if recovery_state is None else recovery_state
+    last = recovery_state.get("last_recovery")
+    if not last:
+        return None
+    now = now or datetime.now(timezone.utc)
+    # A live circuit breaker remains visible even if service recovers.
+    if last.get("status") == "lockout":
+        try:
+            if float(recovery_state.get("asterisk_lockout_until", 0)) > now.timestamp():
+                return last
+        except (TypeError, ValueError):
+            return last
+    # Failed results cease being current once service has recovered.
+    if last.get("status") in ("failed", "lockout"):
+        if state.get("asterisk") != "online":
+            return last
+        return None
+    try:
+        timestamp = datetime.fromisoformat(last["timestamp"])
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        hours = max(0, float(recovery_state.get("display_reset_hours", 6)))
+        if 0 <= (now - timestamp).total_seconds() < hours * 3600:
+            return last
+    except (KeyError, TypeError, ValueError, OverflowError):
+        pass
+    return None
+
+
 def build_intelligence(state=None):
 
     if state is None:
@@ -1629,7 +1790,11 @@ def build_intelligence(state=None):
 
     # Build structured incidents before deciding intelligence level.
 
-    incident_records = build_incident_records(load_events())
+    previous = load_json(INTELLIGENCE_FILE)
+    events = restore_inferred_resolutions(load_events(), previous)
+    incident_records = reconcile_incidents(
+        build_incident_records(events), state, previous
+    )
 
 
 
@@ -1681,81 +1846,25 @@ def build_intelligence(state=None):
 
 
 
-    if unresolved_critical:
-
-        level = "critical"
-
-        attention_required = True
-
-
-
-    elif status == "fault":
-
-        level = "critical"
-
-        attention_required = True
-
-
-
-    elif recovery_failures_day > 0:
-
-        level = "critical"
-
-        attention_required = True
-
-
-
-    elif repeated_failure_critical:
-
-        level = "critical"
-
-        attention_required = True
-
-
-
-    elif unresolved_warning:
-
-        level = "warning"
-
-        attention_required = True
-
-
-
-    elif status == "degraded":
-
-        level = "warning"
-
-        attention_required = True
-
-
-
-    elif failures_hour >= 3:
-
-        level = "warning"
-
-        attention_required = True
-
-
-
-    elif failures_hour == 2:
-
-        level = "warning"
-
-        attention_required = False
-
-
-
+    # Current health drives presentation; past failures remain in history.
+    if status == "fault" or unresolved_critical:
+        level, attention_required = "critical", True
+    elif status == "degraded" or unresolved_warning:
+        level, attention_required = "warning", True
+    elif status == "healthy":
+        level, attention_required = "normal", False
     else:
-
-        level = "normal"
-
-        attention_required = False
-
-
+        level, attention_required = "unknown", True
 
     recent_activity = recent_activity_stats()
 
 
+
+    inferred_resolutions = [
+        record for record in incident_records
+        if record.get("resolved")
+        and record.get("resolution_source") == "health_observation"
+    ]
 
     # Keep only the most recent structured incidents in the
 
@@ -1793,6 +1902,8 @@ def build_intelligence(state=None):
 
         "incidents": incident_records,
 
+        "inferred_resolutions": inferred_resolutions,
+
     }
 
 
@@ -1805,7 +1916,7 @@ def build_intelligence(state=None):
 
         reasons,
 
-        recovery_failures_day,
+        recovery_failures_day if state.get("asterisk") == "offline" else 0,
 
         unresolved_incidents,
 
@@ -1813,6 +1924,7 @@ def build_intelligence(state=None):
 
 
 
+    intelligence["recovery_display"] = recovery_display(state)
     intelligence["summary"] = build_summary(state)
 
 
@@ -2015,63 +2127,14 @@ def build_summary(state=None):
 
 
 
-    if failures_hour >= 3:
-
+    if failures_day > 0:
         parts.append(
-
-            f"Asterisk has gone offline {failures_hour} times "
-
-            f"during the past hour. Continued instability "
-
-            f"should be investigated."
-
+            f"History: {failures_day} Asterisk outage(s) in the past 24 hours."
         )
-
-
-
-    elif failures_hour == 2:
-
-        parts.append(
-
-            "Asterisk has gone offline twice during the past hour. "
-
-            "The node is currently operational, but stability "
-
-            "should be watched."
-
-        )
-
-
-
-    elif failures_hour == 1 and asterisk == "online":
-
-        parts.append(
-
-            "Asterisk experienced one recent failure and is "
-
-            "currently operational."
-
-        )
-
-
-
-    elif failures_day > 0 and asterisk == "online":
-
-        parts.append(
-
-            f"Asterisk experienced {failures_day} "
-
-            f"failure{'s' if failures_day != 1 else ''} "
-
-            f"during the past 24 hours."
-
-        )
-
-
 
     # Most recent recovery
 
-    last_recovery = recovery_state.get("last_recovery")
+    last_recovery = recovery_display(state, recovery_state)
 
 
 
@@ -2175,7 +2238,7 @@ def build_summary(state=None):
 
 
 
-    if recovery_failures_day > 0:
+    if recovery_failures_day > 0 and asterisk != "online":
 
         parts.append(
 
@@ -2191,7 +2254,7 @@ def build_summary(state=None):
 
 
 
-    elif repeated_failure_critical:
+    elif repeated_failure_critical and asterisk != "online":
 
         parts.append(
 
@@ -2205,7 +2268,7 @@ def build_summary(state=None):
 
 
 
-    elif repeated_failure_warning:
+    elif repeated_failure_warning and asterisk != "online":
 
         parts.append(
 
@@ -2235,7 +2298,7 @@ def build_summary(state=None):
 
 
 
-    elif status == "healthy" and failures_hour < 2:
+    elif status == "healthy":
 
         parts.append("No action is required.")
 

@@ -1558,43 +1558,11 @@
         const data = await response.json();
 
 
-        const intelligenceResponse =
-          await fetch('/state/intelligence.json?ts=' + Date.now());
-
-        const intelligenceData =
-          await intelligenceResponse.json();
-
-        data.intelligence = intelligenceData;
-        const last = data.last_recovery;
-
-        // Successful recovery results remain prominent for the configured period.
-        const recoveryDisplayResetHours =
-          Number(data.display_reset_hours ?? 6);
-
-        if (last && last.status === 'success' && last.timestamp) {
-          const recoveryTime = new Date(last.timestamp);
-
-          if (!Number.isNaN(recoveryTime.getTime())) {
-            const recoveryAgeHours =
-              (Date.now() - recoveryTime.getTime()) / 3600000;
-
-            if (recoveryAgeHours >= recoveryDisplayResetHours) {
-              statusElement.textContent = 'Ready';
-              statusElement.className = 'value normal';
-              detailElement.textContent = 'No recent recovery actions.';
-
-              if (recoveryPanel) {
-                recoveryPanel.classList.remove(
-                  'recovery-warning',
-                  'recovery-critical'
-                );
-                recoveryPanel.classList.add('recovery-success');
-              }
-
-              return;
-            }
-          }
-        }
+        const intelligenceResponse = await fetch('/state/intelligence.json?ts=' + Date.now());
+        if (!intelligenceResponse.ok) throw new Error('Intelligence unavailable');
+        const intelligenceData = await intelligenceResponse.json();
+        const last = Object.prototype.hasOwnProperty.call(intelligenceData, 'recovery_display')
+          ? intelligenceData.recovery_display : data.last_recovery;
 
         if (recoveryPanel) {
           recoveryPanel.classList.remove(
@@ -1605,7 +1573,7 @@
         }
 
         if (!last) {
-          statusElement.textContent = 'No recovery actions yet';
+          statusElement.textContent = 'Ready';
           if (recoveryPanel) recoveryPanel.classList.add('recovery-success');
           statusElement.className = 'value normal';
           detailElement.textContent = '';
@@ -1620,8 +1588,8 @@
           statusElement.textContent = 'Last recovery successful';
           if (recoveryPanel) recoveryPanel.classList.add('recovery-success');
           statusElement.classList.add('normal');
-        } else if (last.status === 'failed') {
-          statusElement.textContent = 'Recovery failed';
+        } else if (last.status === 'failed' || last.status === 'lockout') {
+          statusElement.textContent = last.status === 'lockout' ? 'Recovery locked out' : 'Recovery failed';
           if (recoveryPanel) recoveryPanel.classList.add('recovery-critical');
           statusElement.classList.add('critical');
         } else {
@@ -1647,19 +1615,36 @@
           (timestamp ? ' — ' + timestamp : '');
 
       } catch (error) {
+        if (recoveryPanel) recoveryPanel.classList.remove(
+          'recovery-success', 'recovery-warning', 'recovery-critical'
+        );
         statusElement.textContent = 'Recovery status unavailable';
         statusElement.className = 'value unknown';
         detailElement.textContent = '';
       }
     }
 
+    let statusLoading = false;
     async function loadStatus() {
+      if (statusLoading) return;
+      statusLoading = true;
 
       try {
 
         const response = await fetch('/state/system.json?ts=' + Date.now());
 
         const data = await response.json();
+
+        try {
+          const intelligenceResponse = await fetch('/state/intelligence.json?ts=' + Date.now());
+          if (!intelligenceResponse.ok) throw new Error('Intelligence unavailable');
+          data.intelligence = await intelligenceResponse.json();
+        } catch (err) {
+          data.intelligence = {
+            level: 'unknown', attention_required: true,
+            summary: 'Fresh intelligence is unavailable.'
+          };
+        }
 
         // Use the fast AllStar monitor state for live connection display.
         try {
@@ -2269,6 +2254,8 @@
 
           'Unable to load NodeSmart system state.';
 
+      } finally {
+        statusLoading = false;
       }
 
     }
@@ -2421,7 +2408,7 @@
 
 
 
-    setInterval(loadStatus, 5000);
+    setInterval(loadStatus, 2000);
 
     setInterval(loadEvents, 5000);
 
