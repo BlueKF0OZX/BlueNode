@@ -87,6 +87,26 @@ def verify_password(password, config):
         return False
 
 
+def validate_new_credentials(username, first, second):
+    """Validate interactive credentials without retaining terminal CR residue."""
+    normalized_username = str(username).strip()
+    if (not normalized_username or len(normalized_username) > 64 or
+            not all(char.isalnum() or char in "._@-" for char in normalized_username)):
+        raise ValueError("Username contains unsupported characters")
+    # getpass normally removes the line terminator. Some nested Windows SSH
+    # pseudo-terminal paths can leave a single carriage return on one read.
+    # It is terminal framing, not an intentional password character.
+    first = str(first).removesuffix("\r")
+    second = str(second).removesuffix("\r")
+    if not hmac.compare_digest(first, second):
+        raise ValueError("Password confirmation does not match")
+    if len(first) < 14:
+        raise ValueError("Password must contain at least 14 characters")
+    if any(ord(char) < 32 or ord(char) == 127 for char in first):
+        raise ValueError("Password contains an unsupported control character")
+    return normalized_username, first
+
+
 class RemoteAdmin:
     def __init__(self, clock=time.time, runner=subprocess.run):
         self.clock = clock

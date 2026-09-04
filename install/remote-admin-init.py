@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, "/opt/nodesmart/core")
-from remote_admin import hash_password  # noqa: E402
+from remote_admin import hash_password, validate_new_credentials  # noqa: E402
 
 TARGET = Path("/etc/bluenode/remote-admin.json")
 
@@ -74,12 +74,12 @@ def main():
         print("Remote Admin disabled; active sessions are invalid after web service restart")
         return
     username = args.username.strip() or input("Remote Admin username: ").strip()
-    if not username or len(username) > 64 or not all(c.isalnum() or c in "._@-" for c in username):
-        raise SystemExit("Username contains unsupported characters")
     first = getpass.getpass("Remote Admin password: ")
     second = getpass.getpass("Confirm password: ")
-    if first != second or len(first) < 14:
-        raise SystemExit("Passwords must match and contain at least 14 characters")
+    try:
+        username, first = validate_new_credentials(username, first, second)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     salt, digest = hash_password(first)
     write_config({"enabled": True, "username": username, "password_salt": salt,
                   "password_hash": digest, "password_iterations": 600000,

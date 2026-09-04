@@ -71,6 +71,17 @@ class RemoteAdminTests(unittest.TestCase):
         self.assertFalse(self.admin.csrf_valid(token, "wrong"))
         self.admin.logout(token); self.assertIsNone(self.admin.authenticate(token))
 
+    def test_interactive_credentials_accept_terminal_cr_and_match_confirmation(self):
+        username, secret = remote_admin.validate_new_credentials(
+            "operator", "fixture passphrase value\r", "fixture passphrase value")
+        self.assertEqual(username, "operator")
+        self.assertEqual(secret, "fixture passphrase value")
+        with self.assertRaisesRegex(ValueError, "confirmation does not match"):
+            remote_admin.validate_new_credentials(
+                "operator", "fixture passphrase value", "different fixture value")
+        with self.assertRaisesRegex(ValueError, "at least 14"):
+            remote_admin.validate_new_credentials("operator", "too short", "too short")
+
     def test_rate_limit_session_expiration_and_permissions(self):
         self.enable(attempts=2)
         self.admin.login("operator", "bad", "peer"); self.admin.login("operator", "bad", "peer")
