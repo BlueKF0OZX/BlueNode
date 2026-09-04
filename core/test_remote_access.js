@@ -8,6 +8,8 @@ const template = fs.readFileSync(path.join(root, 'install/remote-access/apache-v
 const example = fs.readFileSync(path.join(root, 'install/remote-access.conf.example'), 'utf8');
 const docs = fs.readFileSync(path.join(root, 'docs/REMOTE_ACCESS.md'), 'utf8');
 const installer = fs.readFileSync(path.join(root, 'install/install.sh'), 'utf8');
+const funnelScript = fs.readFileSync(path.join(root, 'install/tailscale-funnel.sh'), 'utf8');
+const funnelTemplate = fs.readFileSync(path.join(root, 'install/remote-access/apache-funnel-gateway.conf.template'), 'utf8');
 
 assert.match(script, /BLUENODE_REMOTE_MODE:.*direct:enable/s);
 assert.match(script, /apache2ctl[^\n]*configtest|\$APACHECTL configtest/);
@@ -24,6 +26,17 @@ assert.match(example, /example\.invalid/);
 assert.match(docs, /Never publish or forward TCP 8080/);
 assert.match(docs, /every API\/control path/);
 assert.match(installer, /install -m 0755[^\n]*remote-access\.sh/);
+assert.match(installer, /install -m 0755[^\n]*tailscale-funnel\.sh/);
+assert.match(funnelTemplate, /Listen 127\.0\.0\.1:@GATEWAY_PORT@/);
+assert.match(funnelTemplate, /<Location "\/">[\s\S]*AuthType Basic[\s\S]*Require valid-user/);
+assert.match(funnelTemplate, /ProxyPass \/ http:\/\/127\.0\.0\.1:@BACKEND_PORT@\//);
+assert.match(funnelScript, /BLUENODE_FUNNEL_GATEWAY_PORT != 8080/);
+assert.match(funnelScript, /\[\[ "\$unauth" == 401 \]\]/);
+assert.match(funnelScript, /verify_credentials[\s\S]*tailscale funnel|verify_credentials[\s\S]*\$TAILSCALE funnel/);
+assert.match(funnelScript, /--user "\$auth_user"/);
+assert.doesNotMatch(funnelScript, /auth_password/);
+assert.match(funnelScript, /funnel --bg --https=443 "http:\/\/127\.0\.0\.1:/);
+assert.match(funnelScript, /funnel --https=443 off/);
 
 const forbidden = [
   /KF0OZX/i, /60873/, /192\.168\.8\.23/, /2\.90\.110\.16/
@@ -32,6 +45,11 @@ for (const pattern of forbidden) {
   for (const [name, content] of [['script', script], ['template', template], ['example', example], ['docs', docs]]) {
     assert.doesNotMatch(content, pattern, `${name} contains node-specific data`);
   }
+}
+
+for (const pattern of forbidden) {
+  assert.doesNotMatch(funnelScript, pattern, 'Funnel script contains node-specific data');
+  assert.doesNotMatch(funnelTemplate, pattern, 'Funnel template contains node-specific data');
 }
 
 console.log('PASS remote access framework tests');

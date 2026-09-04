@@ -11,3 +11,9 @@ BLUENODE_AUTH_USER_FILE=/etc/bluenode/remote-users.htpasswd
 # must enforce authentication for all routes and use the loopback backend.
 # BLUENODE_REMOTE_MODE=tunnel
 # BLUENODE_TUNNEL_AUTHENTICATION_ACK=required
+
+# Tailscale Funnel mode uses a dedicated authenticated loopback gateway.
+# BLUENODE_REMOTE_MODE=tailscale-funnel
+# BLUENODE_FUNNEL_GATEWAY_PORT=8090
+# BLUENODE_BACKEND_PORT=8080
+# BLUENODE_AUTH_USER_FILE=/etc/bluenode/remote-users.htpasswd

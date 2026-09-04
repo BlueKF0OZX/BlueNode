@@ -75,6 +75,42 @@ authentication (preferably MFA) before every path, and ensure no bypass hostname
 or unauthenticated API route exists. Store its token only in the provider's
 root-readable service configuration, never in this repository.
 
+### Tailscale Funnel with an authenticated gateway
+
+Tailscale Funnel is a provider-specific option that needs no owned domain or
+router forwarding. Funnel supplies public HTTPS at the node's stable `*.ts.net`
+name, but Funnel does not authenticate browser users. Therefore it must never
+target BlueNode's raw port 8080.
+
+BlueNode's Funnel helper creates an Apache listener bound only to
+`127.0.0.1:8090`. That listener requires authentication for `/` and every API
+path before proxying to BlueNode. Publication is a separate action which refuses
+to run until an unauthenticated request receives `401` and an interactively
+entered username/password successfully loads the dashboard. The password is not
+placed in process arguments, environment variables, configuration, or Git;
+`curl` reads it directly from the terminal prompt.
+
+After separately installing and enrolling Tailscale, use this order:
+
+```bash
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh validate
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh render
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh enable-gateway
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh verify-auth
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh publish
+```
+
+Disable public access first, then optionally remove the private gateway:
+
+```bash
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh unpublish
+sudo bash /opt/nodesmart/install/tailscale-funnel.sh disable-gateway
+```
+
+The persistent `--bg` Funnel configuration resumes after `tailscaled` or the
+node restarts. Neither Funnel lifecycle action changes BlueNode's LAN listener,
+Apache's public ports, firewalld, the router, or Asterisk.
+
 Set `BLUENODE_REMOTE_MODE=tunnel`, keep the loopback backend, and set
 `BLUENODE_TUNNEL_AUTHENTICATION_ACK=required`. The local validator checks those
 provider-neutral invariants. Provider installation, enable, disable, credential

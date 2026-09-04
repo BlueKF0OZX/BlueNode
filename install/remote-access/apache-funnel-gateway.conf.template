@@ -1,0 +1,46 @@
+Listen 127.0.0.1:@GATEWAY_PORT@
+
+<VirtualHost 127.0.0.1:@GATEWAY_PORT@>
+    ServerName localhost
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:@BACKEND_PORT@/ connectiontimeout=5 timeout=30 retry=0
+    ProxyPassReverse / http://127.0.0.1:@BACKEND_PORT@/
+
+    <Location "/">
+        AuthType Basic
+        AuthName "BlueNode Remote Access"
+        AuthBasicProvider file
+        AuthUserFile @AUTH_USER_FILE@
+        Require valid-user
+    </Location>
+
+    # Prevent globally configured Apache applications from being inherited by
+    # the dedicated BlueNode gateway.
+    <Location "/allmon3">
+        Require all denied
+    </Location>
+    <Location "/server-status">
+        Require all denied
+    </Location>
+
+    RequestHeader set X-Forwarded-Proto "https"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "same-origin"
+    Header always set Cache-Control "no-store" "expr=%{REQUEST_URI} =~ m#^/api/#"
+    RequestReadTimeout header=20-40,MinRate=500 body=20,MinRate=500
+    LimitRequestBody 1048576
+    ProxyTimeout 30
+
+    DOSHashTableSize 3097
+    DOSPageCount 10
+    DOSSiteCount 100
+    DOSPageInterval 1
+    DOSSiteInterval 1
+    DOSBlockingPeriod 60
+
+    ErrorLog ${APACHE_LOG_DIR}/bluenode-funnel-error.log
+    CustomLog ${APACHE_LOG_DIR}/bluenode-funnel-access.log combined
+</VirtualHost>
