@@ -51,6 +51,8 @@ See `docs/INSTALL.md` and `docs/CONFIGURATION.md`.
 
 For the guarded Windows-to-node deployment workflow, see
 `docs/DEPLOYMENT.md`.
+It documents the canonical identity check, `git push origin main`, and the
+single-command deployment/live-verification path for routine changes.
 
 Optional authenticated remote access is disabled by default. Its preparation,
 security model, direct Apache mode, and provider-neutral tunnel guidance are in

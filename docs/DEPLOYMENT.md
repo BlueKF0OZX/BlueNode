@@ -25,3 +25,33 @@ returns a nonzero exit code and prints `FAIL` even when rollback succeeds.
 
 This workflow does not change Asterisk configuration, networking, firewall,
 sudoers, systemd unit definitions, releases, tags, or Git history.
+
+## Canonical autonomous workflow
+
+Use these stable commands for routine work so execution approvals remain narrow
+and reusable:
+
+```powershell
+# Before committing: verify branch, official origin, and exact Git identity.
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Verify-BlueNodeGit.ps1 -IdentityOnly
+
+# Push only main to its named origin.
+git push origin main
+
+# When no deployment is required, verify the clean tree, remote main, and attribution.
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Verify-BlueNodeGit.ps1
+
+# Normal deployment, including local Git gates and live verification.
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy-BlueNode.ps1
+```
+
+For an application deployment, the final Git verification is already part of
+`Deploy-BlueNode.ps1`; routine ad-hoc SSH checks afterward are unnecessary. Its
+single remote session verifies the backup, exact live commit, compilation,
+services, state freshness, Asterisk, dashboard HTTP response, and journal. Use
+separate read-only SSH diagnostics only when the guarded report fails or a
+request specifically requires additional live evidence.
+
+The intended sequence is: inspect, edit, test, review, identity verification,
+commit, `git push origin main`, guarded deployment, built-in live verification,
+report.
