@@ -39,7 +39,7 @@ assert.match(funnelScript, /funnel --bg --https=443 "http:\/\/127\.0\.0\.1:/);
 assert.match(funnelScript, /funnel --https=443 off/);
 
 const forbidden = [
-  /KF0OZX/i, /60873/, /192\.168\.8\.23/, /2\.90\.110\.16/
+  /N0CALL/i, /12345/, /192\.0\.2\.23/, /198\.51\.100\.16/
 ];
 for (const pattern of forbidden) {
   for (const [name, content] of [['script', script], ['template', template], ['example', example], ['docs', docs]]) {

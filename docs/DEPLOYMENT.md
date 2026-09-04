@@ -10,7 +10,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy-BlueNode.ps1
 The command refuses to deploy a dirty tree, a branch other than `main`, a local
 `main` that differs from `origin/main`, or any configured/commit author identity
 other than `BlueKF0OZX <bluedrummer1985@outlook.com>`. It deploys the recorded
-commit through the existing SSH alias `nodesmart60873`.
+commit through an explicitly configured operator SSH target.
+
+Configure the target outside tracked files using one of these methods:
+
+```powershell
+git config --local bluenode.sshTarget example-node
+$env:BLUENODE_SSH_TARGET = "example-node"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy-BlueNode.ps1 -SshTarget example-node
+```
+
+The local Git setting is recommended for the canonical no-argument deployment
+command. It remains in `.git/config` and is never committed.
 
 Before changing `/opt/nodesmart`, the remote process creates and verifies a
 timestamped archive under `/opt/nodesmart-backups`. Git updates only tracked
@@ -60,4 +71,6 @@ The canonical Git verifier also runs `deploy/Test-PublicTree.ps1`. This rejects
 tracked runtime/state directories, live configuration, private-key file types,
 and common private-key, Tailscale, GitHub, cloud-key, password, and token
 signatures. It scans tracked and staged text content, while ignored local
-runtime data remains outside the public repository.
+runtime data remains outside the public repository. It also rejects known
+operator-specific fixture identifiers while preserving the intentional
+`BlueKF0OZX <bluedrummer1985@outlook.com>` project identity.

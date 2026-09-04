@@ -50,13 +50,21 @@ try {
     Run-Git $repo @("add", "fixture.txt")
     Run-Git $repo @("commit", "-m", "Initial fixture")
     Run-Git $repo @("remote", "add", "origin", $remote)
+    Run-Git $repo @("config", "--local", "bluenode.sshTarget", "example-node")
     Run-Git $repo @("push", "-u", "origin", "main")
     $env:BLUENODE_DEPLOY_TEST_REMOTE = $remote
     $env:BLUENODE_GIT_VERIFY_TEST_REMOTE = $remote
 
-    Run-Preflight "ssh_target=nodesmart60873"
+    Run-Preflight "ssh_target=example-node"
     Run-GitVerification "GIT VERIFICATION PASS"
     Run-GitVerification "IDENTITY PASS" -IdentityOnly
+
+    Run-Git $repo @("config", "--local", "--unset", "bluenode.sshTarget")
+    Run-Preflight "Set -SshTarget, BLUENODE_SSH_TARGET" 1
+    $env:BLUENODE_SSH_TARGET = "environment-node"
+    Run-Preflight "ssh_target=environment-node"
+    Remove-Item Env:BLUENODE_SSH_TARGET
+    Run-Git $repo @("config", "--local", "bluenode.sshTarget", "example-node")
 
     New-Item -ItemType Directory -Path (Join-Path $repo "state") | Out-Null
     Set-Content -LiteralPath (Join-Path $repo "state/system.json") -Value "{}"
@@ -64,6 +72,19 @@ try {
     Run-GitVerification "privacy guard failed" 1 -IdentityOnly
     Run-Git $repo @("rm", "--cached", "state/system.json")
     Remove-Item -LiteralPath (Join-Path $repo "state") -Recurse -Force
+
+    Set-Content -LiteralPath (Join-Path $repo ".env.production") -Value "EXAMPLE=value"
+    Run-Git $repo @("add", "-f", ".env.production")
+    Run-GitVerification "privacy guard failed" 1 -IdentityOnly
+    Run-Git $repo @("rm", "--cached", ".env.production")
+    Remove-Item -LiteralPath (Join-Path $repo ".env.production")
+
+    $prohibitedFixture = "host=" + ('192.168.' + '8.23')
+    Set-Content -LiteralPath (Join-Path $repo "fixture.txt") -Value $prohibitedFixture
+    Run-Git $repo @("add", "fixture.txt")
+    Run-GitVerification "privacy guard failed" 1 -IdentityOnly
+    Run-Git $repo @("restore", "--staged", "fixture.txt")
+    Run-Git $repo @("restore", "fixture.txt")
 
     Run-Git $repo @("remote", "set-url", "origin", "https://example.invalid/wrong.git")
     Run-Preflight "Local origin must be exactly" 1
@@ -106,6 +127,7 @@ try {
     Write-Host "PASS deployment preflight tests"
 }
 finally {
+    Remove-Item Env:BLUENODE_SSH_TARGET -ErrorAction SilentlyContinue
     Remove-Item Env:BLUENODE_DEPLOY_TEST_REMOTE -ErrorAction SilentlyContinue
     Remove-Item Env:BLUENODE_GIT_VERIFY_TEST_REMOTE -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $tempRoot) {

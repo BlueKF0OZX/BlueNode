@@ -43,3 +43,27 @@ events/
 
 config/nodesmart.json
 web/*.log
+
+# Local environments and credentials
+.env
+.env.*
+*.htpasswd
+.htpasswd
+htpasswd
+*.passwd
+*.password
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.token
+*.secrets
+
+# Archives may contain live configuration or runtime data
+backups/
+*.tar
+*.tar.gz
+*.tgz
+*.zip

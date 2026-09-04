@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$SshTarget = "nodesmart60873",
+    [string]$SshTarget = "",
     [string]$RepositoryPath = "",
     [switch]$PreflightOnly
 )
@@ -37,6 +37,20 @@ try {
     $requestedRoot = [IO.Path]::GetFullPath((Resolve-Path $RepositoryPath).Path)
     if ($gitRoot -ine $requestedRoot) {
         throw "RepositoryPath must be the BlueNode repository root."
+    }
+    if (-not $SshTarget) {
+        $SshTarget = $env:BLUENODE_SSH_TARGET
+    }
+    if (-not $SshTarget) {
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $configuredTarget = & git -C $RepositoryPath config --local --get bluenode.sshTarget 2>$null
+        $configuredTargetExit = $LASTEXITCODE
+        $ErrorActionPreference = $oldErrorActionPreference
+        if ($configuredTargetExit -eq 0) { $SshTarget = [string]$configuredTarget }
+    }
+    if (-not $SshTarget) {
+        throw "Set -SshTarget, BLUENODE_SSH_TARGET, or local Git config bluenode.sshTarget."
     }
     if ((Invoke-Git branch --show-current) -cne "main") {
         throw "Deployment requires the checked-out main branch."
