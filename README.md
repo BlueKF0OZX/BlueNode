@@ -5,7 +5,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 **Status:** v0.1.0-alpha — early public testing release.
 ## Dashboard
 
-![BlueNode Dashboard](nodesmart-dashboard.png)
+![BlueNode Dashboard](1Screenshot_4-9-2026_124532_192.168.8.23.jpeg)
 ## Features
 
 - Live AllStar, Asterisk, Internet, CPU, memory, disk, and uptime monitoring
