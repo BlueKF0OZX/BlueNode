@@ -34,6 +34,39 @@ PY
   install -o root -g "$SERVICE_GROUP" -m 0640 "$temporary" "$CONFIG"
 }
 
+wait_for_broker() {
+  local attempt
+  for attempt in {1..50}; do
+    if /usr/bin/python3 - "$CONFIG" <<'PY'
+import json, socket, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    config = json.load(handle)
+host = config["listen_host"]
+port = int(config["listen_port"])
+try:
+    with socket.create_connection((host, port), timeout=0.1):
+        pass
+except OSError:
+    raise SystemExit(1)
+PY
+    then
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
+require_remote_admin_permission() {
+  /usr/bin/python3 -c 'import json; c=json.load(open("/etc/bluenode/remote-admin.json")); assert c.get("enabled") and "soft_radio_rx" in c.get("permissions",[])' \
+    || fail "Remote Admin and soft_radio_rx permission are required"
+}
+
+module_running() {
+  /usr/sbin/asterisk -rx "module show like $1" | /usr/bin/awk -v name="$1" \
+    '$1 == name && $(NF-2) ~ /^[0-9]+$/ && $(NF-1) == "Running" { found=1 } END { exit !found }'
+}
+
 case "$ACTION" in
   prepare)
     [[ $# -eq 2 && "$2" =~ ^[0-9]{1,10}$ ]] || fail "usage: $0 prepare LOCAL_NODE"
@@ -76,11 +109,10 @@ PY
     ;;
   enable)
     [[ -f "$CONFIG" ]] || fail "run prepare first"
-    /usr/bin/python3 -c 'import json; c=json.load(open("/etc/bluenode/remote-admin.json")); assert c.get("enabled") and "soft_radio_rx" in c.get("permissions",[])' \
-      || fail "Remote Admin and soft_radio_rx permission are required"
-    /usr/sbin/asterisk -rx 'module show like chan_websocket.so' | grep -q 'Running' \
+    require_remote_admin_permission
+    module_running chan_websocket.so \
       || fail "chan_websocket is not loaded; activation requires explicit operator approval"
-    /usr/sbin/asterisk -rx 'module show like res_websocket_client.so' | grep -q 'Running' \
+    module_running res_websocket_client.so \
       || fail "res_websocket_client is not loaded; activation requires explicit operator approval"
     grep -q '^\[bluenode_soft_radio_rx\]' /etc/asterisk/websocket_client.conf \
       || fail "the staged fixed client stanza has not been installed"
@@ -88,6 +120,20 @@ PY
     /usr/bin/systemctl restart nodesmart-web.service
     /usr/bin/systemctl is-active --quiet nodesmart-web.service || fail "web service did not restart"
     printf 'PASS soft-radio-rx: RX-only broker enabled\n'
+    ;;
+  enable-broker)
+    [[ -f "$CONFIG" ]] || fail "run prepare first"
+    require_remote_admin_permission
+    write_enabled true false
+    /usr/bin/systemctl restart nodesmart-web.service
+    if ! wait_for_broker; then
+      write_enabled false false
+      /usr/bin/systemctl restart nodesmart-web.service || true
+      fail "loopback RX broker did not become ready; Soft Radio was disabled"
+    fi
+    /usr/bin/systemctl is-active --quiet nodesmart-web.service \
+      || fail "web service is not active after broker readiness check"
+    printf 'PASS soft-radio-rx: loopback RX broker ready; channel origination disabled\n'
     ;;
   disable)
     [[ -f "$CONFIG" ]] || fail "configuration does not exist"
@@ -100,5 +146,5 @@ PY
     [[ -f "$CONFIG" ]] || { printf 'Soft Radio RX is unconfigured and disabled\n'; exit 0; }
     /usr/bin/python3 -c 'import json; print("Soft Radio RX is " + ("enabled" if json.load(open("/etc/bluenode/soft-radio.json")).get("enabled") else "disabled"))'
     ;;
-  *) fail "usage: $0 {prepare LOCAL_NODE|enable|disable|status}" ;;
+  *) fail "usage: $0 {prepare LOCAL_NODE|enable-broker|enable|disable|status}" ;;
 esac

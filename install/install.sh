@@ -41,6 +41,7 @@ done
 [[ -f "${REPO_ROOT}/install/remote-admin-init.py" ]] || fail "Missing Remote Admin initializer"
 [[ -f "${REPO_ROOT}/install/remote-admin.sh" ]] || fail "Missing Remote Admin lifecycle helper"
 [[ -f "${REPO_ROOT}/install/soft-radio-rx.sh" ]] || fail "Missing Soft Radio RX lifecycle helper"
+[[ -f "${REPO_ROOT}/install/soft-radio-transaction.sh" ]] || fail "Missing Soft Radio RX transaction helper"
 [[ -f "${REPO_ROOT}/install/soft-radio/websocket-client.conf.template" ]] || fail "Missing Soft Radio RX Asterisk template"
 
 echo "Preparing BlueNode files and directories..."
@@ -58,6 +59,7 @@ if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
   install -m 0755 "${REPO_ROOT}/install/remote-admin-init.py" "${INSTALL_ROOT}/install/remote-admin-init.py"
   install -m 0755 "${REPO_ROOT}/install/remote-admin.sh" "${INSTALL_ROOT}/install/remote-admin.sh"
   install -m 0755 "${REPO_ROOT}/install/soft-radio-rx.sh" "${INSTALL_ROOT}/install/soft-radio-rx.sh"
+  install -m 0755 "${REPO_ROOT}/install/soft-radio-transaction.sh" "${INSTALL_ROOT}/install/soft-radio-transaction.sh"
   cp -f "${REPO_ROOT}/install/remote-access.conf.example" "${INSTALL_ROOT}/install/"
   cp -f "${REPO_ROOT}/install/remote-access/apache-vhost.conf.template" "${INSTALL_ROOT}/install/remote-access/"
   cp -f "${REPO_ROOT}/install/remote-access/apache-funnel-gateway.conf.template" "${INSTALL_ROOT}/install/remote-access/"

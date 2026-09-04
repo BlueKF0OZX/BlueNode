@@ -77,6 +77,22 @@ def _safe_config():
         return disabled
 
 
+def activation_requested():
+    """Return only whether external configuration explicitly requests RX.
+
+    This deliberately does not validate or expose any other configuration
+    field.  It lets the service distinguish the normal disabled state from an
+    enabled configuration that failed closed during validation/startup.
+    """
+    try:
+        if CONFIG_FILE.is_symlink():
+            return False
+        raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        return isinstance(raw, dict) and raw.get("enabled") is True
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+
+
 def _read_exact(stream, length):
     data = bytearray()
     while len(data) < length:
@@ -271,6 +287,9 @@ class SoftRadio:
     def start(self):
         config = _safe_config()
         if not config.get("enabled"):
+            if activation_requested():
+                self.last_error = "enabled configuration is invalid or unreadable"
+                self.audit("soft-radio-rx-broker", "configuration-rejected")
             return False
         with self.lock:
             if self.server is not None:
@@ -288,7 +307,7 @@ class SoftRadio:
             try:
                 server = Server((config["listen_host"], config["listen_port"]), Handler)
             except OSError as exc:
-                self.last_error = "media broker unavailable"
+                self.last_error = "loopback media broker could not bind"
                 self.audit("soft-radio-rx-broker", "start-failed")
                 return False
             self.server = server

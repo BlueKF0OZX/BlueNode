@@ -18,6 +18,7 @@ from event_logger import emit
 from config import load_config
 import automation
 from remote_admin import ADMIN, MAX_BODY_BYTES, _safe_config
+from soft_radio import activation_requested
 from soft_radio import PERMISSION as SOFT_RADIO_PERMISSION
 from soft_radio import SOFT_RADIO, websocket_accept
 
@@ -706,7 +707,11 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
 
-    SOFT_RADIO.start()
+    soft_radio_started = SOFT_RADIO.start()
+    if activation_requested() and not soft_radio_started:
+        raise RuntimeError(
+            "Soft Radio RX was enabled but its loopback broker failed to start: "
+            + (SOFT_RADIO.last_error or "unknown startup failure"))
 
     server = ThreadingHTTPServer((HOST, PORT), NodeSmartHandler)
 

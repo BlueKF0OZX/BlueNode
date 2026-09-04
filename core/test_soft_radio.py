@@ -166,11 +166,32 @@ class SoftRadioTests(unittest.TestCase):
         self.write_config(listen_port=occupied.getsockname()[1])
         self.assertFalse(self.radio.start())
         self.assertEqual(self.radio.public_state(True, True)["status"], "fault")
+        self.assertEqual(self.radio.last_error, "loopback media broker could not bind")
+        self.assertIn(("soft-radio-rx-broker", "start-failed"), self.audit)
         occupied.close()
         left, right = socket.socketpair()
         left.sendall(b"\x82\xfe" + struct.pack("!H", 9) + b"abcd" + b"x" * 9)
         with self.assertRaises(ValueError): soft_radio.read_frame(right, 8)
         left.close(); right.close()
+
+    def test_broker_starts_on_loopback_without_channel_origination(self):
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+        self.write_config(listen_port=port, start_channel=False)
+        self.assertTrue(self.radio.start())
+        self.assertEqual(self.radio.server.server_address, ("127.0.0.1", port))
+        self.assertEqual(self.commands, [])
+        self.assertTrue(self.radio.public_state(True, True)["listening"])
+
+    def test_invalid_enabled_configuration_surfaces_startup_failure(self):
+        self.write_config(listen_host="0.0.0.0")
+        self.assertTrue(soft_radio.activation_requested())
+        self.assertFalse(self.radio.start())
+        self.assertEqual(self.radio.last_error,
+                         "enabled configuration is invalid or unreadable")
+        self.assertIn(("soft-radio-rx-broker", "configuration-rejected"), self.audit)
 
 
 if __name__ == "__main__": unittest.main()

@@ -63,6 +63,30 @@ RX permission (this invalidates existing sessions):
 sudo NODESMART_USER=SERVICE_USER bash /opt/nodesmart/install/remote-admin.sh grant-soft-radio-rx
 ```
 
+Before any activation mutation, create a complete verified transaction:
+
+```sh
+sudo bash /opt/nodesmart/install/soft-radio-transaction.sh snapshot
+```
+
+The transaction records every managed path as present or absent and checksums
+every pre-existing file before it becomes usable. Rollback refuses incomplete
+or modified inventories. Files absent at the start are removed only after the
+activation explicitly records that it created them with `mark-created`.
+Remote Admin configuration can never be marked for removal by this workflow,
+and rollback is safe to repeat.
+
+The broker can be enabled independently, without starting an Asterisk channel:
+
+```sh
+sudo NODESMART_USER=SERVICE_USER bash /opt/nodesmart/install/soft-radio-rx.sh enable-broker
+```
+
+This command waits for the configured loopback socket to accept a connection.
+If readiness times out, it disables Soft Radio again, restarts the web service
+in its disabled state, and reports failure. An enabled configuration that the
+web process cannot validate or bind now fails visibly in the service journal.
+
 ## Activation gate
 
 Activation requires installing the staged stanza into the local
