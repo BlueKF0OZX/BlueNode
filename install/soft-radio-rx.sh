@@ -124,12 +124,23 @@ PY
   enable-broker)
     [[ -f "$CONFIG" ]] || fail "run prepare first"
     require_remote_admin_permission
+    safety_baseline="$(mktemp)"
+    trap 'rm -f "$safety_baseline"' EXIT
+    local_node=$(/usr/bin/python3 -c 'import json; print(json.load(open("/etc/bluenode/soft-radio.json"))["local_node"])')
+    /usr/bin/python3 /opt/nodesmart/core/soft_radio_safety.py snapshot \
+      --node "$local_node" > "$safety_baseline"
     write_enabled true false
     /usr/bin/systemctl restart nodesmart-web.service
     if ! wait_for_broker; then
       write_enabled false false
       /usr/bin/systemctl restart nodesmart-web.service || true
       fail "loopback RX broker did not become ready; Soft Radio was disabled"
+    fi
+    if ! /usr/bin/python3 /opt/nodesmart/core/soft_radio_safety.py verify \
+        --node "$local_node" --baseline "$safety_baseline"; then
+      write_enabled false false
+      /usr/bin/systemctl restart nodesmart-web.service || true
+      fail "broker-only Asterisk safety gate failed; Soft Radio was disabled"
     fi
     /usr/bin/systemctl is-active --quiet nodesmart-web.service \
       || fail "web service is not active after broker readiness check"

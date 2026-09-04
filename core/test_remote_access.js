@@ -43,6 +43,8 @@ assert.match(adminLifecycle, /visudo -cf/);
 assert.match(adminLifecycle, /credential initialization failed; restricted sudo rule rolled back/);
 assert.match(softRadioLifecycle, /enable-broker/);
 assert.match(softRadioLifecycle, /wait_for_broker/);
+assert.match(softRadioLifecycle, /soft_radio_safety\.py snapshot/);
+assert.match(softRadioLifecycle, /soft_radio_safety\.py verify/);
 assert.doesNotMatch(softRadioLifecycle, /asterisk[^\n]*\|[^\n]*grep -q/);
 assert.match(softRadioTransaction, /transaction is incomplete or unverified/);
 assert.match(softRadioTransaction, /Soft Radio may not mark Remote Admin configuration as created/);

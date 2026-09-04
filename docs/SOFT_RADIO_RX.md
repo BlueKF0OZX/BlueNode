@@ -86,6 +86,10 @@ This command waits for the configured loopback socket to accept a connection.
 If readiness times out, it disables Soft Radio again, restarts the web service
 in its disabled state, and reports failure. An enabled configuration that the
 web process cannot validate or bind now fails visibly in the service journal.
+It also takes semantic Asterisk snapshots before and after broker startup. The
+gate compares the Asterisk PID/start marker, keyed state, stable channel names,
+the four Soft Radio module states, and reload continuity. It requires exactly
+one loopback listener and ignores volatile CLI counters and summaries.
 
 ## Activation gate
 
