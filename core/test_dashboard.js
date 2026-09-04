@@ -10,14 +10,15 @@ assert.doesNotMatch(html, />NodeSmart(?: Intelligence| Controls)?</);
 const disk = html.indexOf('id="disk"');
 const controls = html.indexOf('<h2>BlueNode Controls</h2>');
 const connectionStats = html.indexOf('id="connections-today"');
-const radioActivity = html.indexOf('id="radio-activity-panel"');
 const intelligence = html.indexOf('<h2>BlueNode Intelligence</h2>');
 const sessions = html.indexOf('<h2>Recent Sessions</h2>');
 const events = html.indexOf('<h2>Recent Events</h2>');
 const automation = html.indexOf('id="automation-title"');
 const remoteAdmin = html.indexOf('id="remote-admin-panel"');
-assert.ok(disk < connectionStats && connectionStats < radioActivity && radioActivity < controls,
-  'Radio Activity must follow status/statistics and precede Controls');
+assert.ok(disk < connectionStats && connectionStats < controls,
+  'Controls must follow the status/statistics area');
+assert.doesNotMatch(html, /id="radio-activity-panel"|renderRadioActivity|radioDuration/,
+  'The standalone Radio Activity presentation must remain removed');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
 assert.ok(controls < automation && automation < remoteAdmin && remoteAdmin < intelligence,
@@ -35,9 +36,6 @@ assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
   'No section heading may appear between Intelligence and Recent Sessions');
 for (const id of ['disk', 'connections-today', 'control-result',
   'connectivity-summary', 'connectivity-details',
-  'radio-activity-panel', 'radio-activity-title', 'radio-activity-summary',
-  'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-callsign-detail',
-  'radio-location-detail', 'radio-duration',
   'automation-panel', 'automation-title', 'automation-summary',
   'automation-recovery-armed', 'automation-protection',
   'automation-maintenance', 'automation-last-check', 'automation-attempts',
@@ -78,7 +76,7 @@ const context = vm.createContext({Date, Number, Object, Error,
 });
 (async()=>{
   const connectivityStart=html.indexOf('    function renderConnectivity');
-  const connectivityEnd=html.indexOf('    function radioDuration',connectivityStart);
+  const connectivityEnd=html.indexOf('    function automationAge',connectivityStart);
   vm.runInContext(html.slice(connectivityStart,connectivityEnd),context);
   context.renderConnectivity({diagnosis:'healthy',last_check:new Date().toISOString(),
     checks:{interface:true,gateway:true,dns:true,internet:true,allstar:true}});
@@ -94,37 +92,6 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.match(element('connectivity-details').textContent,
     /DNS resolution failed.*DNS FAIL.*Internet OK.*AllStar services BLOCKED_BY_UPSTREAM.*Action: Check DNS/);
   assert.equal(element('connectivity-details').style.display,'');
-  const radioStart=html.indexOf('    function radioDuration');
-  const radioEnd=html.indexOf('    function automationAge',radioStart);
-  vm.runInContext(html.slice(radioStart,radioEnd),context);
-  context.renderRadioActivity({status:'idle',local_rx:false,local_tx:false});
-  assert.match(element('radio-activity-title').textContent,/IDLE$/);
-  assert.equal(element('radio-activity-summary').textContent,'No active transmission');
-  context.renderRadioActivity({status:'local_rx',local_rx:true,local_tx:true,
-    node:'12345',started_at:new Date(Date.now()-2000).toISOString(),
-    tx_origin:{active:true,source_type:'local_rf',confidence:'verified'}});
-  assert.match(element('radio-activity-title').textContent,/LOCAL RX$/);
-  assert.equal(element('radio-local-tx').textContent,'Keyed');
-  assert.match(element('radio-origin-detail').textContent,/Local RF receiver \(verified\)/);
-  context.renderRadioActivity({status:'remote_tx',local_rx:false,local_tx:true,
-    node:'54321',friendly_name:'Example Link',callsign:'W1ABC',
-    display_location:'Orlando, Florida',started_at:new Date().toISOString(),
-    tx_origin:{active:true,source_type:'remote_link',source_node:'54321',
-      confidence:'verified_ingress'}});
-  assert.match(element('radio-node-detail').textContent,/54321.*Example Link/);
-  assert.equal(element('radio-callsign-detail').textContent,'Callsign: W1ABC');
-  assert.equal(element('radio-location-detail').textContent,'Location: Orlando, Florida');
-  assert.match(element('radio-origin-detail').textContent,/Inbound via node 54321.*verified ingress/);
-  context.renderRadioActivity({status:'ambiguous',remote_rx_nodes:['11111','22222'],
-    tx_origin:{active:true,source_type:'ambiguous',confidence:'ambiguous',
-      reason:'Multiple immediate links are keyed'}});
-  assert.match(element('radio-origin-detail').textContent,/Ambiguous.*Multiple immediate links/);
-  context.renderRadioActivity({status:'remote_tx',node:'99999'});
-  assert.equal(element('radio-callsign-detail').textContent,'');
-  assert.equal(element('radio-location-detail').textContent,'');
-  assert.equal(element('radio-callsign-detail').style.display,'none');
-  context.renderRadioActivity({status:'remote_tx',stale:true});
-  assert.match(element('radio-activity-title').textContent,/UNAVAILABLE$/);
   const automationStart=html.indexOf('    function automationAge');
   const automationEnd=html.indexOf('    let statusLoading',automationStart);
   context.fetch=async()=>({ok:true,json:async()=>({automation:{mode:'maintenance',maintenance_mode:true}})});

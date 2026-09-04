@@ -415,28 +415,6 @@
     }
 
 
-    .radio-panel {
-      margin-top: 18px;
-      padding: 14px 18px;
-      border-radius: 12px;
-      background: #1f2937;
-      border-left: 4px solid #6b7280;
-    }
-    .radio-panel.radio-local_rx { border-left-color: #22c55e; }
-    .radio-panel.radio-remote_tx { border-left-color: #3b82f6; }
-    .radio-panel.radio-node_tx { border-left-color: #a78bfa; }
-    .radio-panel.radio-ambiguous { border-left-color: #f59e0b; }
-    .radio-panel h2 { margin: 0; }
-    .radio-summary { margin-top: 6px; color: #d1d5db; }
-    .radio-details {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 6px 18px;
-      margin-top: 10px;
-      color: #9ca3af;
-      font-size: 14px;
-    }
-
     .controls-panel {
       margin-top: 18px;
       background: #1f2937;
@@ -1102,20 +1080,6 @@
 
 
 
-    <div id="radio-activity-panel" class="radio-panel">
-      <h2 id="radio-activity-title">RADIO ACTIVITY &mdash; LOADING</h2>
-      <div id="radio-activity-summary" class="radio-summary">Loading App_Rpt telemetry...</div>
-      <div class="radio-details">
-        <div>Local receiver: <span id="radio-local-rx">&mdash;</span></div>
-        <div>Local transmitter: <span id="radio-local-tx">&mdash;</span></div>
-        <div id="radio-node-detail">Node: &mdash;</div>
-        <div id="radio-origin-detail">Origin: &mdash;</div>
-        <div id="radio-callsign-detail" style="display:none"></div>
-        <div id="radio-location-detail" style="display:none"></div>
-        <div>Duration: <span id="radio-duration">&mdash;</span></div>
-      </div>
-    </div>
-
     <div class="controls-panel">
       <h2>BlueNode Controls</h2>
 
@@ -1768,82 +1732,6 @@
       details.style.display = '';
     }
 
-    function radioDuration(timestamp) {
-      const parsed = new Date(timestamp || '');
-      if (Number.isNaN(parsed.getTime())) return '\u2014';
-      const seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      if (hours) return hours + 'h ' + (minutes % 60) + 'm ' + (seconds % 60) + 's';
-      if (minutes) return minutes + 'm ' + (seconds % 60) + 's';
-      return seconds + 's';
-    }
-
-    function renderRadioActivity(state) {
-      state = state || {};
-      const mode = state.stale ? 'unavailable' : String(state.status || 'unavailable');
-      const labels = {
-        idle: 'IDLE', local_rx: 'LOCAL RX', remote_tx: 'REMOTE TX',
-        node_tx: 'NODE TX', ambiguous: 'MULTIPLE RX', unavailable: 'UNAVAILABLE'
-      };
-      const summaries = {
-        idle: 'No active transmission',
-        local_rx: 'Local radio is transmitting into BlueNode',
-        remote_tx: 'Remote AllStar audio active',
-        node_tx: 'BlueNode transmitter active without receiver or linked audio',
-        ambiguous: 'Multiple linked nodes report inbound audio',
-        unavailable: 'Live App_Rpt activity telemetry unavailable'
-      };
-      document.getElementById('radio-activity-panel').className = 'radio-panel radio-' + mode;
-      document.getElementById('radio-activity-title').textContent =
-        'RADIO ACTIVITY \u2014 ' + (labels[mode] || 'UNAVAILABLE');
-      document.getElementById('radio-activity-summary').textContent =
-        summaries[mode] || summaries.unavailable;
-      document.getElementById('radio-local-rx').textContent =
-        state.local_rx == null ? 'Unavailable' : state.local_rx ? 'Active' : 'Idle';
-      document.getElementById('radio-local-tx').textContent =
-        state.local_tx == null ? 'Unavailable' : state.local_tx ? 'Keyed' : 'Idle';
-      let nodeDetail = 'Node: \u2014';
-      if (mode === 'local_rx') {
-        nodeDetail = 'Node: ' + (state.node || 'Local');
-        if ((state.remote_rx_nodes || []).length) {
-          nodeDetail += ' \u2014 also keyed: ' + state.remote_rx_nodes.join(', ');
-        }
-      }
-      if (mode === 'remote_tx') {
-        nodeDetail = 'Node: ' + (state.node || 'Unknown');
-        if (state.friendly_name) nodeDetail += ' \u2014 ' + state.friendly_name;
-      }
-      if (mode === 'ambiguous') {
-        nodeDetail = 'Keyed links: ' + (state.remote_rx_nodes || []).join(', ');
-      }
-      document.getElementById('radio-node-detail').textContent = nodeDetail;
-      const origin = state.tx_origin || {};
-      let originDetail = 'Origin: \u2014';
-      if (origin.source_type === 'local_rf') {
-        originDetail = 'Origin: Local RF receiver (verified)';
-      } else if (origin.source_type === 'remote_link') {
-        originDetail = 'Origin: Inbound via node ' + (origin.source_node || 'unknown') +
-          ' (verified ingress)';
-      } else if (origin.source_type === 'ambiguous') {
-        originDetail = 'Origin: Ambiguous \u2014 ' +
-          (origin.reason || 'multiple sources are keyed');
-      } else if (origin.source_type === 'internal_or_unknown') {
-        originDetail = 'Origin: Unknown transmitter source';
-      }
-      document.getElementById('radio-origin-detail').textContent = originDetail;
-      const callsignDetail = document.getElementById('radio-callsign-detail');
-      const locationDetail = document.getElementById('radio-location-detail');
-      callsignDetail.textContent = mode === 'remote_tx' && state.callsign ?
-        'Callsign: ' + state.callsign : '';
-      callsignDetail.style.display = callsignDetail.textContent ? '' : 'none';
-      locationDetail.textContent = mode === 'remote_tx' && state.display_location ?
-        'Location: ' + state.display_location : '';
-      locationDetail.style.display = locationDetail.textContent ? '' : 'none';
-      document.getElementById('radio-duration').textContent =
-        mode === 'idle' || mode === 'unavailable' ? '\u2014' : radioDuration(state.started_at);
-    }
-
     function automationAge(timestamp) {
       const parsed = new Date(timestamp || '');
       if (Number.isNaN(parsed.getTime())) return 'Unavailable';
@@ -1982,7 +1870,6 @@
         renderConnectivity(data.connectivity);
 
         updateControlStates(data);
-        renderRadioActivity(data.radio_activity);
         renderAutomation(data.automation);
 
         const intelligenceElement =
