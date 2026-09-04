@@ -56,6 +56,11 @@ class RemoteAdminTests(unittest.TestCase):
         self.config.write_text("not json", encoding="utf-8"); os.chmod(self.config, 0o640)
         self.assertFalse(self.admin.public_state()["enabled"])
         self.assertEqual(self.admin.login("operator", "anything", "peer")[0], 404)
+        self.enable()
+        data = json.loads(self.config.read_text(encoding="utf-8"))
+        data["permissions"] = ["arbitrary_shell"]
+        self.config.write_text(json.dumps(data), encoding="utf-8")
+        self.assertFalse(self.admin.public_state()["enabled"])
 
     def test_valid_invalid_authentication_csrf_logout(self):
         self.enable()

@@ -1,0 +1,13 @@
+; Rendered with a random credential by soft-radio-rx.sh prepare.
+; This fixed per-call connection is loopback-only and exclusively RX media.
+[bluenode_soft_radio_rx]
+type = websocket_client
+uri = ws://127.0.0.1:8767/asterisk-media
+protocols = media
+username = @MEDIA_USERNAME@
+password = @MEDIA_PASSWORD@
+connection_type = per_call_config
+connection_timeout = 500
+reconnect_interval = 1000
+reconnect_attempts = 3
+tls_enabled = no

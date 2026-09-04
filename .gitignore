@@ -48,6 +48,8 @@ web/*.log
 # Remote Admin runtime credentials and audit output
 remote-admin.json
 admin-audit.jsonl
+soft-radio.json
+soft-radio-websocket-client.conf
 
 # Local environments and credentials
 .env

@@ -28,6 +28,7 @@ ALLOWED_LOG_SOURCES = {
 ALLOWED_ACTIONS = {
     "restart-monitor", "restart-asterisk", "refresh-diagnostics",
 }
+ALLOWED_PERMISSIONS = {"soft_radio_rx"}
 
 
 def _utc_now():
@@ -51,15 +52,20 @@ def _safe_config():
         session_seconds = int(raw.get("session_seconds", 1800))
         attempts = int(raw.get("max_login_attempts", 5))
         window = int(raw.get("login_window_seconds", 300))
+        permissions = raw.get("permissions", [])
         if not 200000 <= iterations <= 5000000:
             return base
         if not 300 <= session_seconds <= 86400 or not 1 <= attempts <= 20:
             return base
         if not 30 <= window <= 3600:
             return base
+        if (not isinstance(permissions, list) or
+                any(item not in ALLOWED_PERMISSIONS for item in permissions)):
+            return base
         base.update(raw)
         base.update({"password_iterations": iterations, "session_seconds": session_seconds,
-                     "max_login_attempts": attempts, "login_window_seconds": window})
+                     "max_login_attempts": attempts, "login_window_seconds": window,
+                     "permissions": tuple(permissions)})
         return base
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return base
@@ -111,7 +117,12 @@ class RemoteAdmin:
             session = self.sessions.get(token)
             if not session:
                 return None
-            return {"csrf": session["csrf"], "expires_at": session["expires_at"]}
+            return {"csrf": session["csrf"], "expires_at": session["expires_at"],
+                    "permissions": tuple(config.get("permissions", ()))}
+
+    def has_permission(self, token, permission):
+        session = self.authenticate(token)
+        return bool(session and permission in session.get("permissions", ()))
 
     def login(self, username, password, client_key):
         config = _safe_config()

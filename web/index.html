@@ -491,6 +491,23 @@
     .admin-danger:hover { background:#b91c1c; }
     #admin-log-output { max-height:240px; overflow:auto; white-space:pre-wrap;
       background:#111827; border-radius:8px; padding:10px; margin-top:10px; font-size:12px; }
+    .soft-radio-panel {
+      display: none;
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: #1f2937;
+      border-left: 4px solid #3b82f6;
+    }
+    .soft-radio-heading { display:flex; align-items:center; justify-content:space-between;
+      gap:12px; flex-wrap:wrap; }
+    .soft-radio-heading h2 { margin:0; }
+    .soft-radio-controls { display:flex; align-items:center; flex-wrap:wrap;
+      gap:10px; margin-top:12px; }
+    .soft-radio-level { width:120px; height:8px; border-radius:5px;
+      background:#111827; overflow:hidden; }
+    .soft-radio-level span { display:block; width:0; height:100%; background:#22c55e; }
+    #soft-radio-status { color:#9ca3af; margin-top:8px; }
     .automation-heading {
       display: flex;
       align-items: center;
@@ -1240,6 +1257,22 @@
       </div>
     </div>
 
+    <div id="soft-radio-panel" class="soft-radio-panel">
+      <div class="soft-radio-heading">
+        <h2 id="soft-radio-title">SOFT RADIO â€” DISABLED</h2>
+        <span id="soft-radio-auth">Authentication required</span>
+      </div>
+      <div id="soft-radio-status">RX listening is disabled.</div>
+      <div class="soft-radio-controls">
+        <button id="soft-radio-listen" class="control-button" onclick="startSoftRadio()">Listen</button>
+        <button id="soft-radio-stop" class="control-button" onclick="stopSoftRadio()" disabled>Stop</button>
+        <label for="soft-radio-volume">Volume</label>
+        <input id="soft-radio-volume" type="range" min="0" max="100" value="70"
+               oninput="setSoftRadioVolume(this.value)">
+        <div class="soft-radio-level" aria-label="Audio level"><span id="soft-radio-level"></span></div>
+      </div>
+    </div>
+
     <div id="intelligence-panel" class="events-panel">
       <h2>BlueNode Intelligence</h2>
       <div id="intelligence-summary">Loading intelligence...</div>
@@ -1305,6 +1338,10 @@
   <script>
 
     let adminCsrfToken = null;
+    let softRadioSocket = null;
+    let softRadioContext = null;
+    let softRadioGain = null;
+    let softRadioWorklet = null;
     function adminHeaders(extra = {}) { return adminCsrfToken ? {...extra, 'X-CSRF-Token': adminCsrfToken} : extra; }
 
     async function loadAdminSession() {
@@ -1315,8 +1352,18 @@
         adminCsrfToken = state.authenticated ? state.csrf_token : null;
         document.getElementById('admin-login-view').style.display = state.authenticated ? 'none' : 'block';
         document.getElementById('admin-auth-view').style.display = state.authenticated ? 'block' : 'none';
-        if (state.authenticated) await loadAdminStatus();
-      } catch (_) { document.getElementById('remote-admin-panel').style.display = 'none'; }
+        if (state.authenticated) {
+          await loadAdminStatus();
+          await loadSoftRadioState();
+        } else {
+          stopSoftRadio();
+          document.getElementById('soft-radio-panel').style.display = 'none';
+        }
+      } catch (_) {
+        stopSoftRadio();
+        document.getElementById('remote-admin-panel').style.display = 'none';
+        document.getElementById('soft-radio-panel').style.display = 'none';
+      }
     }
     async function adminLogin(button) {
       button.disabled = true;
@@ -1333,6 +1380,7 @@
       finally { button.disabled = false; }
     }
     async function adminLogout() {
+      stopSoftRadio();
       await fetch('/api/admin/logout', {method:'POST', headers:adminHeaders()});
       adminCsrfToken = null; await loadAdminSession();
     }
@@ -1365,6 +1413,88 @@
       const result = await response.json(); const output = document.getElementById('admin-log-output');
       output.style.display = 'block'; output.textContent = response.ok ? result.lines.join('\n') : result.error;
     }
+
+    function setSoftRadioPresentation(state, message) {
+      const title = document.getElementById('soft-radio-title');
+      title.textContent = 'SOFT RADIO â€” ' + state.toUpperCase();
+      document.getElementById('soft-radio-status').textContent = message;
+      document.getElementById('soft-radio-listen').disabled = state !== 'idle';
+      document.getElementById('soft-radio-stop').disabled = !['connecting','listening'].includes(state);
+    }
+    async function loadSoftRadioState() {
+      try {
+        const response = await fetch('/api/soft-radio/status', {cache:'no-store'});
+        if (response.status === 401) return loadAdminSession();
+        if (response.status === 403) {
+          document.getElementById('soft-radio-panel').style.display = 'none';
+          return;
+        }
+        const state = await response.json();
+        document.getElementById('soft-radio-panel').style.display = 'block';
+        document.getElementById('soft-radio-auth').textContent = 'Authenticated RX-only';
+        if (!state.enabled) setSoftRadioPresentation('disabled', 'Soft Radio RX is disabled on this node.');
+        else if (!softRadioSocket) setSoftRadioPresentation(state.status === 'fault' ? 'fault' : 'idle',
+          state.status === 'fault' ? 'The local RX media path is unavailable.' : 'Ready to listen.');
+      } catch (_) {
+        document.getElementById('soft-radio-panel').style.display = 'none';
+      }
+    }
+    function setSoftRadioVolume(value) {
+      if (softRadioGain) softRadioGain.gain.value = Math.max(0, Math.min(1, Number(value) / 100));
+    }
+    async function startSoftRadio() {
+      if (softRadioSocket) return;
+      setSoftRadioPresentation('connecting', 'Requesting a one-time listening ticket...');
+      try {
+        const response = await fetch('/api/soft-radio/ticket', {method:'POST',
+          headers:adminHeaders({'Content-Type':'application/json'}), body:'{}'});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Listening authorization failed');
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass || !window.AudioWorkletNode) throw new Error('AudioWorklet is not supported by this browser');
+        softRadioContext = new AudioContextClass({latencyHint:'interactive'});
+        await softRadioContext.audioWorklet.addModule('/web/soft-radio-worklet.js');
+        softRadioWorklet = new AudioWorkletNode(softRadioContext, 'bluenode-ulaw-player',
+          {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[1]});
+        softRadioGain = softRadioContext.createGain();
+        setSoftRadioVolume(document.getElementById('soft-radio-volume').value);
+        softRadioWorklet.connect(softRadioGain).connect(softRadioContext.destination);
+        softRadioWorklet.port.onmessage = event => {
+          if (event.data && event.data.type === 'level')
+            document.getElementById('soft-radio-level').style.width = `${Math.round(event.data.value * 100)}%`;
+        };
+        const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(`${scheme}//${location.host}/api/soft-radio/ws`,
+          ['bluenode-rx', `ticket.${result.ticket}`]);
+        softRadioSocket = socket;
+        socket.binaryType = 'arraybuffer';
+        socket.onopen = async () => {
+          await softRadioContext.resume();
+          setSoftRadioPresentation('listening', 'Receiving node audio. Microphone access is not used.');
+        };
+        socket.onmessage = event => {
+          if (event.data instanceof ArrayBuffer && softRadioWorklet)
+            softRadioWorklet.port.postMessage(event.data, [event.data]);
+        };
+        socket.onerror = () => setSoftRadioPresentation('fault', 'The RX media connection failed.');
+        socket.onclose = () => stopSoftRadio('Listening stopped.');
+      } catch (error) {
+        stopSoftRadio(error.message);
+        setSoftRadioPresentation('fault', error.message);
+      }
+    }
+    function stopSoftRadio(message = 'Listening stopped.') {
+      const socket = softRadioSocket; softRadioSocket = null;
+      if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'listener stopped');
+      if (softRadioWorklet) { softRadioWorklet.disconnect(); softRadioWorklet = null; }
+      if (softRadioContext) { softRadioContext.close(); softRadioContext = null; }
+      softRadioGain = null;
+      const level = document.getElementById('soft-radio-level');
+      if (level) level.style.width = '0';
+      const panel = document.getElementById('soft-radio-panel');
+      if (panel && panel.style.display !== 'none') setSoftRadioPresentation('idle', message);
+    }
+    window.addEventListener('pagehide', () => stopSoftRadio());
 
     async function runControl(action, button) {
       const resultElement = document.getElementById('control-result');

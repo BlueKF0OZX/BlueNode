@@ -23,6 +23,8 @@ try {
         '^(state|events|history|logs)/',
         '(^|/)backups?/',
         '^config/nodesmart\.json$',
+        '(^|/)soft-radio\.json$',
+        '(^|/)soft-radio-websocket-client\.conf$',
         '(^|/)\.env($|\.)',
         '(^|/)(\.htpasswd|htpasswd|[^/]*\.(htpasswd|passwd|password))$',
         '(^|/)(id_rsa|id_ed25519)$',

@@ -1,0 +1,30 @@
+#!/bin/bash
+set -euo pipefail
+
+CONFIG=/etc/bluenode/soft-radio.json
+[[ $EUID -eq 0 && $# -eq 0 && -f "$CONFIG" ]] || exit 1
+
+mapfile -t values < <(/usr/bin/python3 - "$CONFIG" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    config = json.load(handle)
+node = str(config.get("local_node", ""))
+connection = str(config.get("connection_name", ""))
+if (config.get("enabled") is not True or config.get("start_channel") is not True):
+    raise SystemExit(1)
+if not node.isdigit() or not 1 <= len(node) <= 10:
+    raise SystemExit(1)
+if not connection.replace("_", "").isalnum() or not 1 <= len(connection) <= 64:
+    raise SystemExit(1)
+print(node)
+print(connection)
+PY
+)
+[[ ${#values[@]} -eq 2 ]] || exit 1
+node="${values[0]}"
+connection="${values[1]}"
+
+# d(in) means application-input-only: Asterisk drops anything received from
+# the application. Pm is App_Rpt's monitor-only phone mode.
+exec /usr/sbin/asterisk -rx \
+  "channel originate WebSocket/${connection}/c(ulaw)f(json)d(in) application Rpt ${node},Pm,BlueNode-RX-P"

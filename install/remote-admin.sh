@@ -38,5 +38,10 @@ case "$ACTION" in
     [[ -f "$SUDOERS_FILE" ]] && printf 'Restricted monitor-restart privilege is installed\n' ||
       printf 'Restricted monitor-restart privilege is absent\n'
     ;;
-  *) fail "usage: $0 {enable|disable|status}" ;;
+  grant-soft-radio-rx|revoke-soft-radio-rx)
+    /usr/bin/python3 "$INITIALIZER" "$ACTION" --service-user "$SERVICE_USER"
+    /usr/bin/systemctl restart nodesmart-web.service
+    printf 'PASS remote-admin: permission updated; active sessions invalidated\n'
+    ;;
+  *) fail "usage: $0 {enable|disable|status|grant-soft-radio-rx|revoke-soft-radio-rx}" ;;
 esac

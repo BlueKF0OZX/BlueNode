@@ -15,19 +15,32 @@ const sessions = html.indexOf('<h2>Recent Sessions</h2>');
 const events = html.indexOf('<h2>Recent Events</h2>');
 const automation = html.indexOf('id="automation-title"');
 const remoteAdmin = html.indexOf('id="remote-admin-panel"');
+const softRadio = html.indexOf('id="soft-radio-panel"');
 assert.ok(disk < connectionStats && connectionStats < controls,
   'Controls must follow the status/statistics area');
 assert.doesNotMatch(html, /id="radio-activity-panel"|renderRadioActivity|radioDuration/,
   'The standalone Radio Activity presentation must remain removed');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
-assert.ok(controls < automation && automation < remoteAdmin && remoteAdmin < intelligence,
-  'Operational order must be Controls, Automation, optional Admin, Intelligence');
+assert.ok(controls < automation && automation < remoteAdmin && remoteAdmin < softRadio && softRadio < intelligence,
+  'Operational order must be Controls, Automation, optional Admin/RX, Intelligence');
 assert.doesNotMatch(html, /<h2>Automatic Recovery<\/h2>|id="recovery-panel"|loadRecoveryStatus/,
   'The redundant standalone recovery presentation must remain removed');
 assert.match(html, /async function loadAdminSession\(\)/);
 assert.match(html, /Type RESTART ASTERISK/);
 assert.match(html, /adminHeaders\(\{'Content-Type': 'application\/json'\}\)/);
+assert.match(html, /\/api\/soft-radio\/ticket/);
+assert.match(html, /\/api\/soft-radio\/ws`,\s*\['bluenode-rx', `ticket\.\$\{result\.ticket\}`\]/);
+assert.match(html, /new AudioWorkletNode\(softRadioContext, 'bluenode-ulaw-player'/);
+const worklet = fs.readFileSync(path.join(__dirname, '../web/soft-radio-worklet.js'), 'utf8');
+assert.match(worklet, /maximumSamples\s*=\s*8000 \* 0\.24/);
+assert.match(worklet, /targetSamples\s*=\s*8000 \* 0\.06/);
+assert.match(worklet, /this\.samples\.splice\(0, this\.samples\.length - this\.targetSamples\)/,
+  'RX jitter buffer must drop stale samples instead of growing latency');
+const softRadioCode = html.slice(html.indexOf('async function loadSoftRadioState'),
+  html.indexOf('async function runControl'));
+assert.doesNotMatch(softRadioCode, /getUserMedia|mediaDevices|push.to.talk|\bPTT\b/i,
+  'Soft Radio Phase A must not contain microphone or transmit controls');
 assert.match(html, /\.grid\s*\+\s*\.grid\s*{[^}]*margin-top:\s*15px/s,
   'Adjacent telemetry grids must use the same 15px gap as card rows');
 assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,
@@ -40,6 +53,8 @@ for (const id of ['disk', 'connections-today', 'control-result',
   'automation-recovery-armed', 'automation-protection',
   'automation-maintenance', 'automation-last-check', 'automation-attempts',
   'automation-backoff', 'automation-action', 'maintenance-toggle',
+  'soft-radio-panel', 'soft-radio-title', 'soft-radio-auth', 'soft-radio-status',
+  'soft-radio-listen', 'soft-radio-stop', 'soft-radio-volume', 'soft-radio-level',
   'intelligence-panel', 'recent-sessions', 'events',
   'btn-dodropin-connect', 'btn-dodropin-disconnect', 'btn-skywarn-on',
   'btn-skywarn-off', 'manual-node-number', 'node-directory-search']) {

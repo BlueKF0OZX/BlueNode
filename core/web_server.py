@@ -3,12 +3,14 @@
 
 
 
+import base64
 import json
 
 import subprocess
+import hmac
 
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from pathlib import Path
 
@@ -16,6 +18,10 @@ from event_logger import emit
 from config import load_config
 import automation
 from remote_admin import ADMIN, MAX_BODY_BYTES, _safe_config
+from soft_radio import PERMISSION as SOFT_RADIO_PERMISSION
+from soft_radio import SOFT_RADIO, websocket_accept
+
+SOFT_RADIO.audit = ADMIN.audit
 
 
 
@@ -106,6 +112,22 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
             status, result = ADMIN.logs(query.get("source", [""])[0],
                                         query.get("lines", ["50"])[0])
             self.send_json(status, result)
+            return
+
+        if path == "/api/soft-radio/status":
+            token = self.admin_cookie()
+            authenticated = ADMIN.authenticate(token) is not None
+            permitted = ADMIN.has_permission(token, SOFT_RADIO_PERMISSION)
+            if not authenticated or not permitted:
+                ADMIN.audit("soft-radio-rx-authorization", "rejected")
+                self.send_json(403 if authenticated else 401,
+                               {"ok": False, "error": "Soft Radio RX permission required"})
+                return
+            self.send_json(200, SOFT_RADIO.public_state(authenticated, permitted))
+            return
+
+        if path == "/api/soft-radio/ws":
+            self.serve_soft_radio_websocket()
             return
 
 
@@ -226,6 +248,54 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
             return False
         return True
 
+    def serve_soft_radio_websocket(self):
+        token = self.admin_cookie()
+        if (ADMIN.authenticate(token) is None or
+                not ADMIN.has_permission(token, SOFT_RADIO_PERMISSION)):
+            ADMIN.audit("soft-radio-rx-authorization", "rejected")
+            self.send_json(401, {"ok": False, "error": "Soft Radio RX authorization required"})
+            return
+        if urlsplit(self.path).query:
+            self.send_json(400, {"ok": False, "error": "Invalid Soft Radio ticket"})
+            return
+        protocols = [item.strip() for item in
+                     self.headers.get("Sec-WebSocket-Protocol", "").split(",")]
+        ticket_protocols = [item for item in protocols if item.startswith("ticket.")]
+        if "bluenode-rx" not in protocols or len(ticket_protocols) != 1:
+            self.send_json(400, {"ok": False, "error": "Invalid Soft Radio ticket"})
+            return
+        origin = self.headers.get("Origin", "")
+        origin_parts = urlsplit(origin)
+        request_host = self.headers.get("Host", "").lower()
+        same_origin = (origin_parts.scheme == "https" and
+                       hmac.compare_digest(origin_parts.netloc.lower(), request_host))
+        if (not same_origin or self.headers.get("Upgrade", "").lower() != "websocket" or
+                self.headers.get("Sec-WebSocket-Version") != "13"):
+            ADMIN.audit("soft-radio-rx-websocket", "handshake-rejected")
+            self.send_json(403, {"ok": False, "error": "Invalid WebSocket origin"})
+            return
+        ticket = ticket_protocols[0][len("ticket."):]
+        if not SOFT_RADIO.consume_ticket(ticket, token):
+            ADMIN.audit("soft-radio-rx-ticket", "rejected")
+            self.send_json(403, {"ok": False, "error": "Invalid or expired Soft Radio ticket"})
+            return
+        key = self.headers.get("Sec-WebSocket-Key", "")
+        try:
+            if len(base64.b64decode(key, validate=True)) != 16:
+                raise ValueError
+        except (ValueError, TypeError):
+            self.send_json(400, {"ok": False, "error": "Invalid WebSocket key"})
+            return
+        self.send_response(101, "Switching Protocols")
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", websocket_accept(key))
+        self.send_header("Sec-WebSocket-Protocol", "bluenode-rx")
+        self.end_headers()
+        SOFT_RADIO.serve_browser(self.connection, token,
+                                 lambda candidate: ADMIN.has_permission(
+                                     candidate, SOFT_RADIO_PERMISSION))
+
     def read_json(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -272,7 +342,9 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
         if path == "/api/admin/logout":
             if not self.require_admin(csrf=True):
                 return
-            ADMIN.logout(self.admin_cookie())
+            token = self.admin_cookie()
+            SOFT_RADIO.disconnect_session(token)
+            ADMIN.logout(token)
             body = b'{"ok":true}'
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -281,6 +353,25 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
             self.send_admin_cookie("", clear=True)
             self.end_headers()
             self.wfile.write(body)
+            return
+
+        if path == "/api/soft-radio/ticket":
+            if not self.require_admin(csrf=True):
+                return
+            token = self.admin_cookie()
+            if not ADMIN.has_permission(token, SOFT_RADIO_PERMISSION):
+                ADMIN.audit("soft-radio-rx-authorization", "rejected")
+                self.send_json(403, {"ok": False, "error": "Soft Radio RX permission required"})
+                return
+            payload = self.read_json()
+            if payload != {}:
+                self.send_json(400, {"ok": False, "error": "Unexpected parameters"})
+                return
+            ticket = SOFT_RADIO.issue_ticket(token)
+            if not ticket:
+                self.send_json(503, {"ok": False, "error": "Soft Radio RX is disabled"})
+                return
+            self.send_json(200, {"ok": True, "ticket": ticket})
             return
 
         if path == "/api/admin/action":
@@ -615,6 +706,8 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
 
+    SOFT_RADIO.start()
+
     server = ThreadingHTTPServer((HOST, PORT), NodeSmartHandler)
 
 
@@ -632,5 +725,7 @@ if __name__ == "__main__":
         pass
 
     finally:
+
+        SOFT_RADIO.stop()
 
         server.server_close()

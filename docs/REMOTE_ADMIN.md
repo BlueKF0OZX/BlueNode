@@ -58,3 +58,7 @@ grant arbitrary `systemctl` access. Disabling changes neither Apache, Tailscale,
 firewall, nor LAN access. If HTTPS
 is unavailable, leave Remote Admin disabled; do not weaken secure cookies to
 administer over plain HTTP.
+
+Soft Radio RX uses a separate permission and remains unavailable to an
+ordinary Remote Admin session until explicitly granted. See
+`docs/SOFT_RADIO_RX.md`. Permission changes invalidate active sessions.

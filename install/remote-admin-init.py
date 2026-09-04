@@ -34,7 +34,9 @@ def write_config(data, service_user):
 
 def main():
     parser = argparse.ArgumentParser(description="Initialize BlueNode Remote Admin")
-    parser.add_argument("mode", choices=("enable", "disable", "status"))
+    parser.add_argument("mode", choices=("enable", "disable", "status",
+                                         "grant-soft-radio-rx",
+                                         "revoke-soft-radio-rx"))
     parser.add_argument("--service-user", default=os.environ.get("NODESMART_USER", ""))
     parser.add_argument("--username", default="")
     args = parser.parse_args()
@@ -47,6 +49,23 @@ def main():
         except (OSError, ValueError):
             pass
         print("Remote Admin is " + ("enabled" if enabled else "disabled"))
+        return
+    if args.mode in ("grant-soft-radio-rx", "revoke-soft-radio-rx"):
+        try:
+            current = json.loads(TARGET.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise SystemExit("Initialize Remote Admin before changing permissions") from exc
+        if current.get("enabled") is not True:
+            raise SystemExit("Remote Admin must be enabled before granting Soft Radio RX")
+        permissions = set(current.get("permissions", []))
+        if args.mode == "grant-soft-radio-rx":
+            permissions.add("soft_radio_rx")
+        else:
+            permissions.discard("soft_radio_rx")
+        current["permissions"] = sorted(permissions)
+        write_config(current, args.service_user)
+        print("Soft Radio RX permission " +
+              ("granted" if "soft_radio_rx" in permissions else "revoked"))
         return
     if not args.service_user:
         raise SystemExit("Provide --service-user or NODESMART_USER")
@@ -66,7 +85,7 @@ def main():
                   "password_hash": digest, "password_iterations": 600000,
                   "session_secret": secrets.token_hex(32), "session_seconds": 1800,
                   "secure_cookie": True, "max_login_attempts": 5,
-                  "login_window_seconds": 300}, args.service_user)
+                  "login_window_seconds": 300, "permissions": []}, args.service_user)
     print("Remote Admin credentials initialized outside Git; restart nodesmart-web.service")
 
 

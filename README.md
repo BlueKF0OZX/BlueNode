@@ -64,6 +64,10 @@ expiring sessions, CSRF protection, fixed action/log allowlists, and a minimal
 audit trail without exposing shell access. See `docs/REMOTE_ADMIN.md` for the
 security model and safe initialization procedure.
 
+Optional Soft Radio Phase A provides separately authorized browser RX with no
+transmit path and is disabled by default. See `docs/SOFT_RADIO_RX.md` for its
+layered RX-only design and activation gate.
+
 ## Security
 
 BlueNode installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.
