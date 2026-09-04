@@ -7,6 +7,23 @@ assert.match(html, /<title>BlueNode<\/title>/);
 assert.match(html, /<h1>BlueNode<\/h1>/);
 assert.match(html, /<h2>BlueNode Intelligence<\/h2>/);
 assert.doesNotMatch(html, />NodeSmart(?: Intelligence| Controls)?</);
+const disk = html.indexOf('id="disk"');
+const controls = html.indexOf('<h2>BlueNode Controls</h2>');
+const connectionStats = html.indexOf('id="connections-today"');
+const intelligence = html.indexOf('<h2>BlueNode Intelligence</h2>');
+const sessions = html.indexOf('<h2>Recent Sessions</h2>');
+const events = html.indexOf('<h2>Recent Events</h2>');
+assert.ok(disk < controls && controls < connectionStats,
+  'Controls must follow the top status cards and precede connection statistics');
+assert.ok(intelligence < sessions && sessions < events,
+  'Intelligence must immediately precede Recent Sessions and Recent Events');
+assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
+  'No section heading may appear between Intelligence and Recent Sessions');
+for (const id of ['disk', 'connections-today', 'control-result',
+  'intelligence-panel', 'recent-sessions', 'events']) {
+  assert.equal(html.split('id="' + id + '"').length - 1, 1,
+    'Moved element ID must remain unique: ' + id);
+}
 const start = html.indexOf('    async function loadRecoveryStatus()');
 const end = html.indexOf('    let statusLoading', start);
 const elements = {};
