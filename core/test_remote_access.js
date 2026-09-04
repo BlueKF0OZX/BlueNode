@@ -31,7 +31,9 @@ assert.match(docs, /every API\/control path/);
 assert.match(installer, /install -m 0755[^\n]*remote-access\.sh/);
 assert.match(installer, /install -m 0755[^\n]*remote-admin-init\.py/);
 assert.match(installer, /install -m 0755[^\n]*remote-admin\.sh/);
-assert.match(adminInitializer, /getpass\.getpass/);
+assert.equal((adminInitializer.match(/read_hidden_secret\(/g) || []).length, 2,
+  'Credential confirmation must use the hardened no-echo PTY reader twice');
+assert.doesNotMatch(adminInitializer, /getpass\.getpass/);
 assert.doesNotMatch(adminInitializer, /add_argument\([^\n]*password/);
 assert.doesNotMatch(sudoers, /systemctl restart nodesmart\.service/);
 assert.match(adminLifecycle, /NOPASSWD: \/usr\/bin\/systemctl restart nodesmart\.service/);

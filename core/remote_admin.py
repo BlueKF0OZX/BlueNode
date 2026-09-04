@@ -107,6 +107,53 @@ def validate_new_credentials(username, first, second):
     return normalized_username, first
 
 
+def read_hidden_secret(prompt, tty_path="/dev/tty"):
+    """Read a secret without canonical PTY editing, echo, logging, or argv use."""
+    if os.name != "posix":
+        import getpass
+        return getpass.getpass(prompt)
+    import termios
+    descriptor = os.open(tty_path, os.O_RDWR | getattr(os, "O_NOCTTY", 0))
+    original = termios.tcgetattr(descriptor)
+    changed = termios.tcgetattr(descriptor)
+    changed[3] &= ~(termios.ECHO | termios.ICANON)
+    changed[6][termios.VMIN] = 1
+    changed[6][termios.VTIME] = 0
+    secret = bytearray()
+    try:
+        termios.tcsetattr(descriptor, termios.TCSANOW, changed)
+        os.write(descriptor, prompt.encode("utf-8"))
+        while True:
+            chunk = os.read(descriptor, 1)
+            if not chunk:
+                raise EOFError("Credential input ended unexpectedly")
+            value = chunk[0]
+            if value in (10, 13):
+                break
+            if value in (8, 127):
+                if secret:
+                    removed = secret.pop()
+                    if removed & 0xC0 == 0x80:
+                        while secret and secret[-1] & 0xC0 == 0x80:
+                            secret.pop()
+                        if secret:
+                            secret.pop()
+                continue
+            if len(secret) >= 4096:
+                raise ValueError("Credential input exceeds the supported limit")
+            secret.append(value)
+    finally:
+        termios.tcsetattr(descriptor, termios.TCSANOW, original)
+        try:
+            os.write(descriptor, b"\n")
+        finally:
+            os.close(descriptor)
+    try:
+        return secret.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Credential input is not valid UTF-8") from exc
+
+
 class RemoteAdmin:
     def __init__(self, clock=time.time, runner=subprocess.run):
         self.clock = clock

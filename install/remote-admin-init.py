@@ -2,7 +2,6 @@
 """Create or disable the untracked BlueNode Remote Admin credential file."""
 
 import argparse
-import getpass
 import json
 import os
 import pwd
@@ -11,7 +10,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, "/opt/nodesmart/core")
-from remote_admin import hash_password, validate_new_credentials  # noqa: E402
+from remote_admin import (hash_password, read_hidden_secret,
+                          validate_new_credentials)  # noqa: E402
 
 TARGET = Path("/etc/bluenode/remote-admin.json")
 
@@ -74,8 +74,8 @@ def main():
         print("Remote Admin disabled; active sessions are invalid after web service restart")
         return
     username = args.username.strip() or input("Remote Admin username: ").strip()
-    first = getpass.getpass("Remote Admin password: ")
-    second = getpass.getpass("Confirm password: ")
+    first = read_hidden_secret("Remote Admin password: ")
+    second = read_hidden_secret("Confirm password: ")
     try:
         username, first = validate_new_credentials(username, first, second)
     except ValueError as exc:
