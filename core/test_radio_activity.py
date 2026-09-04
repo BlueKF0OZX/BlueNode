@@ -17,11 +17,16 @@ class RadioActivityTests(unittest.TestCase):
         self.state_patch = patch.object(radio_activity, "STATE_FILE", self.state_file)
         self.names_patch = patch.object(radio_activity, "NODE_NAMES", {"54321": "Example Link"})
         self.emit_patch = patch.object(radio_activity, "emit")
+        self.metadata_patch = patch.object(
+            radio_activity.node_metadata, "lookup",
+            return_value={"status": "unavailable"})
         self.state_patch.start()
         self.names_patch.start()
         self.emit_patch.start()
+        self.metadata = self.metadata_patch.start()
 
     def tearDown(self):
+        self.metadata_patch.stop()
         self.emit_patch.stop()
         self.names_patch.stop()
         self.state_patch.stop()
@@ -45,12 +50,19 @@ class RadioActivityTests(unittest.TestCase):
         self.assertEqual(state["node"], radio_activity.NODE)
 
     def test_remote_node_and_friendly_name(self):
+        self.metadata.return_value = {
+            "status": "available", "callsign": "W1ABC",
+            "location": "Orlando, Florida", "display_location": "Orlando, Florida",
+            "source": "https://allmondb.allstarlink.org/allmondb.php"}
         state = radio_activity.update(self.sample(local_tx=True, links=[
             {"node": "54321", "mode": "T", "keyed": True},
         ]), NOW)
         self.assertEqual(state["status"], "remote_tx")
         self.assertEqual(state["node"], "54321")
         self.assertEqual(state["friendly_name"], "Example Link")
+        self.assertEqual(state["callsign"], "W1ABC")
+        self.assertEqual(state["display_location"], "Orlando, Florida")
+        self.assertNotIn("latitude", state)
 
     def test_start_end_transitions_are_not_repeated(self):
         active = self.sample(links=[{"node": "54321", "mode": "T", "keyed": True}])
@@ -80,6 +92,23 @@ class RadioActivityTests(unittest.TestCase):
         ]), NOW + timedelta(seconds=2))
         self.assertEqual(ambiguous["status"], "ambiguous")
         self.assertNotIn("node", ambiguous)
+        self.metadata.assert_not_called()
+
+    def test_metadata_does_not_leak_to_a_new_active_node(self):
+        self.metadata.side_effect = [
+            {"status": "available", "callsign": "W1ABC", "location": "Orlando",
+             "display_location": "Orlando"},
+            {"status": "not_found"},
+        ]
+        first = radio_activity.update(self.sample(links=[
+            {"node": "54321", "mode": "T", "keyed": True}]), NOW)
+        second = radio_activity.update(self.sample(links=[
+            {"node": "99999", "mode": "T", "keyed": True}]),
+            NOW + timedelta(seconds=2))
+        self.assertEqual(first["callsign"], "W1ABC")
+        self.assertEqual(second["node"], "99999")
+        self.assertNotIn("callsign", second)
+        self.assertNotIn("display_location", second)
 
     def test_malformed_persisted_state_fails_safely(self):
         self.state_file.write_text("not json")

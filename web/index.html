@@ -1124,6 +1124,8 @@
         <div>Local receiver: <span id="radio-local-rx">&mdash;</span></div>
         <div>Local transmitter: <span id="radio-local-tx">&mdash;</span></div>
         <div id="radio-node-detail">Node: &mdash;</div>
+        <div id="radio-callsign-detail" style="display:none"></div>
+        <div id="radio-location-detail" style="display:none"></div>
         <div>Duration: <span id="radio-duration">&mdash;</span></div>
       </div>
     </div>
@@ -1805,6 +1807,14 @@
         nodeDetail = 'Keyed links: ' + (state.remote_rx_nodes || []).join(', ');
       }
       document.getElementById('radio-node-detail').textContent = nodeDetail;
+      const callsignDetail = document.getElementById('radio-callsign-detail');
+      const locationDetail = document.getElementById('radio-location-detail');
+      callsignDetail.textContent = mode === 'remote_tx' && state.callsign ?
+        'Callsign: ' + state.callsign : '';
+      callsignDetail.style.display = callsignDetail.textContent ? '' : 'none';
+      locationDetail.textContent = mode === 'remote_tx' && state.display_location ?
+        'Location: ' + state.display_location : '';
+      locationDetail.style.display = locationDetail.textContent ? '' : 'none';
       document.getElementById('radio-duration').textContent =
         mode === 'idle' || mode === 'unavailable' ? '\u2014' : radioDuration(state.started_at);
     }

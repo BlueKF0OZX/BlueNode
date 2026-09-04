@@ -8,6 +8,7 @@ from pathlib import Path
 
 from config import load_config
 from event_logger import emit
+import node_metadata
 
 
 CONFIG = load_config()
@@ -88,7 +89,18 @@ def classify(sample):
     if status == "local_rx":
         result.update({"node": NODE, "friendly_name": ""})
     elif status == "remote_tx":
-        result.update({"node": remote[0], "friendly_name": NODE_NAMES.get(remote[0], "")})
+        node = remote[0]
+        result.update({"node": node, "friendly_name": NODE_NAMES.get(node, "")})
+        metadata = node_metadata.lookup(node)
+        result["metadata"] = {
+            key: metadata[key] for key in ("status", "source", "fetched_at")
+            if key in metadata
+        }
+        if metadata.get("status") == "available":
+            for key in ("callsign", "description", "location", "display_location",
+                        "latitude", "longitude"):
+                if key in metadata:
+                    result[key] = metadata[key]
     return result
 
 

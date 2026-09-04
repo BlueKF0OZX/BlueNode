@@ -31,7 +31,8 @@ assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
 for (const id of ['disk', 'connections-today', 'control-result',
   'connectivity-summary',
   'radio-activity-panel', 'radio-activity-title', 'radio-activity-summary',
-  'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-duration',
+  'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-callsign-detail',
+  'radio-location-detail', 'radio-duration',
   'recovery-panel', 'recovery-status', 'recovery-detail',
   'automation-panel', 'automation-title', 'automation-summary',
   'automation-recovery-armed', 'automation-protection',
@@ -110,8 +111,15 @@ vm.runInContext(html.slice(start,end),context);
   assert.match(element('radio-activity-title').textContent,/LOCAL RX$/);
   assert.equal(element('radio-local-tx').textContent,'Keyed');
   context.renderRadioActivity({status:'remote_tx',local_rx:false,local_tx:true,
-    node:'54321',friendly_name:'Example Link',started_at:new Date().toISOString()});
+    node:'54321',friendly_name:'Example Link',callsign:'W1ABC',
+    display_location:'Orlando, Florida',started_at:new Date().toISOString()});
   assert.match(element('radio-node-detail').textContent,/54321.*Example Link/);
+  assert.equal(element('radio-callsign-detail').textContent,'Callsign: W1ABC');
+  assert.equal(element('radio-location-detail').textContent,'Location: Orlando, Florida');
+  context.renderRadioActivity({status:'remote_tx',node:'99999'});
+  assert.equal(element('radio-callsign-detail').textContent,'');
+  assert.equal(element('radio-location-detail').textContent,'');
+  assert.equal(element('radio-callsign-detail').style.display,'none');
   context.renderRadioActivity({status:'remote_tx',stale:true});
   assert.match(element('radio-activity-title').textContent,/UNAVAILABLE$/);
   const automationStart=html.indexOf('    function automationAge');

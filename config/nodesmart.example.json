@@ -59,6 +59,16 @@
 
   },
 
+  "node_metadata": {
+    "source_url": "https://allmondb.allstarlink.org/allmondb.php",
+    "success_ttl_seconds": 86400,
+    "negative_ttl_seconds": 3600,
+    "refresh_retry_seconds": 300,
+    "timeout_seconds": 5,
+    "maximum_download_bytes": 8000000
+
+  },
+
   "connectivity": {
     "interval_seconds": 30,
     "timeout_seconds": 1.5,

@@ -18,6 +18,12 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `automation.maximum_backoff_seconds`: upper bound for escalation backoff
 - `automation.healthy_reset_seconds`: sustained healthy period required to clear escalation and attempt history
 - `radio_activity.stale_seconds`: maximum telemetry age before live radio activity clears as unavailable (default `6`, minimum `4`)
+- `node_metadata.source_url`: structured AllStarLink public Node Directory source
+- `node_metadata.success_ttl_seconds`: successful directory cache lifetime (default `86400`)
+- `node_metadata.negative_ttl_seconds`: shorter cache lifetime for missing nodes (default `3600`)
+- `node_metadata.refresh_retry_seconds`: minimum retry delay after a directory refresh attempt (default `300`)
+- `node_metadata.timeout_seconds`: HTTPS directory request timeout (default `5`)
+- `node_metadata.maximum_download_bytes`: defensive response-size limit (default `8000000`)
 - `connectivity.interval_seconds`: layered diagnostic interval (default `30`, minimum `10`)
 - `connectivity.timeout_seconds`: timeout for each lightweight probe (default `1.5`)
 - `connectivity.failure_threshold` / `recovery_threshold`: consecutive observations required to confirm failure or recovery (default `2`)
@@ -74,6 +80,22 @@ Current activity is written atomically to `state/radio_activity.json`. Start/end
 events are emitted only for local receiver and remote linked-audio transitions,
 not for every poll. Stale, missing, or malformed telemetry fails safely as
 unavailable.
+
+Remote activity metadata comes from AllStarLink's official structured Node
+Directory at `https://allmondb.allstarlink.org/allmondb.php`. BlueNode chose it
+over the live statistics API because it is the directory source intended for
+node number, callsign, description, and registered location data, and avoids
+scraping the searchable HTML node list. The complete directory is refreshed in
+one background request, normally once per day; missing nodes are cached for one
+hour and failed refresh attempts are bounded to at most once every five minutes.
+The two-second App_Rpt telemetry path never waits for this request.
+
+The displayed location is the node owner's public registered directory text,
+not a speaker or handheld position. The source currently provides no structured
+coordinates or reliably separable city/region/country fields, so BlueNode does
+not infer them. `callsign`, `display_location`, `latitude`, and `longitude` are
+optional activity-state fields, allowing a future NetMap consumer without
+assigning fabricated map coordinates.
 
 ## Smart connectivity diagnostics
 

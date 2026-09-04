@@ -12,6 +12,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 - HEALTHY / DEGRADED / FAULT health states
 - Connection/session tracking with friendly node names
 - Live local RX, node PTT, and keyed AllStar-link activity telemetry
+- Cached callsign and registered-location enrichment for active remote nodes
 - Cached layered diagnostics for LAN, gateway, DNS, Internet, and AllStar connectivity
 - Manual connect/disconnect controls
 - Optional DODROPIN and SkywarnPlus controls
