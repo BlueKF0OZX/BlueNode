@@ -1,0 +1,50 @@
+<VirtualHost *:443>
+    ServerName @REMOTE_HOST@
+
+    SSLEngine on
+    SSLCertificateFile @CERTIFICATE_FILE@
+    SSLCertificateKeyFile @CERTIFICATE_KEY_FILE@
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+    ProxyPass / @BACKEND_URL@/ connectiontimeout=5 timeout=30 retry=0
+    ProxyPassReverse / @BACKEND_URL@/
+
+    <Location "/">
+        AuthType Basic
+        AuthName "BlueNode Remote Access"
+        AuthBasicProvider file
+        AuthUserFile @AUTH_USER_FILE@
+        Require valid-user
+    </Location>
+
+    # Do not inherit unrelated globally configured Apache applications into
+    # the BlueNode hostname. BlueNode itself has no routes at these paths.
+    <Location "/allmon3">
+        Require all denied
+    </Location>
+    <Location "/server-status">
+        Require all denied
+    </Location>
+
+    RequestHeader set X-Forwarded-Proto "https"
+    Header always set Strict-Transport-Security "max-age=31536000"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "same-origin"
+    Header always set Cache-Control "no-store" "expr=%{REQUEST_URI} =~ m#^/api/#"
+
+    RequestReadTimeout header=20-40,MinRate=500 body=20,MinRate=500
+    LimitRequestBody 1048576
+    ProxyTimeout 30
+
+    DOSHashTableSize 3097
+    DOSPageCount 10
+    DOSSiteCount 100
+    DOSPageInterval 1
+    DOSSiteInterval 1
+    DOSBlockingPeriod 60
+
+    ErrorLog ${APACHE_LOG_DIR}/bluenode-remote-error.log
+    CustomLog ${APACHE_LOG_DIR}/bluenode-remote-access.log combined
+</VirtualHost>

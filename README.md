@@ -49,11 +49,17 @@ See `docs/INSTALL.md` and `docs/CONFIGURATION.md`.
 For the guarded Windows-to-node deployment workflow, see
 `docs/DEPLOYMENT.md`.
 
+Optional authenticated remote access is disabled by default. Its preparation,
+security model, direct Apache mode, and provider-neutral tunnel guidance are in
+`docs/REMOTE_ACCESS.md`.
+
 ## Security
 
 BlueNode installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.
 
-The dashboard does not provide Internet-facing authentication. Keep it on a trusted network unless you place it behind appropriate authentication and network security.
+The dashboard does not provide native Internet-facing authentication. Keep it
+on a trusted network unless the optional authenticated HTTPS framework has been
+deliberately configured and enabled.
 
 ## Optional integrations
 
