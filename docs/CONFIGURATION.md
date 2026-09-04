@@ -18,6 +18,10 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `automation.maximum_backoff_seconds`: upper bound for escalation backoff
 - `automation.healthy_reset_seconds`: sustained healthy period required to clear escalation and attempt history
 - `radio_activity.stale_seconds`: maximum telemetry age before live radio activity clears as unavailable (default `6`, minimum `4`)
+- `connectivity.interval_seconds`: layered diagnostic interval (default `30`, minimum `10`)
+- `connectivity.timeout_seconds`: timeout for each lightweight probe (default `1.5`)
+- `connectivity.failure_threshold` / `recovery_threshold`: consecutive observations required to confirm failure or recovery (default `2`)
+- `connectivity.stale_seconds`: maximum cached diagnostic age (default `120`)
 
 The DODROPIN helper looks for a friendly node whose name is `DODROPIN` (case-insensitive).
 
@@ -70,6 +74,21 @@ Current activity is written atomically to `state/radio_activity.json`. Start/end
 events are emitted only for local receiver and remote linked-audio transitions,
 not for every poll. Stale, missing, or malformed telemetry fails safely as
 unavailable.
+
+## Smart connectivity diagnostics
+
+A separate cached monitor checks the active IPv4 default-route interface, its
+gateway, DNS resolution, a direct-IP external TCP endpoint, and App_Rpt HTTP
+registration status. These checks default to every 30 seconds and never run in
+the two-second health or browser polling paths. Two consecutive failures are
+required before escalation, and two successful observations verify recovery.
+
+The resulting `state/connectivity.json` is published atomically. BlueNode keeps
+the established `internet` field for compatibility while exposing the diagnosed
+failure domain in `connectivity`. DNS and AllStar-only failures leave general
+Internet status online but create a sustained warning; interface, gateway, and
+external-path failures become offline after confirmation. Asterisk recovery is
+never requested for a connectivity-only failure.
 
 The shipped systemd service runs monitor.py, which owns health collection,
 AllStar monitoring, Intelligence updates, and automatic recovery. Do not schedule

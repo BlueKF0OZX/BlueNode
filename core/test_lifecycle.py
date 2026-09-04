@@ -210,5 +210,46 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue(result["recommendation"]["action_required"])
         self.assertIn("Repeated instability", result["recommendation"]["message"])
 
+    def test_transient_connectivity_does_not_escalate(self):
+        state = copy.deepcopy(NORMAL)
+        state["connectivity"] = {"status": "degraded", "diagnosis": "transient",
+                                 "failure_domain": "dns", "sustained": False,
+                                 "message": "A DNS check failed"}
+        result = self.build(state, [])
+        self.assertFalse(result["recommendation"]["action_required"])
+        self.assertIn("transient", result["recommendation"]["message"].lower())
+
+    def test_connectivity_failure_domains_explain_remaining_service(self):
+        scenarios = {
+            "gateway": ("offline", "gateway_failure", "Local BlueNode monitoring"),
+            "dns": ("degraded", "dns_failure", "direct-IP Internet"),
+            "external_internet": ("offline", "external_internet_failure", "default gateway"),
+            "allstar": ("degraded", "allstar_failure", "general Internet"),
+            "local_network": ("offline", "local_network_failure", "local system monitoring"),
+        }
+        for domain, (status, diagnosis, expected) in scenarios.items():
+            with self.subTest(domain=domain):
+                state = copy.deepcopy(NORMAL)
+                state["status"] = "fault" if status == "offline" else "degraded"
+                state["connectivity"] = {
+                    "status": status, "diagnosis": diagnosis,
+                    "failure_domain": domain, "sustained": True,
+                    "message": f"{domain} diagnosed",
+                }
+                state["health"]["internet"] = "critical" if status == "offline" else "warning"
+                state["health_reasons"] = [f"{domain} diagnosed"]
+                result = self.build(state, [])
+                self.assertTrue(result["recommendation"]["action_required"])
+                self.assertIn(expected, result["recommendation"]["message"])
+
+    def test_connectivity_verified_recovery_needs_no_action(self):
+        state = copy.deepcopy(NORMAL)
+        state["connectivity"] = {"status": "degraded", "diagnosis": "recovering",
+                                 "failure_domain": "healthy", "sustained": False,
+                                 "message": "Connectivity returned"}
+        result = self.build(state, [])
+        self.assertFalse(result["recommendation"]["action_required"])
+        self.assertIn("verifying", result["recommendation"]["message"])
+
 if __name__ == '__main__':
     unittest.main()

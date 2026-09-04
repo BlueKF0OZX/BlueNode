@@ -45,6 +45,9 @@ DEFAULT_STATE = {
     "last_result": None,
     "last_verification": None,
     "escalation_reason": None,
+    "connectivity_status": "unavailable",
+    "connectivity_failure_domain": "unavailable",
+    "connectivity_action": "monitoring_only",
 }
 _THREAD_LOCK = threading.RLock()
 
@@ -172,6 +175,10 @@ def observe_health(health, now=None):
     state = load_state()
     _prune(state, now)
     state["last_automation_check"] = datetime.fromtimestamp(now, timezone.utc).isoformat()
+    connectivity = health.get("connectivity") or {}
+    state["connectivity_status"] = connectivity.get("status", "unavailable")
+    state["connectivity_failure_domain"] = connectivity.get("failure_domain", "unavailable")
+    state["connectivity_action"] = "monitoring_only"
     healthy = health.get("asterisk") == "online"
     if healthy:
         if not state.get("healthy_since"):

@@ -75,6 +75,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
         "/state/system.json",
         "/state/automation.json",
         "/state/radio_activity.json",
+        "/state/connectivity.json",
         "/events/allstar_state.json",
         "/logs/events.log",
 

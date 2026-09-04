@@ -1784,6 +1784,8 @@ def build_intelligence(state=None):
 
     automation_state = state.get("automation", {})
     automation_mode = str(automation_state.get("mode", "active")).lower()
+    connectivity_state = state.get("connectivity", {})
+    connectivity_diagnosis = str(connectivity_state.get("diagnosis", "healthy"))
 
 
 
@@ -1871,6 +1873,10 @@ def build_intelligence(state=None):
         level = "warning"
         attention_required = False
 
+    if connectivity_diagnosis == "recovering" and state.get("asterisk") == "online":
+        level = "warning"
+        attention_required = False
+
     recent_activity = recent_activity_stats()
 
 
@@ -1920,6 +1926,7 @@ def build_intelligence(state=None):
         "inferred_resolutions": inferred_resolutions,
 
         "automation": automation_state,
+        "connectivity": connectivity_state,
 
     }
 
@@ -1938,6 +1945,32 @@ def build_intelligence(state=None):
         unresolved_incidents,
 
     )
+    connectivity_message = connectivity_state.get("message", "Connectivity is degraded")
+    connectivity_domain = connectivity_state.get("failure_domain")
+    if connectivity_diagnosis == "transient":
+        intelligence["recommendation"] = {
+            "priority": "normal", "action_required": False,
+            "message": ("A transient connectivity check failed. BlueNode is monitoring for "
+                        "confirmation before escalating."),
+        }
+    elif connectivity_diagnosis == "recovering":
+        intelligence["recommendation"] = {
+            "priority": "normal", "action_required": False,
+            "message": "Connectivity has returned; BlueNode is verifying sustained recovery.",
+        }
+    elif connectivity_state.get("sustained"):
+        remains = {
+            "dns": "The LAN, gateway, and direct-IP Internet path remain operational.",
+            "allstar": "The LAN and general Internet path remain operational.",
+            "gateway": "Local BlueNode monitoring remains operational.",
+            "external_internet": "The LAN and default gateway remain operational.",
+            "local_network": "BlueNode continues local system monitoring.",
+        }.get(connectivity_domain, "BlueNode continues monitoring available services.")
+        intelligence["recommendation"] = {
+            "priority": "critical" if connectivity_state.get("status") == "offline" else "warning",
+            "action_required": True,
+            "message": f"{connectivity_message}. {remains} Operator investigation is recommended.",
+        }
 
     if automation_mode == "recovering":
         intelligence["recommendation"] = {
@@ -1962,6 +1995,9 @@ def build_intelligence(state=None):
 
     intelligence["recovery_display"] = recovery_display(state)
     intelligence["summary"] = build_summary(state)
+
+    if connectivity_diagnosis not in ("healthy", "unavailable"):
+        intelligence["summary"] += " " + connectivity_message + "."
 
     if automation_mode == "recovering":
         intelligence["summary"] += " BlueNode automation is handling recovery and verification."

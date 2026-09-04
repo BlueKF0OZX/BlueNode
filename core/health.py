@@ -14,6 +14,7 @@ from connection_stats import summarize_connections
 from intelligence import build_intelligence
 from config import load_config
 import radio_activity
+import connectivity
 
 
 
@@ -297,7 +298,8 @@ def check_skywarn():
 
 
 
-def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent):
+def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent,
+                    connectivity_state=None):
 
     """Evaluate BlueNode component health and return overall status."""
 
@@ -331,11 +333,19 @@ def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent):
 
 
 
-    if internet != "online":
+    if internet == "offline":
 
         health["internet"] = "critical"
 
         reasons.append("Internet connectivity is unavailable")
+    elif internet == "unknown":
+        health["internet"] = "unknown"
+        reasons.append("Internet connectivity diagnostics are unavailable")
+    elif connectivity_state and connectivity_state.get("sustained"):
+        domain = connectivity_state.get("failure_domain")
+        if domain in ("dns", "allstar"):
+            health["internet"] = "warning"
+            reasons.append(connectivity_state.get("message", "Connectivity is degraded"))
 
 
 
@@ -427,7 +437,8 @@ def build_state():
 
     asterisk = check_asterisk()
 
-    internet = check_internet()
+    connectivity_state = connectivity.public_state()
+    internet = connectivity.legacy_internet_state(connectivity_state)
 
     allstar_state = get_allstar_state()
     connected_nodes = allstar_state["links"]
@@ -458,6 +469,7 @@ def build_state():
         memory_percent,
 
         disk_percent,
+        connectivity_state,
 
     )
 
@@ -479,6 +491,7 @@ def build_state():
         "asterisk": asterisk,
 
         "internet": internet,
+        "connectivity": connectivity_state,
 
         "skywarn": skywarn,
 

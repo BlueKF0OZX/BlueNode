@@ -73,6 +73,16 @@ class AutomationTests(unittest.TestCase):
         automation.save_state(state)
         self.assertEqual(json.loads(self.state_file.read_text())["version"], 1)
 
+    def test_connectivity_failure_never_requests_asterisk_recovery(self):
+        for domain in ("local_network", "gateway", "dns", "external_internet", "allstar"):
+            with self.subTest(domain=domain):
+                health = {"asterisk": "online", "connectivity": {
+                    "status": "offline", "failure_domain": domain}}
+                observed = automation.observe_health(health, 1000)
+                self.assertEqual(observed["connectivity_failure_domain"], domain)
+                self.assertEqual(observed["connectivity_action"], "monitoring_only")
+                self.assertFalse(automation.recovery_allowed(health, 1000))
+
 
 if __name__ == "__main__":
     unittest.main()

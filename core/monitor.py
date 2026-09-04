@@ -10,6 +10,7 @@ from health import build_state, load_previous_state, log_state_changes, save_sta
 from intelligence import build_intelligence
 from recovery import recover_asterisk
 import automation
+import connectivity
 
 
 POLL_INTERVAL_SECONDS = 2
@@ -91,6 +92,10 @@ def run_periodic(name, operation, stop_event, interval=POLL_INTERVAL_SECONDS):
 def main():
     stop_event = threading.Event()
     recovery = RecoveryCoordinator()
+    try:
+        connectivity.update()
+    except Exception as exc:
+        print(f"BlueNode connectivity startup error: {exc}", flush=True)
     threads = [
         threading.Thread(
             target=run_periodic,
@@ -101,6 +106,12 @@ def main():
             target=run_periodic,
             args=("AllStar", check_changes, stop_event),
             name="nodesmart-allstar",
+        ),
+        threading.Thread(
+            target=run_periodic,
+            args=("connectivity", connectivity.update, stop_event,
+                  connectivity.INTERVAL_SECONDS),
+            name="nodesmart-connectivity",
         ),
     ]
 

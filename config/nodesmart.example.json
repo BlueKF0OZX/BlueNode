@@ -57,6 +57,18 @@
   "radio_activity": {
     "stale_seconds": 6
 
+  },
+
+  "connectivity": {
+    "interval_seconds": 30,
+    "timeout_seconds": 1.5,
+    "failure_threshold": 2,
+    "recovery_threshold": 2,
+    "stale_seconds": 120,
+    "dns_test_host": "example.com",
+    "external_test_host": "1.1.1.1",
+    "external_test_port": 443
+
   }
 
 }

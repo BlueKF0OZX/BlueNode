@@ -29,6 +29,7 @@ assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,
 assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
   'No section heading may appear between Intelligence and Recent Sessions');
 for (const id of ['disk', 'connections-today', 'control-result',
+  'connectivity-summary',
   'radio-activity-panel', 'radio-activity-title', 'radio-activity-summary',
   'radio-local-rx', 'radio-local-tx', 'radio-node-detail', 'radio-duration',
   'recovery-panel', 'recovery-status', 'recovery-detail',
@@ -89,6 +90,15 @@ vm.runInContext(html.slice(start,end),context);
   display=null;
   await context.loadRecoveryStatus();
   assert.equal(element('recovery-status').className,'value normal');
+  const connectivityStart=html.indexOf('    function renderConnectivity');
+  const connectivityEnd=html.indexOf('    function radioDuration',connectivityStart);
+  vm.runInContext(html.slice(connectivityStart,connectivityEnd),context);
+  context.renderConnectivity({diagnosis:'healthy',checks:{interface:true,gateway:true,
+    dns:true,internet:true,allstar:true}});
+  assert.match(element('connectivity-summary').textContent,/Healthy.*Gateway OK.*DNS OK.*AllStar OK/);
+  context.renderConnectivity({diagnosis:'dns_failure',checks:{interface:true,gateway:true,
+    dns:false,internet:true,allstar:true}});
+  assert.match(element('connectivity-summary').textContent,/DNS failure.*DNS FAIL.*Internet OK/);
   const radioStart=html.indexOf('    function radioDuration');
   const radioEnd=html.indexOf('    function automationAge',radioStart);
   vm.runInContext(html.slice(radioStart,radioEnd),context);
@@ -113,6 +123,8 @@ vm.runInContext(html.slice(start,end),context);
     last_automation_check:new Date().toISOString()});
   assert.equal(element('automation-title').textContent,'AUTOMATION — ACTIVE');
   assert.equal(element('automation-action').textContent,'No operator action required');
+  context.renderAutomation({mode:'active',automation_armed:true,connectivity_status:'offline'});
+  assert.match(element('automation-summary').textContent,/no Asterisk restart/);
   context.renderAutomation({mode:'recovering',automation_armed:true,last_result:'Verifying service health'});
   assert.equal(element('automation-title').textContent,'AUTOMATION — RECOVERING');
   context.renderAutomation({mode:'recovered',automation_armed:true,last_result:'Asterisk restored'});

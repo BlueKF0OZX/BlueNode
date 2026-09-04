@@ -630,6 +630,13 @@
 
     }
 
+    .connectivity-summary {
+      margin-top: 6px;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #9ca3af;
+    }
+
 
 
     .connection-summary-strip {
@@ -998,6 +1005,7 @@
         <div class="label">Internet</div>
 
         <div id="internet" class="value">Loading...</div>
+        <div id="connectivity-summary" class="connectivity-summary">Diagnostics loading...</div>
 
       </div>
 
@@ -1729,6 +1737,24 @@
       }
     }
 
+    function renderConnectivity(state) {
+      state = state || {};
+      const checks = state.checks || {};
+      const labels = {
+        healthy: 'Healthy', transient: 'Checking transient failure',
+        recovering: 'Verifying recovery', local_network_failure: 'Local interface failure',
+        gateway_failure: 'Gateway failure', dns_failure: 'DNS failure',
+        external_internet_failure: 'External Internet failure',
+        allstar_failure: 'AllStar connectivity failure', unavailable: 'Diagnostics unavailable'
+      };
+      const flag = value => value === true ? 'OK' : value === false ? 'FAIL' : '\u2014';
+      document.getElementById('connectivity-summary').textContent =
+        (labels[state.diagnosis] || labels.unavailable) + ' \u00b7 ' +
+        'LAN ' + flag(checks.interface) + ' \u00b7 Gateway ' + flag(checks.gateway) +
+        ' \u00b7 DNS ' + flag(checks.dns) + ' \u00b7 Internet ' + flag(checks.internet) +
+        ' \u00b7 AllStar ' + flag(checks.allstar);
+    }
+
     function radioDuration(timestamp) {
       const parsed = new Date(timestamp || '');
       if (Number.isNaN(parsed.getTime())) return '\u2014';
@@ -1811,6 +1837,10 @@
         attention: state.escalation_reason || 'Repeated instability detected',
         maintenance: 'Monitoring continues; automatic actions are intentionally paused'
       };
+      if (mode === 'active' && state.connectivity_status &&
+          !['healthy', 'unavailable'].includes(state.connectivity_status)) {
+        summaries.active = 'Monitoring connectivity; no Asterisk restart is requested for network-only failures';
+      }
       document.getElementById('automation-summary').textContent =
         summaries[mode] || 'Automation state unavailable';
       document.getElementById('automation-recovery-armed').textContent =
@@ -1914,6 +1944,7 @@
         setValue('internet', data.internet);
 
         setValue('skywarn', data.skywarn);
+        renderConnectivity(data.connectivity);
 
         updateControlStates(data);
         renderRadioActivity(data.radio_activity);
