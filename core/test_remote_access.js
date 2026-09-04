@@ -8,6 +8,9 @@ const template = fs.readFileSync(path.join(root, 'install/remote-access/apache-v
 const example = fs.readFileSync(path.join(root, 'install/remote-access.conf.example'), 'utf8');
 const docs = fs.readFileSync(path.join(root, 'docs/REMOTE_ACCESS.md'), 'utf8');
 const installer = fs.readFileSync(path.join(root, 'install/install.sh'), 'utf8');
+const adminInitializer = fs.readFileSync(path.join(root, 'install/remote-admin-init.py'), 'utf8');
+const adminLifecycle = fs.readFileSync(path.join(root, 'install/remote-admin.sh'), 'utf8');
+const sudoers = fs.readFileSync(path.join(root, 'install/nodesmart.sudoers.example'), 'utf8');
 const funnelScript = fs.readFileSync(path.join(root, 'install/tailscale-funnel.sh'), 'utf8');
 const funnelTemplate = fs.readFileSync(path.join(root, 'install/remote-access/apache-funnel-gateway.conf.template'), 'utf8');
 
@@ -26,6 +29,14 @@ assert.match(example, /example\.invalid/);
 assert.match(docs, /Never publish or forward TCP 8080/);
 assert.match(docs, /every API\/control path/);
 assert.match(installer, /install -m 0755[^\n]*remote-access\.sh/);
+assert.match(installer, /install -m 0755[^\n]*remote-admin-init\.py/);
+assert.match(installer, /install -m 0755[^\n]*remote-admin\.sh/);
+assert.match(adminInitializer, /getpass\.getpass/);
+assert.doesNotMatch(adminInitializer, /add_argument\([^\n]*password/);
+assert.doesNotMatch(sudoers, /systemctl restart nodesmart\.service/);
+assert.match(adminLifecycle, /NOPASSWD: \/usr\/bin\/systemctl restart nodesmart\.service/);
+assert.match(adminLifecycle, /visudo -cf/);
+assert.match(adminLifecycle, /credential initialization failed; restricted sudo rule rolled back/);
 assert.match(installer, /install -m 0755[^\n]*tailscale-funnel\.sh/);
 assert.match(funnelTemplate, /Listen 127\.0\.0\.1:@GATEWAY_PORT@/);
 assert.match(funnelTemplate, /<Location "\/">[\s\S]*AuthType Basic[\s\S]*Require valid-user/);

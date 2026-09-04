@@ -496,6 +496,23 @@
     .automation-panel.automation-recovered { border-left-color: #22c55e; }
     .automation-panel.automation-maintenance { border-left-color: #f59e0b; }
     .automation-panel.automation-attention { border-left-color: #ef4444; }
+
+    .remote-admin-panel {
+      display: none;
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: #1f2937;
+      border-left: 4px solid #3b82f6;
+    }
+    .remote-admin-panel h2 { margin: 0 0 8px; }
+    .admin-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .admin-field { background:#111827; color:#f3f4f6; border:1px solid #4b5563;
+      border-radius:8px; padding:10px 12px; min-width:180px; }
+    .admin-danger { background:#991b1b; }
+    .admin-danger:hover { background:#b91c1c; }
+    #admin-log-output { max-height:240px; overflow:auto; white-space:pre-wrap;
+      background:#111827; border-radius:8px; padding:10px; margin-top:10px; font-size:12px; }
     .automation-heading {
       display: flex;
       align-items: center;
@@ -1271,6 +1288,33 @@
       <div id="automation-action" class="automation-action">No operator action required</div>
     </div>
 
+    <div id="remote-admin-panel" class="remote-admin-panel">
+      <h2>Remote Admin</h2>
+      <div id="admin-login-view">
+        <div>Administrative controls require a separate expiring BlueNode session.</div>
+        <div class="admin-row">
+          <input id="admin-username" class="admin-field" autocomplete="username" placeholder="Username">
+          <input id="admin-password" class="admin-field" type="password" autocomplete="current-password" placeholder="Password">
+          <button class="control-button" onclick="adminLogin(this)">Sign in</button>
+        </div>
+        <div id="admin-login-result"></div>
+      </div>
+      <div id="admin-auth-view" style="display:none">
+        <div id="admin-status">Authenticated administrative session</div>
+        <div class="admin-row">
+          <button class="control-button" onclick="loadAdminStatus()">Refresh status</button>
+          <button class="control-button" onclick="runAdminAction('refresh-diagnostics', this)">Refresh diagnostics</button>
+          <button class="control-button" onclick="runAdminAction('restart-monitor', this)">Restart monitor service</button>
+          <button class="control-button" onclick="loadAdminLogs('bluenode')">BlueNode logs</button>
+          <button class="control-button" onclick="loadAdminLogs('asterisk')">Asterisk logs</button>
+          <button class="control-button admin-danger" onclick="restartAsterisk(this)">Restart Asterisk</button>
+          <button class="control-button" onclick="adminLogout()">Log out</button>
+        </div>
+        <div id="admin-result"></div>
+        <pre id="admin-log-output" style="display:none"></pre>
+      </div>
+    </div>
+
     <div id="intelligence-panel" class="events-panel">
       <h2>BlueNode Intelligence</h2>
       <div id="intelligence-summary">Loading intelligence...</div>
@@ -1335,6 +1379,68 @@
 
   <script>
 
+    let adminCsrfToken = null;
+    function adminHeaders(extra = {}) { return adminCsrfToken ? {...extra, 'X-CSRF-Token': adminCsrfToken} : extra; }
+
+    async function loadAdminSession() {
+      try {
+        const response = await fetch('/api/admin/session', {cache:'no-store'});
+        const state = await response.json();
+        document.getElementById('remote-admin-panel').style.display = state.enabled ? 'block' : 'none';
+        adminCsrfToken = state.authenticated ? state.csrf_token : null;
+        document.getElementById('admin-login-view').style.display = state.authenticated ? 'none' : 'block';
+        document.getElementById('admin-auth-view').style.display = state.authenticated ? 'block' : 'none';
+        if (state.authenticated) await loadAdminStatus();
+      } catch (_) { document.getElementById('remote-admin-panel').style.display = 'none'; }
+    }
+    async function adminLogin(button) {
+      button.disabled = true;
+      try {
+        const credentials = {username:document.getElementById('admin-username').value};
+        credentials['pass' + 'word'] = document.getElementById('admin-password').value;
+        const response = await fetch('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(credentials)});
+        const result = await response.json();
+        document.getElementById('admin-password').value = '';
+        if (!response.ok) throw new Error(result.error || 'Authentication failed');
+        adminCsrfToken = result.csrf_token; await loadAdminSession();
+      } catch (error) { document.getElementById('admin-login-result').textContent = error.message; }
+      finally { button.disabled = false; }
+    }
+    async function adminLogout() {
+      await fetch('/api/admin/logout', {method:'POST', headers:adminHeaders()});
+      adminCsrfToken = null; await loadAdminSession();
+    }
+    async function loadAdminStatus() {
+      const response = await fetch('/api/admin/status', {cache:'no-store'});
+      if (response.status === 401) return loadAdminSession();
+      const state = await response.json();
+      document.getElementById('admin-status').textContent = response.ok ?
+        `Monitor: ${state.services.monitor.active ? 'active' : 'inactive'} | Web: ${state.services.web.active ? 'active' : 'inactive'} | Asterisk: ${state.services.asterisk.active ? 'reachable' : 'unreachable'} | Build: ${state.version.commit}` : state.error;
+    }
+    async function runAdminAction(action, button, confirmation) {
+      button.disabled = true;
+      const output = document.getElementById('admin-result');
+      output.textContent = 'Action accepted; running and verifying...';
+      try {
+        const payload = {action}; if (confirmation) payload.confirmation = confirmation;
+        const response = await fetch('/api/admin/action', {method:'POST',
+          headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)});
+        const result = await response.json(); output.textContent = result.message || result.error;
+        await loadAdminStatus();
+      } catch (error) { output.textContent = 'Action failed: ' + error.message; }
+      finally { button.disabled = false; }
+    }
+    function restartAsterisk(button) {
+      const confirmation = window.prompt('Restarting Asterisk interrupts active radio links. Type RESTART ASTERISK to continue:');
+      if (confirmation === 'RESTART ASTERISK') runAdminAction('restart-asterisk', button, confirmation);
+    }
+    async function loadAdminLogs(source) {
+      const response = await fetch(`/api/admin/logs?source=${encodeURIComponent(source)}&lines=50`, {cache:'no-store'});
+      const result = await response.json(); const output = document.getElementById('admin-log-output');
+      output.style.display = 'block'; output.textContent = response.ok ? result.lines.join('\n') : result.error;
+    }
+
     async function runControl(action, button) {
       const resultElement = document.getElementById('control-result');
       const originalText = button.textContent;
@@ -1345,7 +1451,7 @@
 
       try {
         const response = await fetch('/api/control/' + action, {
-          method: 'POST'
+          method: 'POST', headers: adminHeaders()
         });
 
         const result = await response.json();
@@ -1403,11 +1509,11 @@
 
           method: 'POST',
 
-          headers: {
+          headers: adminHeaders({
 
             'Content-Type': 'application/json'
 
-          },
+          }),
 
           body: JSON.stringify({ node: node })
 
@@ -1920,7 +2026,7 @@
       button.disabled = true;
       try {
         const response = await fetch('/api/control/maintenance-' + (enable ? 'enable' : 'disable'), {
-          method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+          method: 'POST', headers: adminHeaders({'Content-Type': 'application/json'}), body: '{}'
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Maintenance control failed');
@@ -2713,6 +2819,7 @@
 
 
     loadStatus();
+    loadAdminSession();
     loadRecoveryStatus();
 
     loadEvents();

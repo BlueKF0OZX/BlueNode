@@ -38,6 +38,8 @@ done
 [[ -f "${REPO_ROOT}/install/remote-access/apache-vhost.conf.template" ]] || fail "Missing remote-access Apache template"
 [[ -f "${REPO_ROOT}/install/tailscale-funnel.sh" ]] || fail "Missing install/tailscale-funnel.sh"
 [[ -f "${REPO_ROOT}/install/remote-access/apache-funnel-gateway.conf.template" ]] || fail "Missing Funnel gateway template"
+[[ -f "${REPO_ROOT}/install/remote-admin-init.py" ]] || fail "Missing Remote Admin initializer"
+[[ -f "${REPO_ROOT}/install/remote-admin.sh" ]] || fail "Missing Remote Admin lifecycle helper"
 
 echo "Preparing BlueNode files and directories..."
 mkdir -p "${INSTALL_ROOT}"
@@ -51,6 +53,8 @@ if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
   cp -f "${REPO_ROOT}/install/nodesmart.sudoers.example" "${INSTALL_ROOT}/install/"
   install -m 0755 "${REPO_ROOT}/install/remote-access.sh" "${INSTALL_ROOT}/install/remote-access.sh"
   install -m 0755 "${REPO_ROOT}/install/tailscale-funnel.sh" "${INSTALL_ROOT}/install/tailscale-funnel.sh"
+  install -m 0755 "${REPO_ROOT}/install/remote-admin-init.py" "${INSTALL_ROOT}/install/remote-admin-init.py"
+  install -m 0755 "${REPO_ROOT}/install/remote-admin.sh" "${INSTALL_ROOT}/install/remote-admin.sh"
   cp -f "${REPO_ROOT}/install/remote-access.conf.example" "${INSTALL_ROOT}/install/"
   cp -f "${REPO_ROOT}/install/remote-access/apache-vhost.conf.template" "${INSTALL_ROOT}/install/remote-access/"
   cp -f "${REPO_ROOT}/install/remote-access/apache-funnel-gateway.conf.template" "${INSTALL_ROOT}/install/remote-access/"

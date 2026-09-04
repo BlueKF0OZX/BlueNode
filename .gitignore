@@ -42,7 +42,12 @@ events/
 .DS_Store
 
 config/nodesmart.json
+config/remote-admin.json
 web/*.log
+
+# Remote Admin runtime credentials and audit output
+remote-admin.json
+admin-audit.jsonl
 
 # Local environments and credentials
 .env

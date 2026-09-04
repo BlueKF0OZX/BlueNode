@@ -59,6 +59,11 @@ Optional authenticated remote access is disabled by default. Its preparation,
 security model, direct Apache mode, and provider-neutral tunnel guidance are in
 `docs/REMOTE_ACCESS.md`.
 
+Optional application-level Remote Admin is also disabled by default. It adds
+expiring sessions, CSRF protection, fixed action/log allowlists, and a minimal
+audit trail without exposing shell access. See `docs/REMOTE_ADMIN.md` for the
+security model and safe initialization procedure.
+
 ## Security
 
 BlueNode installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.

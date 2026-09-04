@@ -15,6 +15,7 @@ from pathlib import Path
 from event_logger import emit
 from config import load_config
 import automation
+from remote_admin import ADMIN, MAX_BODY_BYTES, _safe_config
 
 
 
@@ -86,6 +87,26 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
 
         path = self.path.split("?", 1)[0]
+
+        if path == "/api/admin/session":
+            self.send_json(200, ADMIN.public_state(self.admin_cookie()))
+            return
+
+        if path == "/api/admin/status":
+            if not self.require_admin():
+                return
+            self.send_json(200, ADMIN.status())
+            return
+
+        if path == "/api/admin/logs":
+            if not self.require_admin():
+                return
+            from urllib.parse import parse_qs, urlsplit
+            query = parse_qs(urlsplit(self.path).query)
+            status, result = ADMIN.logs(query.get("source", [""])[0],
+                                        query.get("lines", ["50"])[0])
+            self.send_json(status, result)
+            return
 
 
 
@@ -184,15 +205,100 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
         self.wfile.write(body)
 
+    def admin_cookie(self):
+        from http.cookies import SimpleCookie
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+            return cookie["bluenode_admin"].value if "bluenode_admin" in cookie else None
+        except Exception:
+            return None
+
+    def require_admin(self, csrf=False):
+        token = self.admin_cookie()
+        if ADMIN.authenticate(token) is None:
+            ADMIN.audit("authorization", "rejected")
+            self.send_json(401, {"ok": False, "error": "Remote Admin authentication required"})
+            return False
+        if csrf and not ADMIN.csrf_valid(token, self.headers.get("X-CSRF-Token")):
+            ADMIN.audit("csrf", "rejected")
+            self.send_json(403, {"ok": False, "error": "Invalid CSRF token"})
+            return False
+        return True
+
+    def read_json(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > MAX_BODY_BYTES:
+                return None
+            return json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
+
+    def send_admin_cookie(self, token, clear=False):
+        config = _safe_config()
+        parts = [f"bluenode_admin={'' if clear else token}", "Path=/", "HttpOnly",
+                 "SameSite=Strict", f"Max-Age={0 if clear else config['session_seconds']}"]
+        if config.get("secure_cookie", True):
+            parts.append("Secure")
+        self.send_header("Set-Cookie", "; ".join(parts))
+
 
 
     def do_POST(self):
+
+        path = self.path.split("?", 1)[0]
+        if path == "/api/admin/login":
+            payload = self.read_json()
+            if not isinstance(payload, dict) or set(payload) - {"username", "password"}:
+                self.send_json(400, {"ok": False, "error": "Invalid authentication request"})
+                return
+            status, result, token = ADMIN.login(payload.get("username", ""),
+                                                payload.get("password", ""),
+                                                self.client_address[0])
+            if token:
+                body = json.dumps(result).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_admin_cookie(token)
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_json(status, result)
+            return
+
+        if path == "/api/admin/logout":
+            if not self.require_admin(csrf=True):
+                return
+            ADMIN.logout(self.admin_cookie())
+            body = b'{"ok":true}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_admin_cookie("", clear=True)
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if path == "/api/admin/action":
+            if not self.require_admin(csrf=True):
+                return
+            payload = self.read_json()
+            if not isinstance(payload, dict):
+                self.send_json(400, {"ok": False, "error": "Invalid JSON request"})
+                return
+            status, result = ADMIN.action(str(payload.get("action", "")), payload)
+            self.send_json(status, result)
+            return
 
         prefix = "/api/control/"
 
 
 
-        if not self.path.startswith(prefix):
+        if not path.startswith(prefix):
 
             self.send_json(404, {
 
@@ -206,7 +312,10 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
 
-        action = self.path[len(prefix):].strip("/")
+        if _safe_config()["enabled"] and not self.require_admin(csrf=True):
+            return
+
+        action = path[len(prefix):].strip("/")
 
         if action in ("maintenance-enable", "maintenance-disable"):
             enabled = action == "maintenance-enable"

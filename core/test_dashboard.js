@@ -16,12 +16,16 @@ const sessions = html.indexOf('<h2>Recent Sessions</h2>');
 const events = html.indexOf('<h2>Recent Events</h2>');
 const recovery = html.indexOf('<h2>Automatic Recovery</h2>');
 const automation = html.indexOf('id="automation-title"');
+const remoteAdmin = html.indexOf('id="remote-admin-panel"');
 assert.ok(disk < connectionStats && connectionStats < radioActivity && radioActivity < controls,
   'Radio Activity must follow status/statistics and precede Controls');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
-assert.ok(controls < recovery && recovery < automation && automation < intelligence,
-  'Operational order must be Controls, Recovery, Automation, Intelligence');
+assert.ok(controls < recovery && recovery < automation && automation < remoteAdmin && remoteAdmin < intelligence,
+  'Operational order must be Controls, Recovery, Automation, optional Admin, Intelligence');
+assert.match(html, /async function loadAdminSession\(\)/);
+assert.match(html, /Type RESTART ASTERISK/);
+assert.match(html, /adminHeaders\(\{'Content-Type': 'application\/json'\}\)/);
 assert.match(html, /\.grid\s*\+\s*\.grid\s*{[^}]*margin-top:\s*15px/s,
   'Adjacent telemetry grids must use the same 15px gap as card rows');
 assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,

@@ -450,3 +450,7 @@ def legacy_internet_state(state):
     if checks.get("internet") is True:
         return "online"
     return "unknown"
+
+
+if __name__ == "__main__":
+    update()
