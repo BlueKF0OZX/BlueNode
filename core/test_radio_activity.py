@@ -40,7 +40,9 @@ class RadioActivityTests(unittest.TestCase):
         parsed = radio_activity.parse_variables(
             "RPT_TXKEYED=0\nRPT_RXKEYED=0\nRPT_ALINKS=1,54321TU\n")
         self.assertEqual(parsed["links"], [{"node": "54321", "mode": "T", "keyed": False}])
-        self.assertEqual(radio_activity.update(parsed, NOW)["status"], "idle")
+        state = radio_activity.update(parsed, NOW)
+        self.assertEqual(state["status"], "idle")
+        self.assertEqual(state["tx_origin"]["source_type"], "none")
 
     def test_local_receiver_and_separate_transmitter(self):
         state = radio_activity.update(self.sample(local_rx=True, local_tx=True), NOW)
@@ -48,6 +50,8 @@ class RadioActivityTests(unittest.TestCase):
         self.assertTrue(state["local_rx"])
         self.assertTrue(state["local_tx"])
         self.assertEqual(state["node"], radio_activity.NODE)
+        self.assertEqual(state["tx_origin"]["source_type"], "local_rf")
+        self.assertEqual(state["tx_origin"]["confidence"], "verified")
 
     def test_remote_node_and_friendly_name(self):
         self.metadata.return_value = {
@@ -63,6 +67,11 @@ class RadioActivityTests(unittest.TestCase):
         self.assertEqual(state["callsign"], "W1ABC")
         self.assertEqual(state["display_location"], "Orlando, Florida")
         self.assertNotIn("latitude", state)
+        self.assertEqual(state["tx_origin"]["source_node"], "54321")
+        self.assertEqual(state["tx_origin"]["friendly_name"], "Example Link")
+        self.assertEqual(state["tx_origin"]["confidence"], "verified_ingress")
+        self.assertFalse(state["tx_origin"]["ultimate_source_known"])
+        self.assertEqual(state["tx_origin"]["started_at"], NOW.isoformat())
 
     def test_start_end_transitions_are_not_repeated(self):
         active = self.sample(links=[{"node": "54321", "mode": "T", "keyed": True}])
@@ -82,6 +91,8 @@ class RadioActivityTests(unittest.TestCase):
         self.assertEqual(current["status"], "local_rx")
         self.assertEqual(stale["status"], "unavailable")
         self.assertTrue(stale["stale"])
+        self.assertFalse(stale["tx_origin"]["active"])
+        self.assertEqual(stale["tx_origin"]["confidence"], "unavailable")
 
     def test_unavailable_and_ambiguous_fail_safely(self):
         self.assertIsNone(radio_activity.parse_variables("RPT_RXKEYED=1\n"))
@@ -92,7 +103,32 @@ class RadioActivityTests(unittest.TestCase):
         ]), NOW + timedelta(seconds=2))
         self.assertEqual(ambiguous["status"], "ambiguous")
         self.assertNotIn("node", ambiguous)
+        self.assertEqual(ambiguous["tx_origin"]["confidence"], "ambiguous")
+        self.assertEqual(ambiguous["tx_origin"]["candidate_nodes"], ["11111", "22222"])
         self.metadata.assert_not_called()
+
+    def test_simultaneous_local_and_remote_is_not_falsely_attributed(self):
+        state = radio_activity.update(self.sample(local_rx=True, local_tx=True, links=[
+            {"node": "54321", "mode": "T", "keyed": True},
+        ]), NOW)
+        self.assertEqual(state["status"], "local_rx")
+        self.assertEqual(state["tx_origin"]["source_type"], "ambiguous")
+        self.assertEqual(state["tx_origin"]["direction"], "mixed")
+
+    def test_disconnect_and_unkey_clear_origin(self):
+        radio_activity.update(self.sample(links=[
+            {"node": "54321", "mode": "T", "keyed": True}]), NOW)
+        idle = radio_activity.update(self.sample(), NOW + timedelta(seconds=2))
+        self.assertFalse(idle["tx_origin"]["active"])
+        self.assertEqual(idle["tx_origin"]["source_type"], "none")
+        self.assertNotIn("source_node", idle["tx_origin"])
+        reconnected = radio_activity.update(self.sample(links=[
+            {"node": "54321", "mode": "T", "keyed": True}]),
+            NOW + timedelta(seconds=4))
+        self.assertTrue(reconnected["tx_origin"]["active"])
+        self.assertEqual(reconnected["tx_origin"]["source_node"], "54321")
+        self.assertEqual(reconnected["tx_origin"]["started_at"],
+                         (NOW + timedelta(seconds=4)).isoformat())
 
     def test_metadata_does_not_leak_to_a_new_active_node(self):
         self.metadata.side_effect = [

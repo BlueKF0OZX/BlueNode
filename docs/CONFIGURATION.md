@@ -76,6 +76,15 @@ Friendly names come only from `friendly_nodes`; otherwise BlueNode displays the
 node number. Multiple keyed links are shown as ambiguous rather than assigning
 an unsupported speaker identity.
 
+The published `tx_origin` object distinguishes verified local RF, a verified
+immediate linked-node ingress, ambiguous simultaneous sources, and unknown
+internal transmitter activity. For linked audio, App_Rpt identifies the keyed
+connection that delivered audio to this node; it does not identify whether that
+peer originated or relayed the transmission. BlueNode therefore reports
+`confidence: verified_ingress`, `path_scope: immediate_peer`, and
+`ultimate_source_known: false` instead of claiming an unsupported distant RF
+station or individual operator identity.
+
 Current activity is written atomically to `state/radio_activity.json`. Start/end
 events are emitted only for local receiver and remote linked-audio transitions,
 not for every poll. Stale, missing, or malformed telemetry fails safely as

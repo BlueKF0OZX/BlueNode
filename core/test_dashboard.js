@@ -107,15 +107,24 @@ vm.runInContext(html.slice(start,end),context);
   assert.match(element('radio-activity-title').textContent,/IDLE$/);
   assert.equal(element('radio-activity-summary').textContent,'No active transmission');
   context.renderRadioActivity({status:'local_rx',local_rx:true,local_tx:true,
-    node:'12345',started_at:new Date(Date.now()-2000).toISOString()});
+    node:'12345',started_at:new Date(Date.now()-2000).toISOString(),
+    tx_origin:{active:true,source_type:'local_rf',confidence:'verified'}});
   assert.match(element('radio-activity-title').textContent,/LOCAL RX$/);
   assert.equal(element('radio-local-tx').textContent,'Keyed');
+  assert.match(element('radio-origin-detail').textContent,/Local RF receiver \(verified\)/);
   context.renderRadioActivity({status:'remote_tx',local_rx:false,local_tx:true,
     node:'54321',friendly_name:'Example Link',callsign:'W1ABC',
-    display_location:'Orlando, Florida',started_at:new Date().toISOString()});
+    display_location:'Orlando, Florida',started_at:new Date().toISOString(),
+    tx_origin:{active:true,source_type:'remote_link',source_node:'54321',
+      confidence:'verified_ingress'}});
   assert.match(element('radio-node-detail').textContent,/54321.*Example Link/);
   assert.equal(element('radio-callsign-detail').textContent,'Callsign: W1ABC');
   assert.equal(element('radio-location-detail').textContent,'Location: Orlando, Florida');
+  assert.match(element('radio-origin-detail').textContent,/Inbound via node 54321.*verified ingress/);
+  context.renderRadioActivity({status:'ambiguous',remote_rx_nodes:['11111','22222'],
+    tx_origin:{active:true,source_type:'ambiguous',confidence:'ambiguous',
+      reason:'Multiple immediate links are keyed'}});
+  assert.match(element('radio-origin-detail').textContent,/Ambiguous.*Multiple immediate links/);
   context.renderRadioActivity({status:'remote_tx',node:'99999'});
   assert.equal(element('radio-callsign-detail').textContent,'');
   assert.equal(element('radio-location-detail').textContent,'');

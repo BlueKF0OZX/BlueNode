@@ -1124,6 +1124,7 @@
         <div>Local receiver: <span id="radio-local-rx">&mdash;</span></div>
         <div>Local transmitter: <span id="radio-local-tx">&mdash;</span></div>
         <div id="radio-node-detail">Node: &mdash;</div>
+        <div id="radio-origin-detail">Origin: &mdash;</div>
         <div id="radio-callsign-detail" style="display:none"></div>
         <div id="radio-location-detail" style="display:none"></div>
         <div>Duration: <span id="radio-duration">&mdash;</span></div>
@@ -1807,6 +1808,20 @@
         nodeDetail = 'Keyed links: ' + (state.remote_rx_nodes || []).join(', ');
       }
       document.getElementById('radio-node-detail').textContent = nodeDetail;
+      const origin = state.tx_origin || {};
+      let originDetail = 'Origin: \u2014';
+      if (origin.source_type === 'local_rf') {
+        originDetail = 'Origin: Local RF receiver (verified)';
+      } else if (origin.source_type === 'remote_link') {
+        originDetail = 'Origin: Inbound via node ' + (origin.source_node || 'unknown') +
+          ' (verified ingress)';
+      } else if (origin.source_type === 'ambiguous') {
+        originDetail = 'Origin: Ambiguous \u2014 ' +
+          (origin.reason || 'multiple sources are keyed');
+      } else if (origin.source_type === 'internal_or_unknown') {
+        originDetail = 'Origin: Unknown transmitter source';
+      }
+      document.getElementById('radio-origin-detail').textContent = originDetail;
       const callsignDetail = document.getElementById('radio-callsign-detail');
       const locationDetail = document.getElementById('radio-location-detail');
       callsignDetail.textContent = mode === 'remote_tx' && state.callsign ?

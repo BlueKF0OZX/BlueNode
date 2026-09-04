@@ -62,7 +62,10 @@ def classify(sample):
     if sample is None:
         return {"status": "unavailable", "telemetry_available": False,
                 "local_rx": None, "local_tx": None, "connected_nodes": [],
-                "remote_rx_nodes": []}
+                "remote_rx_nodes": [], "tx_origin": {
+                    "active": False, "source_type": "unknown",
+                    "direction": "unknown", "confidence": "unavailable",
+                }}
 
     connected = [link["node"] for link in sample["links"]]
     remote = [link["node"] for link in sample["links"]
@@ -86,6 +89,45 @@ def classify(sample):
         "connected_nodes": connected,
         "remote_rx_nodes": remote,
     }
+    if sample["local_rx"] and remote:
+        result["tx_origin"] = {
+            "active": True, "source_type": "ambiguous",
+            "direction": "mixed", "confidence": "ambiguous",
+            "candidate_nodes": [NODE, *remote],
+            "reason": "Local receiver and linked audio are keyed simultaneously",
+        }
+    elif sample["local_rx"]:
+        result["tx_origin"] = {
+            "active": True, "source_type": "local_rf",
+            "direction": "local_to_network", "confidence": "verified",
+            "source_node": NODE, "friendly_name": "",
+        }
+    elif len(remote) == 1:
+        node = remote[0]
+        result["tx_origin"] = {
+            "active": True, "source_type": "remote_link",
+            "direction": "network_to_local", "confidence": "verified_ingress",
+            "source_node": node, "friendly_name": NODE_NAMES.get(node, ""),
+            "path_scope": "immediate_peer", "ultimate_source_known": False,
+        }
+    elif len(remote) > 1:
+        result["tx_origin"] = {
+            "active": True, "source_type": "ambiguous",
+            "direction": "network_to_local", "confidence": "ambiguous",
+            "candidate_nodes": remote,
+            "reason": "Multiple immediate links are keyed",
+        }
+    elif sample["local_tx"]:
+        result["tx_origin"] = {
+            "active": True, "source_type": "internal_or_unknown",
+            "direction": "unknown", "confidence": "unknown",
+            "reason": "Transmitter is keyed without local COR or linked RX",
+        }
+    else:
+        result["tx_origin"] = {
+            "active": False, "source_type": "none",
+            "direction": "none", "confidence": "verified",
+        }
     if status == "local_rx":
         result.update({"node": NODE, "friendly_name": ""})
     elif status == "remote_tx":
@@ -140,6 +182,12 @@ def _identity(state):
     return status, None
 
 
+def _origin_identity(state):
+    origin = state.get("tx_origin", {})
+    return (origin.get("source_type"), origin.get("source_node"),
+            tuple(origin.get("candidate_nodes", [])))
+
+
 def _transition_event(state, transition):
     status = state.get("status")
     if status == "local_rx":
@@ -168,6 +216,13 @@ def update(sample, now=None):
         current["started_at"] = previous.get("started_at", now.isoformat())
     elif current["status"] not in ("idle", "unavailable"):
         current["started_at"] = now.isoformat()
+    if current["tx_origin"]["active"]:
+        if (_origin_identity(current) == _origin_identity(previous)
+                and previous.get("tx_origin", {}).get("started_at")):
+            origin_started = previous["tx_origin"]["started_at"]
+        else:
+            origin_started = now.isoformat()
+        current["tx_origin"]["started_at"] = origin_started
 
     if previous_identity != current_identity:
         ended = _transition_event(previous, "END")
@@ -198,6 +253,8 @@ def public_state(now=None):
         return {"status": "unavailable", "telemetry_available": False,
                 "local_rx": None, "local_tx": None, "connected_nodes": [],
                 "remote_rx_nodes": [], "last_update": state.get("last_update"),
-                "stale": True, "stale_after_seconds": STALE_SECONDS}
+                "stale": True, "stale_after_seconds": STALE_SECONDS,
+                "tx_origin": {"active": False, "source_type": "unknown",
+                              "direction": "unknown", "confidence": "unavailable"}}
     state["stale"] = False
     return state
