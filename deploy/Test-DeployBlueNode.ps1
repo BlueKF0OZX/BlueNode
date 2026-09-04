@@ -58,6 +58,13 @@ try {
     Run-GitVerification "GIT VERIFICATION PASS"
     Run-GitVerification "IDENTITY PASS" -IdentityOnly
 
+    New-Item -ItemType Directory -Path (Join-Path $repo "state") | Out-Null
+    Set-Content -LiteralPath (Join-Path $repo "state/system.json") -Value "{}"
+    Run-Git $repo @("add", "state/system.json")
+    Run-GitVerification "privacy guard failed" 1 -IdentityOnly
+    Run-Git $repo @("rm", "--cached", "state/system.json")
+    Remove-Item -LiteralPath (Join-Path $repo "state") -Recurse -Force
+
     Run-Git $repo @("remote", "set-url", "origin", "https://example.invalid/wrong.git")
     Run-Preflight "Local origin must be exactly" 1
     Run-Git $repo @("remote", "set-url", "origin", $remote)

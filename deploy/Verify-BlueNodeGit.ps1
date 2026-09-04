@@ -55,6 +55,13 @@ try {
         throw "Local origin must be exactly $expectedRemoteForRun; found $localRemote."
     }
 
+    $privacyGuard = Join-Path $PSScriptRoot "Test-PublicTree.ps1"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $privacyGuard `
+        -RepositoryPath $RepositoryPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Public-tree privacy guard failed."
+    }
+
     if ($IdentityOnly) {
         Write-Host "IDENTITY PASS identity=$ExpectedName<$ExpectedEmail> branch=main origin=$localRemote"
         exit 0

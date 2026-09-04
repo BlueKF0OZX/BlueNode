@@ -55,3 +55,9 @@ request specifically requires additional live evidence.
 The intended sequence is: inspect, edit, test, review, identity verification,
 commit, `git push origin main`, guarded deployment, built-in live verification,
 report.
+
+The canonical Git verifier also runs `deploy/Test-PublicTree.ps1`. This rejects
+tracked runtime/state directories, live configuration, private-key file types,
+and common private-key, Tailscale, GitHub, cloud-key, password, and token
+signatures. It scans tracked and staged text content, while ignored local
+runtime data remains outside the public repository.
