@@ -18,8 +18,8 @@ assert.ok(disk < connectionStats && connectionStats < controls,
   'Status cards and connection statistics must remain together before Controls');
 assert.ok(intelligence < sessions && sessions < events,
   'Intelligence must immediately precede Recent Sessions and Recent Events');
-assert.ok(controls < intelligence && events < recovery,
-  'Controls must precede Intelligence and remaining content must follow Events');
+assert.ok(controls < recovery && recovery < intelligence,
+  'Automatic Recovery must appear between Controls and Intelligence');
 assert.match(html, /\.grid\s*\+\s*\.grid\s*{[^}]*margin-top:\s*15px/s,
   'Adjacent telemetry grids must use the same 15px gap as card rows');
 assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,
@@ -27,6 +27,7 @@ assert.match(html, /\.controls-panel\s*{[^}]*margin-top:\s*18px/s,
 assert.equal(html.slice(intelligence, sessions).match(/<h2>/g)?.length, 1,
   'No section heading may appear between Intelligence and Recent Sessions');
 for (const id of ['disk', 'connections-today', 'control-result',
+  'recovery-panel', 'recovery-status', 'recovery-detail',
   'intelligence-panel', 'recent-sessions', 'events',
   'btn-dodropin-connect', 'btn-dodropin-disconnect', 'btn-skywarn-on',
   'btn-skywarn-off', 'manual-node-number', 'node-directory-search']) {
