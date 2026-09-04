@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$SshTarget = "60873",
+    [string]$SshTarget = "nodesmart60873",
     [string]$RepositoryPath = "",
     [switch]$PreflightOnly
 )
@@ -73,7 +73,7 @@ try {
         "Target commit committer"
 
     if ($PreflightOnly) {
-        Write-Host "PASS preflight target=$targetCommit identity=$ExpectedName<$ExpectedEmail>"
+        Write-Host "PASS preflight target=$targetCommit ssh_target=$SshTarget identity=$ExpectedName<$ExpectedEmail>"
         exit 0
     }
 

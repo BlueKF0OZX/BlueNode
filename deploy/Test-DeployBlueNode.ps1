@@ -38,7 +38,7 @@ try {
     Run-Git $repo @("push", "-u", "origin", "main")
     $env:BLUENODE_DEPLOY_TEST_REMOTE = $remote
 
-    Run-Preflight "PASS preflight"
+    Run-Preflight "ssh_target=nodesmart60873"
 
     Run-Git $repo @("remote", "set-url", "origin", "https://example.invalid/wrong.git")
     Run-Preflight "Local origin must be exactly" 1

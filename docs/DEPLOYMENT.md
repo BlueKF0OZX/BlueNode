@@ -10,7 +10,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy-BlueNode.ps1
 The command refuses to deploy a dirty tree, a branch other than `main`, a local
 `main` that differs from `origin/main`, or any configured/commit author identity
 other than `BlueKF0OZX <bluedrummer1985@outlook.com>`. It deploys the recorded
-commit through the existing SSH target `60873`.
+commit through the existing SSH alias `nodesmart60873`.
 
 Before changing `/opt/nodesmart`, the remote process creates and verifies a
 timestamped archive under `/opt/nodesmart-backups`. Git updates only tracked
