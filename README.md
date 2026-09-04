@@ -46,6 +46,9 @@ http://NODE_IP:8080/web/
 
 See `docs/INSTALL.md` and `docs/CONFIGURATION.md`.
 
+For the guarded Windows-to-node deployment workflow, see
+`docs/DEPLOYMENT.md`.
+
 ## Security
 
 NodeSmart installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.
