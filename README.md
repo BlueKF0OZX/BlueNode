@@ -1,11 +1,11 @@
-# NodeSmart
+# BlueNode
 
-NodeSmart is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
+BlueNode is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
 
 **Status:** v0.1.0-alpha — early public testing release.
 ## Dashboard
 
-![NodeSmart Dashboard](nodesmart-dashboard.png)
+![BlueNode Dashboard](nodesmart-dashboard.png)
 ## Features
 
 - Live AllStar, Asterisk, Internet, CPU, memory, disk, and uptime monitoring
@@ -14,7 +14,7 @@ NodeSmart is an open-source monitoring, control, intelligence, and automatic-rec
 - Manual connect/disconnect controls
 - Optional DODROPIN and SkywarnPlus controls
 - Event logging and incident correlation
-- NodeSmart Intelligence summaries and recommendations
+- BlueNode Intelligence summaries and recommendations
 - Automatic Asterisk recovery with verification, cooldown, and lockout protection
 - Desktop/mobile web dashboard
 - systemd startup and installer support
@@ -51,7 +51,7 @@ For the guarded Windows-to-node deployment workflow, see
 
 ## Security
 
-NodeSmart installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.
+BlueNode installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.
 
 The dashboard does not provide Internet-facing authentication. Keep it on a trusted network unless you place it behind appropriate authentication and network security.
 
@@ -80,7 +80,7 @@ This is an alpha release. Test it on a node you can access directly before relyi
 
 ## Author
 
-NodeSmart was originally created and developed by **BlueKF0OZX**.
+BlueNode was originally created and developed by **BlueKF0OZX**.
 
 ## License
 

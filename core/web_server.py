@@ -495,7 +495,7 @@ if __name__ == "__main__":
 
 
 
-    print(f"NodeSmart web server listening on {HOST}:{PORT}")
+    print(f"BlueNode web server listening on {HOST}:{PORT}")
 
 
 

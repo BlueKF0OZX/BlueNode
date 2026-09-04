@@ -192,7 +192,7 @@ def get_disk_usage():
 
 def get_allstar_state():
 
-    """Read connection state maintained by NodeSmart monitor."""
+    """Read connection state maintained by the BlueNode monitor."""
 
     try:
 
@@ -298,7 +298,7 @@ def check_skywarn():
 
 def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent):
 
-    """Evaluate NodeSmart component health and return overall status."""
+    """Evaluate BlueNode component health and return overall status."""
 
 
 
@@ -509,7 +509,7 @@ def build_state():
 
 def load_previous_state():
 
-    """Read the previous NodeSmart state for transition detection."""
+    """Read the previous BlueNode state for transition detection."""
 
 
 
@@ -531,7 +531,7 @@ def load_previous_state():
 
 def log_state_changes(previous, current):
 
-    """Emit events only when meaningful NodeSmart state changes occur."""
+    """Emit events only when meaningful BlueNode state changes occur."""
 
 
 

@@ -20,7 +20,7 @@ application files; machine-specific `config/nodesmart.json`, `events`, `history`
 The deployed commit, service, live state files, Asterisk CLI, dashboard HTTP
 endpoint, and new journal messages are validated. If any post-change validation
 fails, the failed tree is retained under `/opt/nodesmart-backups`, the verified
-backup is restored, and the NodeSmart services are restarted and checked. The command
+backup is restored, and the BlueNode services are restarted and checked. The command
 returns a nonzero exit code and prints `FAIL` even when rollback succeeds.
 
 This workflow does not change Asterisk configuration, networking, firewall,

@@ -190,7 +190,7 @@ web_port="$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1]))[
 curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$web_port/web/" >/dev/null
 
 journal_output="$(journalctl -u nodesmart.service -u nodesmart-web.service --since "@$deploy_epoch" --no-pager 2>&1)"
-if grep -Eiq 'Traceback|NodeSmart .* error|unhandled exception|segmentation fault|Failed with result' <<<"$journal_output"; then
+if grep -Eiq 'Traceback|(BlueNode|NodeSmart) .* error|unhandled exception|segmentation fault|Failed with result' <<<"$journal_output"; then
     printf '%s\n' "$journal_output" >&2
     false
 fi

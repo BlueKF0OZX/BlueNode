@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Run NodeSmart's independent monitoring and recovery workloads."""
+"""Run BlueNode's independent monitoring and recovery workloads."""
 
 import threading
 import time
@@ -48,7 +48,7 @@ class RecoveryCoordinator:
         try:
             self._worker()
         except Exception as exc:
-            print(f"NodeSmart recovery worker error: {exc}", flush=True)
+            print(f"BlueNode recovery worker error: {exc}", flush=True)
         finally:
             self._lock.release()
 
@@ -76,7 +76,7 @@ def run_periodic(name, operation, stop_event, interval=POLL_INTERVAL_SECONDS):
         try:
             operation()
         except Exception as exc:
-            print(f"NodeSmart {name} loop error: {exc}", flush=True)
+            print(f"BlueNode {name} loop error: {exc}", flush=True)
 
         remaining = max(0, interval - (time.monotonic() - started))
         stop_event.wait(remaining)

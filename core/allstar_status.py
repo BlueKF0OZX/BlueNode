@@ -330,7 +330,7 @@ def check_changes():
 
 
 
-    # If NodeSmart restarted while a link was already active,
+    # If BlueNode restarted while a link was already active,
 
     # begin tracking it from this monitor session.
 

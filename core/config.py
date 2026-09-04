@@ -13,8 +13,8 @@ CONFIG_FILE = Path(
 def load_config():
     if not CONFIG_FILE.exists():
         raise RuntimeError(
-            f"NodeSmart configuration file not found: {CONFIG_FILE}\n"
-            "Create it from config/nodesmart.example.json before starting NodeSmart."
+            f"BlueNode configuration file not found: {CONFIG_FILE}\n"
+            "Create it from config/nodesmart.example.json before starting BlueNode."
         )
 
     try:
@@ -22,18 +22,18 @@ def load_config():
             config = json.load(file)
     except json.JSONDecodeError as exc:
         raise RuntimeError(
-            f"Invalid JSON in NodeSmart configuration file "
+            f"Invalid JSON in BlueNode configuration file "
             f"{CONFIG_FILE}: line {exc.lineno}, column {exc.colno}"
         ) from exc
     except OSError as exc:
         raise RuntimeError(
-            f"Unable to read NodeSmart configuration file "
+            f"Unable to read BlueNode configuration file "
             f"{CONFIG_FILE}: {exc}"
         ) from exc
 
     if not isinstance(config, dict):
         raise RuntimeError(
-            f"NodeSmart configuration file {CONFIG_FILE} "
+            f"BlueNode configuration file {CONFIG_FILE} "
             "must contain a JSON object."
         )
 

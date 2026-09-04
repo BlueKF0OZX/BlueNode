@@ -638,7 +638,7 @@ def build_incident_records(events):
 
     """
 
-    Build logical incident records from raw NodeSmart events.
+    Build logical incident records from raw BlueNode events.
 
 
 
@@ -1758,7 +1758,7 @@ def build_intelligence(state=None):
 
             "recovery_successes_24h": 0,
 
-            "summary": "NodeSmart system state is unavailable.",
+            "summary": "BlueNode system state is unavailable.",
 
         }
 
@@ -1949,7 +1949,7 @@ def build_summary(state=None):
 
     if not state:
 
-        return "NodeSmart system state is unavailable."
+        return "BlueNode system state is unavailable."
 
 
 

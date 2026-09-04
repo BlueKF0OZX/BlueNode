@@ -27,4 +27,4 @@ def emit(event, message=""):
 
 if __name__ == "__main__":
 
-    emit("NODESMART.STARTED", "NodeSmart event system test")
+    emit("NODESMART.STARTED", "BlueNode event system test")

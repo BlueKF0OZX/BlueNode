@@ -20,7 +20,7 @@ fi
 SERVICE_USER="${NODESMART_USER:-${SUDO_USER-}}"
 
 if [[ -z "${SERVICE_USER}" || "${SERVICE_USER}" == "root" ]]; then
-  fail "Unable to determine the NodeSmart service user. Run with sudo from the intended user account, or set NODESMART_USER."
+  fail "Unable to determine the BlueNode service user. Run with sudo from the intended user account, or set NODESMART_USER."
 fi
 
 id "${SERVICE_USER}" >/dev/null 2>&1 || fail "User ${SERVICE_USER} does not exist."
@@ -35,7 +35,7 @@ done
 [[ -f "${REPO_ROOT}/systemd/nodesmart-web.service" ]] || fail "Missing systemd/nodesmart-web.service"
 [[ -f "${REPO_ROOT}/install/nodesmart.sudoers.example" ]] || fail "Missing install/nodesmart.sudoers.example"
 
-echo "Preparing NodeSmart files and directories..."
+echo "Preparing BlueNode files and directories..."
 mkdir -p "${INSTALL_ROOT}"
 
 if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
@@ -83,10 +83,10 @@ if [[ ! -f "${INSTALL_ROOT}/config/nodesmart.json" ]]; then
   chmod 0644 "${INSTALL_ROOT}/config/nodesmart.json"
   chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}"
   echo
-  echo "NodeSmart configuration created:"
+  echo "BlueNode configuration created:"
   echo "  ${INSTALL_ROOT}/config/nodesmart.json"
   echo "Edit the node number, callsign, and friendly nodes, then rerun this installer."
-  echo "NodeSmart has NOT been started yet."
+  echo "BlueNode has NOT been started yet."
   exit 0
 fi
 
@@ -120,20 +120,20 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
 
   firewall-cmd --permanent --zone="${FIREWALL_ZONE}" --add-port="${WEB_PORT}/tcp" >/dev/null
   firewall-cmd --reload >/dev/null
-  echo "Allowed NodeSmart dashboard TCP port ${WEB_PORT} in firewalld zone ${FIREWALL_ZONE}."
+  echo "Allowed BlueNode dashboard TCP port ${WEB_PORT} in firewalld zone ${FIREWALL_ZONE}."
 else
   echo "WARNING: Active firewalld was not detected."
   echo "Ensure TCP port ${WEB_PORT} is allowed on the host firewall for dashboard access."
 fi
 
-echo "Enabling and starting NodeSmart..."
+echo "Enabling and starting BlueNode..."
 /usr/bin/systemctl enable nodesmart nodesmart-web
 /usr/bin/systemctl restart nodesmart nodesmart-web
 
 if /usr/bin/systemctl is-active --quiet nodesmart && /usr/bin/systemctl is-active --quiet nodesmart-web; then
-  echo "NodeSmart installation complete."
+  echo "BlueNode installation complete."
 else
-  echo "NodeSmart is installed but the service is not running." >&2
+  echo "BlueNode is installed but the service is not running." >&2
   /usr/bin/systemctl status nodesmart --no-pager || true
   exit 1
 fi
