@@ -426,6 +426,62 @@
       margin: 0;
     }
 
+    .controls-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .emergency-enter { background: #991b1b; }
+    .emergency-enter:hover { background: #b91c1c; }
+
+    .emergency-banner {
+      display: none;
+      margin-top: 16px;
+      padding: 18px 20px;
+      border: 1px solid #ef4444;
+      border-left: 6px solid #ef4444;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #451a1a, #1f2937);
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.12);
+    }
+    .emergency-banner-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .emergency-banner h2 { margin: 0; color: #fecaca; letter-spacing: 0.06em; }
+    .emergency-meta { margin-top: 8px; color: #f3f4f6; }
+    .emergency-summary { margin-top: 8px; color: #d1d5db; }
+
+    body.emergency-mode .wrap { display: flex; flex-direction: column; }
+    body.emergency-mode h1 { order: -3; }
+    body.emergency-mode #node-identity { order: -2; }
+    body.emergency-mode #emergency-banner { display: block; order: -1; }
+    body.emergency-mode #status-grid { order: 1; }
+    body.emergency-mode #intelligence-panel { order: 2; }
+    body.emergency-mode #operational-events-panel { order: 3; }
+    body.emergency-mode #automation-panel { order: 4; }
+    body.emergency-mode #recent-sessions-panel { order: 5; }
+    body.emergency-mode #statistics-grid { order: 6; }
+    body.emergency-mode .controls-panel { order: 7; }
+    body.emergency-mode #remote-admin-panel { order: 8; }
+    body.emergency-mode #soft-radio-panel { order: 9; }
+    body.emergency-mode #error { order: 10; }
+    body.emergency-mode #status-grid,
+    body.emergency-mode #intelligence-panel,
+    body.emergency-mode #operational-events-panel { margin-top: 15px; }
+
+    body.emergency-mode .skywarn-card,
+    body.emergency-mode .connected-nodes-card {
+      border-color: rgba(239,68,68,0.72);
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.14);
+    }
+
     .controls-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -683,6 +739,10 @@
         grid-template-columns: 1fr;
 
       }
+
+      .emergency-banner { padding: 15px; }
+      .emergency-banner-heading { align-items: stretch; }
+      .emergency-banner-heading .control-button { width: 100%; }
 
     }
 
@@ -954,9 +1014,19 @@
 
     <div id="node-identity" class="sub">Loading...</div>
 
+    <section id="emergency-banner" class="emergency-banner" aria-live="polite">
+      <div class="emergency-banner-heading">
+        <h2>EMERGENCY MODE ACTIVE</h2>
+        <button id="emergency-exit" class="control-button admin-danger"
+                onclick="toggleEmergencyMode(false, this)">Exit Emergency Mode</button>
+      </div>
+      <div id="emergency-meta" class="emergency-meta">Operation elapsed: 00:00:00</div>
+      <div id="emergency-summary" class="emergency-summary">Assessing operational state...</div>
+    </section>
 
 
-    <div class="grid">
+
+    <div id="status-grid" class="grid">
 
       <div class="card">
 
@@ -991,7 +1061,7 @@
 
 
 
-      <div class="card">
+      <div class="card skywarn-card">
 
         <div class="label">SkywarnPlus</div>
 
@@ -1001,7 +1071,7 @@
 
 
 
-      <div class="card">
+      <div class="card connected-nodes-card">
 
         <div class="label">Connected Nodes</div>
 
@@ -1061,7 +1131,7 @@
 
     </div>
 
-    <div class="grid">
+    <div id="statistics-grid" class="grid">
 
 
 
@@ -1098,7 +1168,11 @@
 
 
     <div class="controls-panel">
-      <h2>BlueNode Controls</h2>
+      <div class="controls-heading">
+        <h2>BlueNode Controls</h2>
+        <button id="emergency-enter" class="control-button emergency-enter"
+                onclick="toggleEmergencyMode(true, this)">Enter Emergency Mode</button>
+      </div>
 
       <div class="controls-grid">
         <button id="btn-dodropin-connect" class="control-button" onclick="runControl('dodropin-connect', this)">DODROPIN Connect</button>
@@ -1298,7 +1372,7 @@
       </div>
     </div>
 
-    <div class="events-panel">
+    <div id="recent-sessions-panel" class="events-panel">
       <h2>Recent Sessions</h2>
 
       <div class="session-stats">
@@ -1321,7 +1395,7 @@
       <div id="recent-sessions">No connection history yet</div>
     </div>
 
-    <div class="events-panel">
+    <div id="operational-events-panel" class="events-panel">
 
       <h2>Recent Events</h2>
 
@@ -1342,6 +1416,8 @@
     let softRadioContext = null;
     let softRadioGain = null;
     let softRadioWorklet = null;
+    let emergencyModeState = {active:false, mode:'normal', elapsed_seconds:0};
+    let emergencyModeRenderedAt = Date.now();
     function adminHeaders(extra = {}) { return adminCsrfToken ? {...extra, 'X-CSRF-Token': adminCsrfToken} : extra; }
 
     async function loadAdminSession() {
@@ -1871,6 +1947,73 @@
       return Math.floor(seconds / 60) + ' minutes ago';
     }
 
+    function formatEmergencyDuration(seconds) {
+      seconds = Math.max(0, Math.floor(Number(seconds) || 0));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const remainder = seconds % 60;
+      return [hours, minutes, remainder].map(value => String(value).padStart(2, '0')).join(':');
+    }
+
+    function updateEmergencyTimer() {
+      if (!emergencyModeState.active) return;
+      const extra = Math.max(0, Math.floor((Date.now() - emergencyModeRenderedAt) / 1000));
+      document.getElementById('emergency-meta').textContent =
+        'Operation elapsed: ' + formatEmergencyDuration(
+          Number(emergencyModeState.elapsed_seconds || 0) + extra
+        ) + (emergencyModeState.activated_at
+          ? ' \u00b7 Activated ' + new Date(emergencyModeState.activated_at).toLocaleString()
+          : '');
+    }
+
+    function renderEmergencyMode(state, systemState = {}) {
+      emergencyModeState = state || {active:false, mode:'normal', elapsed_seconds:0};
+      emergencyModeRenderedAt = Date.now();
+      document.body.classList.toggle('emergency-mode', emergencyModeState.active === true);
+      document.getElementById('emergency-enter').style.display =
+        emergencyModeState.active ? 'none' : '';
+      if (!emergencyModeState.active) return;
+      updateEmergencyTimer();
+      const intelligence = systemState.intelligence || {};
+      const attention = intelligence.attention_required ? 'OPERATOR ATTENTION REQUIRED' : 'No operator action required';
+      document.getElementById('emergency-summary').textContent =
+        'Overall: ' + String(systemState.status || 'unknown').toUpperCase() +
+        ' \u00b7 Asterisk: ' + String(systemState.asterisk || 'unknown').toUpperCase() +
+        ' \u00b7 Connectivity: ' + String(systemState.connectivity?.diagnosis || systemState.internet || 'unknown').replaceAll('_', ' ').toUpperCase() +
+        ' \u00b7 ' + attention;
+    }
+
+    async function loadEmergencyMode(systemState = {}) {
+      try {
+        const response = await fetch('/api/emergency-mode?ts=' + Date.now(), {cache:'no-store'});
+        if (!response.ok) throw new Error('Emergency Mode state unavailable');
+        renderEmergencyMode(await response.json(), systemState);
+      } catch (_) {
+        renderEmergencyMode({active:false, mode:'normal', elapsed_seconds:0}, systemState);
+      }
+    }
+
+    async function toggleEmergencyMode(enable, button) {
+      const prompt = enable
+        ? 'Enter Emergency Mode and reprioritize the dashboard for active operations?'
+        : 'Exit Emergency Mode and return to the normal dashboard layout?';
+      if (!confirm(prompt)) return;
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/control/emergency-' + (enable ? 'enable' : 'disable'), {
+          method: 'POST', headers: adminHeaders({'Content-Type':'application/json'}), body: '{}'
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Emergency Mode control failed');
+        renderEmergencyMode(result.emergency_mode);
+        loadEvents();
+      } catch (error) {
+        document.getElementById('control-result').textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     function renderAutomation(state) {
       state = state || {};
       const panel = document.getElementById('automation-panel');
@@ -1956,6 +2099,8 @@
             summary: 'Fresh intelligence is unavailable.'
           };
         }
+
+        await loadEmergencyMode(data);
 
         // Use the fast AllStar monitor state for live connection display.
         try {
@@ -2610,9 +2755,13 @@
           .filter(Boolean)
           .reverse();
 
+        const emergencyPattern = /EMERGENCY|ASTERISK|CONNECT|DISCONNECT|INTERNET|DNS|GATEWAY|ALLSTAR|SKYWARN|INCIDENT|RECOVERY|AUTOMATION|CONTROL/i;
+        const operationalLines = emergencyModeState.active
+          ? allLines.filter(line => emergencyPattern.test(line))
+          : allLines;
         const lines = eventsExpanded
-          ? allLines
-          : allLines.slice(0, 10);
+          ? operationalLines
+          : operationalLines.slice(0, 10);
 
 
 
@@ -2689,7 +2838,7 @@
           })
           .join('');
 
-        if (allLines.length > 10) {
+        if (operationalLines.length > 10) {
           container.innerHTML += `
             <div style="text-align:center; margin-top:16px;">
               <button type="button" onclick="toggleEvents()"
@@ -2726,6 +2875,7 @@
 
     setInterval(updateLiveConnectedTime, 1000);
     setInterval(updateCurrentSession, 1000);
+    setInterval(updateEmergencyTimer, 1000);
 
   </script>
 

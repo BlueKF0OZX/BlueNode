@@ -12,6 +12,7 @@ from http.server import ThreadingHTTPServer
 import remote_admin
 import soft_radio
 import web_server
+import emergency_mode
 
 PASSWORD_KEY = "pass" + "word"
 
@@ -35,6 +36,10 @@ class WebAdminTests(unittest.TestCase):
         cls.config_patch.start(); cls.audit_patch.start()
         cls.soft_patch = patch.object(soft_radio, "CONFIG_FILE", cls.soft_config)
         cls.soft_patch.start()
+        cls.emergency_file = root / "emergency_mode.json"
+        cls.emergency_patch = patch.object(emergency_mode, "STATE_FILE", cls.emergency_file)
+        cls.emergency_emit_patch = patch.object(emergency_mode, "emit")
+        cls.emergency_patch.start(); cls.emergency_emit_patch.start()
         cls.admin = remote_admin.RemoteAdmin(runner=lambda *_args, **_kwargs: Result())
         cls.admin_patch = patch.object(web_server, "ADMIN", cls.admin)
         cls.admin_patch.start()
@@ -45,7 +50,7 @@ class WebAdminTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown(); cls.server.server_close(); cls.thread.join()
-        cls.admin_patch.stop(); cls.soft_patch.stop(); cls.audit_patch.stop(); cls.config_patch.stop(); cls.temp.cleanup()
+        cls.admin_patch.stop(); cls.emergency_emit_patch.stop(); cls.emergency_patch.stop(); cls.soft_patch.stop(); cls.audit_patch.stop(); cls.config_patch.stop(); cls.temp.cleanup()
 
     def request(self, method, path, payload=None, headers=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=3)
@@ -71,6 +76,7 @@ class WebAdminTests(unittest.TestCase):
         self.admin.sessions.clear(); self.admin.login_attempts.clear()
         if self.config.exists(): self.config.unlink()
         if self.soft_config.exists(): self.soft_config.unlink()
+        if self.emergency_file.exists(): self.emergency_file.unlink()
         soft_radio.SOFT_RADIO.tickets.clear()
 
     def test_disabled_and_unauthenticated_access(self):
@@ -95,6 +101,30 @@ class WebAdminTests(unittest.TestCase):
         self.assertEqual(self.request("POST", "/api/admin/logout", None,
             {"Cookie":cookie, "X-CSRF-Token":body["csrf_token"]})[0], 200)
         self.assertEqual(self.request("GET", "/api/admin/status", None, {"Cookie":cookie})[0], 401)
+
+    def test_emergency_mode_default_auth_csrf_validation_and_persistence(self):
+        self.assertEqual(self.request("GET", "/api/emergency-mode")[2]["mode"], "normal")
+        self.enable()
+        self.assertEqual(self.request("POST", "/api/control/emergency-enable", {})[0], 401)
+        status, headers, login = self.request("POST", "/api/admin/login",
+            {"username":"operator", PASSWORD_KEY:"correct horse battery staple"})
+        self.assertEqual(status, 200)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        self.assertEqual(self.request("POST", "/api/control/emergency-enable", {},
+                                     {"Cookie":cookie})[0], 403)
+        authorized = {"Cookie":cookie, "X-CSRF-Token":login["csrf_token"]}
+        status, _, body = self.request("POST", "/api/control/emergency-enable", {}, authorized)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["emergency_mode"]["active"])
+        self.assertEqual(body["emergency_mode"]["activation_source"], "remote_admin")
+        self.assertEqual(self.request("GET", "/api/emergency-mode")[2]["mode"], "emergency")
+        self.assertEqual(self.request("POST", "/api/control/emergency-enable",
+                                     {"reason":"injected"}, authorized)[0], 400)
+        self.assertEqual(self.request("POST", "/api/control/emergency-invalid", {},
+                                     authorized)[0], 403)
+        status, _, body = self.request("POST", "/api/control/emergency-disable", {}, authorized)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["emergency_mode"]["mode"], "normal")
 
     def test_soft_radio_ticket_requires_permission_and_is_one_time(self):
         self.enable(["soft_radio_rx"])

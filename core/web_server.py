@@ -17,6 +17,7 @@ from pathlib import Path
 from event_logger import emit
 from config import load_config
 import automation
+import emergency_mode
 from remote_admin import ADMIN, MAX_BODY_BYTES, _safe_config
 from soft_radio import activation_requested
 from soft_radio import PERMISSION as SOFT_RADIO_PERMISSION
@@ -97,6 +98,10 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/admin/session":
             self.send_json(200, ADMIN.public_state(self.admin_cookie()))
+            return
+
+        if path == "/api/emergency-mode":
+            self.send_json(200, emergency_mode.public_state())
             return
 
         if path == "/api/admin/status":
@@ -417,6 +422,23 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
                 "action": action,
                 "message": "Maintenance mode enabled" if enabled else "Maintenance mode disabled",
                 "automation": state,
+            })
+            return
+
+        if action in ("emergency-enable", "emergency-disable"):
+            payload = self.read_json()
+            if payload != {}:
+                self.send_json(400, {"ok": False, "error": "Unexpected parameters"})
+                return
+            enabled = action == "emergency-enable"
+            source = "remote_admin" if _safe_config()["enabled"] else "local_dashboard"
+            state = emergency_mode.set_emergency(enabled, source=source)
+            ADMIN.audit("emergency-mode", "activated" if enabled else "deactivated")
+            self.send_json(200, {
+                "ok": True,
+                "action": action,
+                "message": "Emergency Mode activated" if enabled else "Normal Mode restored",
+                "emergency_mode": state,
             })
             return
 

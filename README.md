@@ -20,6 +20,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 - BlueNode Intelligence summaries and recommendations
 - Automatic Asterisk recovery with verification, cooldown, and lockout protection
 - Automated Operations status, persistent Maintenance Mode, and repeated-failure backoff
+- Deliberate persistent Emergency Mode for high-attention operational views
 - Desktop/mobile web dashboard
 - systemd startup and installer support
 - Python standard library only
@@ -67,6 +68,10 @@ security model and safe initialization procedure.
 Optional Soft Radio Phase A provides separately authorized browser RX with no
 transmit path and is disabled by default. See `docs/SOFT_RADIO_RX.md` for its
 layered RX-only design and activation gate.
+
+Emergency Mode reprioritizes existing health, connectivity, Skywarn, connected
+node, Intelligence, incident, recovery, and event information without changing
+radio or recovery behavior. See `docs/EMERGENCY_MODE.md`.
 
 ## Security
 
