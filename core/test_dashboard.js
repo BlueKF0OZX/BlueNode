@@ -180,9 +180,11 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.equal(context.document.body.classList.active,false);
   const statusStart=html.indexOf('    let statusLoading');
   const statusEnd=html.indexOf('    function setValue',statusStart);
+  context.loadEmergencyMode=async()=>{};
   let resolveFetch, calls=0;
   context.fetch=()=>{calls++;return new Promise(resolve=>{resolveFetch=resolve;});};
   vm.runInContext(html.slice(statusStart,statusEnd),context);
+  vm.runInContext(html.slice(statusEnd,html.indexOf('    let eventsExpanded',statusEnd)),context);
   const first=context.loadStatus();
   await context.loadStatus();
   assert.equal(calls,1,'Concurrent status refresh must be suppressed');

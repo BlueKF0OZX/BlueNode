@@ -1923,9 +1923,10 @@
       if (disconnectButton) disconnectButton.disabled = !dodropinConnected;
 
       const skywarnEnabled = data.skywarn === 'enabled';
+      const skywarnAvailable = ['enabled', 'disabled'].includes(data.skywarn);
 
-      if (skywarnOnButton) skywarnOnButton.disabled = skywarnEnabled;
-      if (skywarnOffButton) skywarnOffButton.disabled = !skywarnEnabled;
+      if (skywarnOnButton) skywarnOnButton.disabled = !skywarnAvailable || skywarnEnabled;
+      if (skywarnOffButton) skywarnOffButton.disabled = !skywarnAvailable || !skywarnEnabled;
     }
 
     function renderConnectivity(state) {
@@ -2049,7 +2050,7 @@
     function renderAutomation(state) {
       state = state || {};
       const panel = document.getElementById('automation-panel');
-      const mode = String(state.mode || 'active').toLowerCase();
+      const mode = String(state.mode || 'unavailable').toLowerCase();
       const labels = {
         active: 'ACTIVE', recovering: 'RECOVERING', recovered: 'RECOVERED',
         attention: 'ATTENTION', maintenance: 'MAINTENANCE'
@@ -2072,10 +2073,11 @@
       document.getElementById('automation-summary').textContent =
         summaries[mode] || 'Automation state unavailable';
       document.getElementById('automation-recovery-armed').textContent =
+        state.recovery_enabled === false ? 'Disabled in configuration' :
         state.automation_armed ? 'Armed' :
           (state.mode === 'attention' ? 'Backed off' : 'Suspended');
       document.getElementById('automation-protection').textContent =
-        state.repeated_failure_protection === false ? 'Unavailable' : 'Armed';
+        state.repeated_failure_protection === true ? 'Armed' : 'Unavailable';
       document.getElementById('automation-maintenance').textContent =
         state.maintenance_mode ? 'On' : 'Off';
       document.getElementById('automation-last-check').textContent =
@@ -2141,6 +2143,7 @@
 
         const response = await fetch('/state/system.json?ts=' + Date.now());
 
+        if (!response.ok) throw new Error('Monitoring state unavailable');
         const data = await response.json();
 
         try {
@@ -2765,7 +2768,13 @@
 
         document.getElementById('error').textContent =
 
-          'Unable to load BlueNode system state.';
+          'Waiting for BlueNode monitoring data. If this persists, check nodesmart.service.';
+        for (const id of ['status', 'asterisk', 'internet', 'skywarn']) setValue(id, 'unavailable');
+        renderConnectivity(null);
+        renderAutomation({mode:'unavailable', automation_armed:false});
+        renderNodeBehavior(null);
+        document.getElementById('intelligence-summary').textContent = 'Intelligence unavailable until monitoring data arrives.';
+        await loadEmergencyMode();
 
       } finally {
         statusLoading = false;
@@ -2779,6 +2788,7 @@
 
       const element = document.getElementById(id);
 
+      value = typeof value === 'string' ? value : 'unavailable';
       element.textContent = value.toUpperCase();
 
       element.className = 'value ' + value;
@@ -2799,6 +2809,11 @@
       try {
 
         const response = await fetch('/logs/events.log?ts=' + Date.now());
+        if (response.status === 404) {
+          document.getElementById('events').textContent = 'No event history yet.';
+          return;
+        }
+        if (!response.ok) throw new Error('Event history unavailable');
 
         const text = await response.text();
 
