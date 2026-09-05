@@ -15,6 +15,7 @@ _path = SETTINGS.get('snapshot_path')
 SNAPSHOT_FILE = Path(_path if isinstance(_path, str) and _path else '/tmp/SkywarnPlus/bluenode-weather.json')
 MAX_BYTES = 1048576
 STALE_SECONDS = 180
+SKYWARN_ROOT = Path('/usr/local/bin/SkywarnPlus')
 _cache = (None, None)
 
 
@@ -103,6 +104,39 @@ def normalize(snapshot, enabled, now):
 def public_state(enabled, now=None):
     now = time.time() if now is None else now
     try:
-        return normalize(read_snapshot(SNAPSHOT_FILE), enabled, now)
+        result = normalize(read_snapshot(SNAPSHOT_FILE), enabled, now)
     except (OSError, ValueError, TypeError, RecursionError):
-        return normalize({}, enabled, now)
+        result = normalize({}, enabled, now)
+    result['integration'] = integration_state(enabled)
+    return result
+
+
+def integration_state(enabled):
+    """Read-only presence diagnostics; absence is never a weather all-clear."""
+    try:
+        SKYWARN_ROOT.stat()
+    except FileNotFoundError:
+        return 'not_detected'
+    except OSError:
+        return 'unavailable'
+    try:
+        (SKYWARN_ROOT / 'config.yaml').stat()
+    except FileNotFoundError:
+        return 'not_configured'
+    except OSError:
+        return 'unavailable'
+    if enabled not in ('enabled', 'disabled'):
+        return 'unavailable'
+    try:
+        (SKYWARN_ROOT / 'bluenode_skywarn_snapshot.py').stat()
+    except FileNotFoundError:
+        return 'observer_not_configured'
+    except OSError:
+        return 'unavailable'
+    try:
+        SNAPSHOT_FILE.stat()
+    except FileNotFoundError:
+        return 'awaiting_snapshot'
+    except OSError:
+        return 'unavailable'
+    return 'detected'

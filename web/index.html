@@ -794,6 +794,7 @@
     #weather-primary { margin-top: 4px; color: var(--muted); font-size: 13px; }
     .weather-link { display: inline-flex; align-items: center; min-height: 44px; color: #c4d7ef; font-size: 13px; text-underline-offset: 3px; }
     #weather-overview { margin-left: 12px; font-size: 13px; color: var(--muted); }
+    .onboarding-help { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 13px; }
     .weather-alert { margin-top: 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); }
     .weather-alert h3 { margin: 0 0 8px; font-size: 16px; }
     .weather-important { border-left: 4px solid #fbbf24; }
@@ -884,6 +885,7 @@
   <div class="wrap">
 
     <h1>BlueNode</h1>
+    <a class="onboarding-help" href="https://github.com/BlueKF0OZX/BlueNode/blob/main/docs/INSTALL.md#after-installation">New to BlueNode?</a>
 
     <div id="node-identity" class="sub">Loading...</div>
 
@@ -953,7 +955,7 @@
 
         <div class="label">Connected Nodes</div>
 
-        <div id="nodes" class="value">Loading...</div>
+        <div id="nodes" class="value">Waiting for first observation</div>
 
       </div>
 
@@ -963,7 +965,7 @@
 
         <div class="label">Last Health Check</div>
 
-        <div id="lastcheck" class="value">Loading...</div>
+        <div id="lastcheck" class="value">Waiting for observation</div>
 
       </div>
 
@@ -973,7 +975,7 @@
 
         <div class="label">CPU Temperature</div>
 
-        <div id="cputemp" class="value">Loading...</div>
+        <div id="cputemp" class="value">Waiting for observation</div>
 
       </div>
 
@@ -983,7 +985,7 @@
 
         <div class="label">System Uptime</div>
 
-        <div id="uptime" class="value">Loading...</div>
+        <div id="uptime" class="value">Waiting for observation</div>
 
       </div>
 
@@ -993,7 +995,7 @@
 
         <div class="label">Memory Usage</div>
 
-        <div id="memory" class="value">Loading...</div>
+        <div id="memory" class="value">Waiting for observation</div>
 
       </div>
 
@@ -1003,7 +1005,7 @@
 
         <div class="label">Disk Usage</div>
 
-        <div id="disk" class="value">Loading...</div>
+        <div id="disk" class="value">Waiting for observation</div>
 
       </div>
 
@@ -1016,27 +1018,27 @@
 
       <div class="card">
         <div class="label">Connections Today</div>
-        <div id="connections-today" class="value">0</div>
+        <div id="connections-today" class="value">Waiting for first observation</div>
       </div>
 
       <div class="card">
         <div class="label">Connected Time Today</div>
-        <div id="connected-time-today" class="value">0m</div>
+        <div id="connected-time-today" class="value">Waiting for first observation</div>
       </div>
 
       <div class="card">
         <div class="label">Last Session</div>
-        <div id="last-session" class="value">None</div>
+        <div id="last-session" class="value">Waiting for first observation</div>
       </div>
 
       <div class="card">
         <div class="label">Active Connections</div>
-        <div id="active-connections" class="value">0</div>
+        <div id="active-connections" class="value">Waiting for first observation</div>
       </div>
 
       <div class="card">
         <div class="label">Current Session</div>
-        <div id="current-session" class="value">None</div>
+        <div id="current-session" class="value">Waiting for first observation</div>
       </div>
 
     </div>
@@ -1050,6 +1052,7 @@
       <div class="connectivity-body">
         <div id="weather-alerts">Weather information unavailable</div>
         <p id="weather-freshness"></p>
+        <a class="onboarding-help" href="https://github.com/BlueKF0OZX/BlueNode/blob/main/docs/WEATHER_ALERTS.md">Optional SkywarnPlus setup</a>
       </div>
     </details>
 
@@ -1287,21 +1290,21 @@
       <div class="session-stats">
         <div class="session-stat">
           <div class="session-stat-label">Longest Session Today</div>
-          <div id="longest-session-today" class="session-stat-value">None</div>
+          <div id="longest-session-today" class="session-stat-value">Waiting for first observation</div>
         </div>
 
         <div class="session-stat">
           <div class="session-stat-label">Completed Today</div>
-          <div id="completed-connections-today" class="session-stat-value">0</div>
+          <div id="completed-connections-today" class="session-stat-value">Waiting for first observation</div>
         </div>
 
         <div class="session-stat">
           <div class="session-stat-label">Completed Time Today</div>
-          <div id="completed-time-today" class="session-stat-value">0s</div>
+          <div id="completed-time-today" class="session-stat-value">Waiting for first observation</div>
         </div>
       </div>
 
-      <div id="recent-sessions">No connection history yet</div>
+      <div id="recent-sessions">Waiting for first observation</div>
     </div>
 
     <div id="operational-events-panel" class="events-panel">
@@ -1783,6 +1786,13 @@
 
 
 
+    let connectionsObserved = false;
+    const observationIds = ['nodes','connections-today','connected-time-today','last-session','active-connections','current-session',
+      'longest-session-today','completed-connections-today','completed-time-today','recent-sessions'];
+    function unavailableConnections() {
+      connectionsObserved = false;
+      for (const id of observationIds) document.getElementById(id).textContent = 'Observation unavailable';
+    }
     let connectedTimeSnapshotSeconds = 0;
     let connectedTimeSnapshotAt = Date.now();
     let activeConnectionCount = 0;
@@ -1804,6 +1814,7 @@
     }
 
     function updateCurrentSession() {
+      if (!connectionsObserved) return;
       const element = document.getElementById('current-session');
 
       if (!element) return;
@@ -1843,6 +1854,7 @@
     }
 
     function updateLiveConnectedTime() {
+      if (!connectionsObserved) return;
       const element = document.getElementById('connected-time-today');
 
       if (!element) return;
@@ -1909,17 +1921,21 @@
       const s = state || {};
       const now = Date.now() / 1000;
       let status = ['current','stale','unavailable'].includes(s.status) ? s.status : 'unavailable';
+      const optionalMessage = {not_detected:'SkywarnPlus not detected', not_configured:'SkywarnPlus needs configuration',
+        observer_not_configured:'Weather integration not configured', awaiting_snapshot:'Awaiting weather information'}[s.integration];
+      if (optionalMessage) status = 'unavailable';
+      if (s.integration === 'not_detected') setValue('skywarn', 'Not detected');
       if (status === 'current' && (!Number.isFinite(s.last_success) || now - s.last_success > 180 || s.last_success > now + 30)) status = 'stale';
       if (status === 'current' && !Array.isArray(s.alerts)) status = 'unavailable';
       const alerts = status === 'current' && Array.isArray(s.alerts) ? s.alerts.filter(a => Number.isFinite(a.end_time) && a.end_time > now) : [];
       const events = [...new Set(alerts.map(a => String(a.event)))];
       const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const significant = event => /^(Tornado|Severe Thunderstorm|Flash Flood|Hurricane|Tsunami) Warning$/i.test(event);
-      const message = status === 'current' ? (events.length ? `${events.length} ACTIVE ALERT ${events.length === 1 ? 'TYPE' : 'TYPES'}` : 'No active weather alerts') :
-        status === 'stale' ? 'Alert information stale' : 'Alert information unavailable';
+      const message = optionalMessage || (status === 'current' ? (events.length ? `${events.length} ACTIVE ALERT ${events.length === 1 ? 'TYPE' : 'TYPES'}` : 'No active weather alerts') :
+        status === 'stale' ? 'Alert information stale' : 'Alert information unavailable');
       document.getElementById('weather-summary').textContent = message;
-      document.getElementById('weather-primary').textContent = events[0] || '';
-      const detailStatus = {current: 'Up to date', stale: 'Information may be outdated', unavailable: 'Weather information unavailable'}[status];
+      document.getElementById('weather-primary').textContent = s.integration === 'not_detected' ? 'Optional integration' : events[0] || '';
+      const detailStatus = optionalMessage || {current: 'Up to date', stale: 'Information may be outdated', unavailable: 'Weather information unavailable'}[status];
       document.getElementById('weather-overview').textContent = detailStatus;
       document.getElementById('weather-freshness').textContent =
         Number.isFinite(s.last_success) ? 'Last updated: ' + new Date(s.last_success * 1000).toLocaleString() : '';
@@ -2199,12 +2215,15 @@
         await loadEmergencyMode(data);
 
         // Use the fast AllStar monitor state for live connection display.
+        let allstarObserved = false;
         try {
           const allstarResponse =
             await fetch('/events/allstar_state.json?ts=' + Date.now());
 
           if (allstarResponse.ok) {
             const allstarData = await allstarResponse.json();
+            allstarObserved = Array.isArray(allstarData.links) && allstarData.connected_since !== null &&
+              typeof allstarData.connected_since === 'object' && !Array.isArray(allstarData.connected_since);
 
             data.connected_nodes = allstarData.links || [];
             data.connected_since = allstarData.connected_since || {};
@@ -2508,6 +2527,10 @@
         }
 
         const connectionStats = data.connection_stats || {};
+        connectionsObserved = allstarObserved && data.radio_activity?.telemetry_available === true && data.radio_activity?.stale === false &&
+          Array.isArray(data.connected_nodes) && ['connections_today','connected_seconds_today','active_connections',
+            'completed_connections_today','completed_connected_seconds_today'].every(k => Number.isFinite(connectionStats[k]) && connectionStats[k] >= 0) &&
+          Array.isArray(connectionStats.recent_sessions);
 
         document.getElementById('connections-today').textContent =
           connectionStats.connections_today ?? 0;
@@ -2803,6 +2826,7 @@
 
 
 
+        if (!connectionsObserved) unavailableConnections();
         document.getElementById('error').textContent = '';
 
       } catch (err) {
@@ -2811,6 +2835,8 @@
 
           'Waiting for BlueNode monitoring data. If this persists, check nodesmart.service.';
         for (const id of ['status', 'asterisk', 'internet', 'skywarn']) setValue(id, 'unavailable');
+        for (const id of ['lastcheck','cputemp','uptime','memory','disk']) document.getElementById(id).textContent = 'Unavailable';
+        unavailableConnections();
         renderWeather(null);
         renderConnectivity(null);
         renderAutomation({mode:'unavailable', automation_armed:false});

@@ -17,6 +17,28 @@ def alert(end='2030-01-01T00:00:00Z', description='Example weather description')
 
 
 class WeatherTests(unittest.TestCase):
+    def test_optional_integration_presence(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / 'optional'
+            with patch.object(weather, 'SKYWARN_ROOT', root), patch.object(weather, 'SNAPSHOT_FILE', root / 'snapshot.json'):
+                self.assertEqual(weather.integration_state('unknown'), 'not_detected')
+                root.mkdir()
+                self.assertEqual(weather.integration_state('unknown'), 'not_configured')
+                (root / 'config.yaml').write_text('generic fixture')
+                self.assertEqual(weather.integration_state('unknown'), 'unavailable')
+                self.assertEqual(weather.integration_state('enabled'), 'observer_not_configured')
+                (root / 'bluenode_skywarn_snapshot.py').touch()
+                self.assertEqual(weather.integration_state('enabled'), 'awaiting_snapshot')
+                (root / 'snapshot.json').write_text('malformed')
+                state = weather.public_state('enabled')
+                self.assertEqual(state['integration'], 'detected')
+                self.assertEqual(state['status'], 'unavailable')
+                self.assertEqual(state['alerts'], [])
+
+    def test_permission_failure_is_not_absence(self):
+        with patch.object(Path, 'stat', side_effect=PermissionError('fixture denied')):
+            self.assertEqual(weather.integration_state('enabled'), 'unavailable')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)

@@ -20,11 +20,13 @@ function fixture(detailed) {
     last_health_check:now, connected_nodes:['23456'], connected_since:{'23456':now},
     friendly_nodes:{'23456':'Example linked node'},
     health:{cpu:'normal',memory:'normal',disk:'normal'},
+    radio_activity:{telemetry_available:true,stale:false},
     health_reasons:detailed?['AllStar service availability is limited.']:[],
     node_behavior:{assessment:'normal',stale:false,evidence_status:'current',reasons:[]},
     automation:{mode:'active',automation_armed:false,recovery_enabled:false,
       repeated_failure_protection:true,last_automation_check:now},
     connection_stats:{connections_today:4,active_connections:1,connected_seconds_today:4138,
+      completed_connections_today:0,completed_connected_seconds_today:0,
       recent_sessions:[{node:'34567',name:'Example previous session',duration_seconds:350,disconnected_at:now}]},
     connectivity:{diagnosis:detailed?'allstar_services_failure':'healthy',last_check:now,
       checks:{interface:true,gateway:true,dns:true,internet:true,allstar:!detailed},
@@ -47,6 +49,8 @@ function fixture(detailed) {
       let missing = false;
       let attentionUnavailable = false;
       let intelligenceIncomplete = false;
+      let observedZero = false;
+      let connectionUnavailable = false;
       let releaseIntelligence;
       const intelligenceGate = new Promise(resolve => { releaseIntelligence = resolve; });
       await page.route('**/*', async route=>{
@@ -56,6 +60,12 @@ function fixture(detailed) {
         let body;
         if (attentionUnavailable && ['/state/intelligence.json','/api/emergency-mode'].includes(url.pathname)) return route.fulfill({status:503,body:'Unavailable'});
         if (url.pathname === '/state/system.json' && !missing) body = fixture(detailed);
+        if (url.pathname === '/state/system.json' && body && observedZero) {
+          body.connected_nodes=[];body.connected_since={};
+          body.connection_stats={connections_today:0,active_connections:0,connected_seconds_today:0,
+            completed_connections_today:0,completed_connected_seconds_today:0,recent_sessions:[]};
+        }
+        if (url.pathname === '/state/system.json' && body && connectionUnavailable) body.radio_activity={telemetry_available:false,stale:true};
         if (url.pathname === '/state/intelligence.json' && !missing) {
           await intelligenceGate;
           body = {
@@ -66,15 +76,20 @@ function fixture(detailed) {
           if (intelligenceIncomplete) body = {level:'normal',summary:'A stale reassuring summary'};
         }
         if (url.pathname === '/api/admin/session') body = {enabled:true,authenticated:false};
+        if (url.pathname === '/events/allstar_state.json' && !missing) body = {links:observedZero?[]:['23456'],connected_since:observedZero?{}:{'23456':now}};
         if (url.pathname === '/api/emergency-mode') body = {active:emergency,mode:emergency?'emergency':'normal',elapsed_seconds:65};
         if (body) return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
         return route.fulfill({status:404,contentType:'text/html',body:'Not Found'});
       });
       await page.goto('http://bluenode.test/web/');
       await page.waitForFunction(()=>document.getElementById('weather-summary').textContent.includes('1 ACTIVE ALERT TYPE'));
+      assert.equal(await page.locator('#connections-today').innerText(), 'Waiting for first observation');
       assert.equal(await page.locator('#status').innerText(), 'Loading...', 'weather must render before delayed Intelligence');
       releaseIntelligence();
       await page.waitForFunction(()=>document.getElementById('status').textContent === 'DEGRADED');
+      assert.equal(await page.locator('#connections-today').innerText(), '4');
+      assert.equal(await page.locator('#completed-connections-today').innerText(), '0');
+      assert.equal(await page.locator('.onboarding-help').first().getAttribute('href'), 'https://github.com/BlueKF0OZX/BlueNode/blob/main/docs/INSTALL.md#after-installation');
       const geometry = async()=>page.evaluate(()=>({
         overflow:document.documentElement.scrollWidth>innerWidth,
         heights:[...document.querySelectorAll('#status-grid .card')].slice(0,5).map(e=>e.getBoundingClientRect().height)
@@ -160,8 +175,24 @@ function fixture(detailed) {
       assert.equal(await page.locator('#intelligence-summary').innerText(), 'Node intelligence is unavailable.');
       assert.match(await page.locator('#intelligence-details').innerText(), /Attention: UNKNOWN/);
       intelligenceIncomplete = false;
+      observedZero = true;
+      await page.evaluate(()=>loadStatus());
+      assert.equal(await page.locator('#connections-today').innerText(),'0');
+      assert.equal(await page.locator('#active-connections').innerText(),'0');
+      assert.equal(await page.locator('#current-session').innerText(),'None');
+      connectionUnavailable = true;
+      await page.evaluate(()=>loadStatus());
+      assert.equal(await page.locator('#active-connections').innerText(),'Observation unavailable');
       missing = true;
       await page.evaluate(()=>loadStatus());
+      assert.equal(await page.locator('#connections-today').innerText(), 'Observation unavailable');
+      await page.evaluate(()=>{updateLiveConnectedTime();updateCurrentSession();});
+      assert.equal(await page.locator('#current-session').innerText(), 'Observation unavailable');
+      for (const [integration,message] of Object.entries({not_detected:'SkywarnPlus not detected',not_configured:'SkywarnPlus needs configuration',observer_not_configured:'Weather integration not configured',awaiting_snapshot:'Awaiting weather information'})) {
+        await page.evaluate(integration=>renderWeather({status:'unavailable',integration,alerts:[]}),integration);
+        assert.equal(await page.locator('#weather-summary').innerText(),message);
+        assert.doesNotMatch(await page.locator('#weather-alerts').textContent(),/No active weather alerts/);
+      }
       assert.equal(await page.locator('#status').innerText(),'UNAVAILABLE');
       assert.equal((await geometry()).overflow,false);
       assert.deepEqual(errors,[],`browser errors at ${width}`);

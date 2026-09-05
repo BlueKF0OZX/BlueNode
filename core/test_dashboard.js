@@ -196,6 +196,7 @@ const context = vm.createContext({Date, Number, Object, Error,
   const statusEnd=html.indexOf('    function setValue',statusStart);
   context.loadEmergencyMode=async()=>{};
   context.renderWeather=()=>{};
+  context.unavailableConnections=()=>{};
   let resolveFetch, calls=0;
   context.fetch=()=>{calls++;return new Promise(resolve=>{resolveFetch=resolve;});};
   vm.runInContext(html.slice(statusStart,statusEnd),context);

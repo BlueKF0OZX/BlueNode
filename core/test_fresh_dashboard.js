@@ -39,6 +39,8 @@ const context = vm.createContext({console, Date, URL, URLSearchParams,
   assert.match(element('node-behavior-title').textContent, /UNAVAILABLE/);
   assert.match(element('intelligence-summary').textContent, /unavailable/i);
   assert.match(element('error').textContent, /Waiting for BlueNode monitoring data/);
+  for (const id of ['lastcheck','cputemp','uptime','memory','disk']) assert.equal(element(id).textContent,'Unavailable');
+  for (const id of ['nodes','connections-today','current-session','recent-sessions']) assert.equal(element(id).textContent,'Observation unavailable');
   assert.doesNotMatch(element('events').textContent, /<html>/);
   assert.ok(requests.some(url=>url.startsWith('/api/emergency-mode')));
   context.updateControlStates({skywarn:'unknown', friendly_nodes:{}, connected_nodes:[]});

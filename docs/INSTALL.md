@@ -89,6 +89,50 @@ Then open `http://127.0.0.1:8080/web/` on that computer. BlueNode does not chang
 host firewall rules, router settings, or public exposure. Any LAN firewall
 policy is an operator decision, outside the installer.
 
+## After installation
+
+1. Check `systemctl is-active nodesmart nodesmart-web`. Both should be active.
+2. Confirm `systemctl is-active asterisk` and compare its PID/start time with
+   your pre-install baseline. The read-only broker check in Troubleshooting
+   verifies BlueNode can query Asterisk; do not use radio/control actions as a test.
+3. Confirm the dashboard's node number and callsign match the local node you
+   configured. BlueNode does not automatically select among multiple local nodes.
+4. Allow the first observations to arrive. Monitoring normally repeats every
+   two seconds after startup checks; Connectivity normally refreshes every
+   30 seconds. These are polling intervals, not guaranteed readiness deadlines.
+   Waiting/unavailable values are not zero activity. Connection statistics
+   describe activity recorded by BlueNode, not events before installation.
+5. Overall Status summarizes current observations. Read its explanation and
+   Intelligence's recommendation when attention is indicated. Smart Connectivity
+   identifies the affected network layer; Node Behavior describes findings in
+   available evidence, not a certification of long-term node behavior.
+6. Monitoring is active independently of automatic recovery. Automatic Asterisk
+   recovery is disabled by default; leave it disabled during initial validation.
+7. SkywarnPlus is optional. If wanted, follow [Weather Alerts](WEATHER_ALERTS.md)
+   after installing/configuring SkywarnPlus separately. No weather update is not
+   an all-clear; wait for its normal collection schedule without forcing a run.
+8. Remote Admin and HTTPS are optional, separate setup steps. Follow
+   [Remote access](REMOTE_ACCESS.md) and [Remote Admin](REMOTE_ADMIN.md); use
+   trusted HTTPS, initialize your own credentials, and verify unauthenticated
+   protected requests are rejected. Do not publicly expose the default listener.
+9. Soft Radio is parked. Net Mode/NetMap are deferred; neither is an incomplete
+   setup step you need to perform.
+
+If observations remain unavailable, use Troubleshooting below rather than
+restarting Asterisk or changing radio settings.
+
+### After reboot
+
+Enabled BlueNode services should start automatically. Configuration and recorded
+history persist; cached telemetry needs fresh observations. Remote Admin's
+in-memory sessions are cleared by a web-service restart, so sign in again through
+the configured HTTPS path. Optional weather may be unavailable until the next
+normal collection, especially when its temporary output was cleared at boot.
+Verify both BlueNode services, Asterisk, the configured node and observation
+freshness. These are code-derived expectations: real reboot behavior still
+requires validation on a disposable ASL3 host. Do not reboot an operating radio
+node solely to test onboarding.
+
 ## What installation changes
 
 After configuration validation, installation copies application files into
