@@ -787,6 +787,15 @@
     .health-reason:empty { display: none; }
     .connectivity-summary { display: block; min-height: 44px; margin-top: 5px; color: #c4d7ef; font-size: 12px; line-height: 1.4; text-decoration: none; }
     .connectivity-summary::after { content: 'View diagnostics \203A'; display: block; margin-top: 3px; text-decoration: underline; text-underline-offset: 3px; }
+    .grid #skywarn { font-size: 14px; margin-bottom: 8px; }
+    #weather-summary { font-size: 16px; font-weight: 650; line-height: 1.4; }
+    #weather-primary { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .weather-link { display: inline-flex; align-items: center; min-height: 44px; color: #c4d7ef; font-size: 13px; text-underline-offset: 3px; }
+    #weather-overview { margin-left: 12px; font-size: 13px; color: var(--muted); }
+    .weather-alert { margin-top: 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); }
+    .weather-alert h3 { margin: 0 0 8px; font-size: 16px; }
+    .weather-important { border-left: 4px solid #fbbf24; }
+    .weather-description { white-space: pre-wrap; font-size: 13px; }
     .connectivity-panel { margin-top: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); scroll-margin-top: 16px; }
     .connectivity-panel summary { min-height: 56px; padding: 16px 20px; cursor: pointer; font-weight: 600; }
     .connectivity-panel summary::marker { color: #a9c7ef; }
@@ -884,6 +893,7 @@
       </div>
       <div id="emergency-meta" class="emergency-meta">Operation elapsed: 00:00:00</div>
       <div id="emergency-summary" class="emergency-summary">Assessing operational state...</div>
+      <div id="emergency-weather" class="emergency-summary" aria-live="polite"></div>
     </section>
 
 
@@ -929,6 +939,9 @@
         <div class="label">SkywarnPlus</div>
 
         <div id="skywarn" class="value">Loading...</div>
+        <div id="weather-summary" aria-live="polite">Alert information unavailable</div>
+        <div id="weather-primary"></div>
+        <a class="weather-link" href="#weather-disclosure" onclick="document.getElementById('weather-disclosure').open = true">View alerts &#8250;</a>
 
       </div>
 
@@ -1029,6 +1042,14 @@
 
 
 
+
+    <details id="weather-disclosure" class="connectivity-panel">
+      <summary><span>Current Weather Alerts</span><span id="weather-overview">Unavailable</span></summary>
+      <div class="connectivity-body">
+        <p id="weather-freshness"></p>
+        <div id="weather-alerts">Alert information unavailable</div>
+      </div>
+    </details>
 
     <details id="connectivity-disclosure" class="connectivity-panel">
       <summary><span>Smart Connectivity</span><span id="connectivity-overview">Diagnostics loading...</span></summary>
@@ -1848,6 +1869,42 @@
       if (skywarnOffButton) skywarnOffButton.disabled = !skywarnAvailable || !skywarnEnabled;
     }
 
+    let weatherSource = null;
+    let weatherMarkup = null;
+    function renderWeather(state) {
+      weatherSource = state;
+      const s = state || {};
+      const now = Date.now() / 1000;
+      let status = ['current','stale','unavailable'].includes(s.status) ? s.status : 'unavailable';
+      if (status === 'current' && (!Number.isFinite(s.last_success) || now - s.last_success > 180 || s.last_success > now + 30)) status = 'stale';
+      if (status === 'current' && !Array.isArray(s.alerts)) status = 'unavailable';
+      const alerts = status === 'current' && Array.isArray(s.alerts) ? s.alerts.filter(a => Number.isFinite(a.end_time) && a.end_time > now) : [];
+      const events = [...new Set(alerts.map(a => String(a.event)))];
+      const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const significant = event => /^(Tornado|Severe Thunderstorm|Flash Flood|Hurricane|Tsunami) Warning$/i.test(event);
+      const message = status === 'current' ? (events.length ? `${events.length} ACTIVE ALERT ${events.length === 1 ? 'TYPE' : 'TYPES'}` : 'No active weather alerts') :
+        status === 'stale' ? 'Alert information stale' : 'Alert information unavailable';
+      document.getElementById('weather-summary').textContent = message;
+      document.getElementById('weather-primary').textContent = events[0] || '';
+      document.getElementById('weather-overview').textContent = status.toUpperCase();
+      document.getElementById('weather-freshness').textContent =
+        (Number.isFinite(s.last_success) ? 'Last complete SkywarnPlus check: ' + new Date(s.last_success * 1000).toLocaleString() + '. ' : '') +
+        (status !== 'current' ? (s.reason || message) : 'Grouped by the alert types SkywarnPlus supplies.');
+      const markup = alerts.length ? events.map(event =>
+        `<article class="weather-alert ${significant(event) ? 'weather-important' : ''}"><h3>${esc(event)}</h3>` +
+        alerts.filter(a => a.event === event).map(a => `<p>Area: ${esc(a.area || a.county_code)} (${esc(a.county_code)}) &middot; SkywarnPlus severity: ${esc(a.severity)}/4</p>` +
+          `<p>Ends: ${esc(new Date(a.end_time * 1000).toLocaleString())}</p>` +
+          (a.description ? `<details><summary>Description</summary><div class="weather-description">${esc(a.description)}</div></details>` : '')).join('') + '</article>'
+      ).join('') : esc(message);
+      if (markup !== weatherMarkup) {
+        document.getElementById('weather-alerts').innerHTML = markup;
+        weatherMarkup = markup;
+      }
+      const warnings = events.filter(significant);
+      document.getElementById('emergency-weather').textContent = warnings.length ? 'Current weather warnings: ' + warnings.join('; ') :
+        status === 'current' ? 'No significant current weather warnings reported by SkywarnPlus.' : message;
+    }
+
     function renderConnectivity(state) {
       state = state || {};
       const checks = state.checks || {};
@@ -2063,6 +2120,9 @@
 
         if (!response.ok) throw new Error('Monitoring state unavailable');
         const data = await response.json();
+        // Weather/status comes from the fast monitoring snapshot, before auxiliary requests.
+        setValue('skywarn', data.skywarn);
+        renderWeather(data.weather_alerts);
 
         try {
           const intelligenceResponse = await fetch('/state/intelligence.json?ts=' + Date.now());
@@ -2116,7 +2176,6 @@
 
         setValue('internet', data.internet);
 
-        setValue('skywarn', data.skywarn);
         renderConnectivity(data.connectivity);
 
         updateControlStates(data);
@@ -2688,6 +2747,7 @@
 
           'Waiting for BlueNode monitoring data. If this persists, check nodesmart.service.';
         for (const id of ['status', 'asterisk', 'internet', 'skywarn']) setValue(id, 'unavailable');
+        renderWeather(null);
         renderConnectivity(null);
         renderAutomation({mode:'unavailable', automation_armed:false});
         renderNodeBehavior(null);
@@ -2858,6 +2918,8 @@
 
 
     setInterval(loadStatus, 2000);
+    // Expire local presentation even if an unrelated HTTP request stalls a refresh.
+    setInterval(() => renderWeather(weatherSource), 2000);
 
     setInterval(loadEvents, 5000);
 

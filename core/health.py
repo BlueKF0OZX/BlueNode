@@ -16,6 +16,7 @@ from config import load_config
 import radio_activity
 import connectivity
 import node_behavior
+import weather_alerts
 
 
 
@@ -495,6 +496,7 @@ def build_state():
         "connectivity": connectivity_state,
 
         "skywarn": skywarn,
+        "weather_alerts": weather_alerts.public_state(skywarn),
 
         "cpu_temp_c": cpu_temp,
 

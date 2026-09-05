@@ -96,6 +96,10 @@ deliberately configured and enabled.
 ## Optional integrations
 
 Skywarn controls require an existing SkywarnPlus installation at `/usr/local/bin/SkywarnPlus/`.
+Current Weather Alerts use an optional, version-checked observer of SkywarnPlus's
+existing collection cycle. See [Weather Alerts](docs/WEATHER_ALERTS.md) for the
+explicit installation check, freshness rules and update compatibility. Without
+the observer, alert telemetry is unavailable; ordinary Skywarn controls still work.
 
 Friendly node controls can be configured using entries in friendly_nodes.
 
