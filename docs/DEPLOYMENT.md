@@ -46,6 +46,30 @@ returns a nonzero exit code and prints `FAIL` even when rollback succeeds.
 This workflow does not change Asterisk configuration, networking, firewall,
 sudoers, systemd unit definitions, releases, tags, or Git history.
 
+## Dashboard-only presentation deployment
+
+For validated changes confined to the existing static dashboard, use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy-BlueNode.ps1 -DashboardOnly
+```
+
+This mode applies only `web/index.html` from the verified, pushed commit. It
+backs up that file, preserves its permissions, replaces it atomically, verifies
+its served HTTP hash and primary APIs, and confirms unauthenticated Remote Admin
+access is rejected. It checks service health, unchanged Asterisk PID/start time,
+and unchanged non-dashboard application files. Any validation failure restores
+the previous dashboard. It never restarts services, changes privileges or
+configuration, or migrates the backend. The broker prerequisite applies to full
+application deployments, not this static-file mode.
+
+The live Git HEAD deliberately remains at the deployed backend commit;
+`git status` shows the known `web/index.html` overlay. The UI commit, backend
+commit, backup path, and dashboard checksum are recorded under
+`/opt/nodesmart-backups/dashboard-current.*`. A repeat run accepts only that
+recorded overlay and refuses unknown tracked changes. A later full application
+migration must account for the recorded UI version.
+
 ## Canonical autonomous workflow
 
 Use these stable commands for routine work so execution approvals remain narrow

@@ -57,7 +57,7 @@ hosts: files
             path.write_bytes(cls.sentinels[path])
         binaries = ("bash", "python3", "install", "id", "mkdir", "cp", "rm", "mv", "rmdir",
                     "mktemp", "sed", "chown", "chmod", "find", "dirname", "visudo",
-                    "systemd-analyze", "ip", "ping", "free", "df", "getent", "sleep", "ln", "tee", "basename", "cmp",
+                    "systemd-analyze", "git", "ip", "ping", "free", "df", "getent", "sleep", "ln", "tee", "basename", "cmp",
                     "head", "cat", "stat", "tar", "date", "grep", "awk", "tr", "cut", "wc", "flock", "sync", "xargs", "sha256sum", "readlink", "realpath", "sort")
         for name in binaries:
             binary = shutil.which(name)
@@ -65,6 +65,9 @@ hosts: files
                 raise RuntimeError("Required fixture tool missing: " + name)
             cls.copy_binary(Path(binary))
         cls.copy_binary(Path("/bin/sh"))
+        (cls.root / "usr/lib/git-core").mkdir(parents=True, exist_ok=True)
+        for name in ("git-upload-pack", "git-receive-pack"):
+            (cls.root / "usr/lib/git-core" / name).symlink_to("/usr/bin/git")
         stdlib = Path(subprocess.check_output(
             ["python3", "-c", "import sysconfig; print(sysconfig.get_path('stdlib'))"], text=True).strip())
         shutil.copytree(stdlib, cls.root / str(stdlib).lstrip("/"), dirs_exist_ok=True,
@@ -88,6 +91,8 @@ hosts: files
 echo "$*" >> /systemctl.calls
 case "$*" in
   'daemon-reload'|'enable nodesmart nodesmart-web'|'restart nodesmart nodesmart-web') exit 0;;
+  'show asterisk -p MainPID -p ActiveEnterTimestampMonotonic') printf 'MainPID=42\\nActiveEnterTimestampMonotonic=1000\\n'; exit 0;;
+  'is-active --quiet asterisk') exit 0;;
   'is-active --quiet nodesmart'|'is-active --quiet nodesmart-web') [[ ! -f /fail-start ]]; exit $?;;
   'status nodesmart --no-pager') exit 0;;
   *) echo "Forbidden fixture service operation: $*" >&2; exit 99;;
@@ -263,6 +268,66 @@ print('Unprivileged first monitor cycle and installed dashboard PASS')
         calls = (self.root / "systemctl.calls").read_text()
         self.assertNotIn("asterisk", calls)
         print("CLEAN INSTALL: config, repeat, missing state, units, sudoers, permissions, safety PASS")
+
+    def test_dashboard_deployment_preserves_backend_and_rolls_back(self):
+        import time
+        import urllib.request
+        app = self.root / "opt/nodesmart"
+        (self.root / "fail-start").unlink(missing_ok=True)
+        (app / ".gitignore").write_text("__pycache__/\n*.pyc\nconfig/nodesmart.json\nstate/\nevents/\nhistory/\nlogs/\n")
+        self.inside("git", "-C", "/opt/nodesmart", "init", "-b", "main")
+        self.inside("git", "-C", "/opt/nodesmart", "add", ".gitignore", "core", "web", "install", "systemd", "config/nodesmart.example.json")
+        def commit(where):
+            self.inside("git", "-C", where, "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-m", "Fixture")
+        commit("/opt/nodesmart")
+        baseline = self.inside("git", "-C", "/opt/nodesmart", "rev-parse", "HEAD").stdout.strip()
+        self.inside("git", "clone", "--bare", "/opt/nodesmart", "/remote.git")
+        self.inside("git", "-C", "/opt/nodesmart", "remote", "add", "origin", "/remote.git")
+        self.inside("git", "clone", "/remote.git", "/candidate")
+        candidate = self.root / "candidate"
+        original_core = (app / "core/config.py").read_bytes()
+        with (candidate / "web/index.html").open("a") as handle:
+            handle.write("<!-- synthetic dashboard deployment fixture -->")
+        with (candidate / "core/config.py").open("a") as handle:
+            handle.write("\n# This backend change must not be deployed by dashboard-only mode.\n")
+        self.inside("git", "-C", "/candidate", "add", "core/config.py", "web/index.html")
+        commit("/candidate")
+        target = self.inside("git", "-C", "/candidate", "rev-parse", "HEAD").stdout.strip()
+        self.inside("git", "-C", "/candidate", "push", "origin", "main")
+        calls_before = (self.root / "systemctl.calls").read_text()
+        server = subprocess.Popen(["chroot", str(self.root), "python3", "/opt/nodesmart/core/web_server.py"],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            for attempt in range(50):
+                try:
+                    with urllib.request.urlopen("http://127.0.0.1:8080/web/", timeout=1):
+                        break
+                except OSError:
+                    time.sleep(0.1)
+            else:
+                self.fail("Isolated dashboard server did not start")
+            command = ("bash", "/src/deploy/dashboard-only.sh", target, "/remote.git")
+            self.inside(*command)
+            self.inside(*command)  # A recorded overlay is safe to apply again.
+            self.assertEqual((app / "web/index.html").read_bytes(), (candidate / "web/index.html").read_bytes())
+            self.assertEqual((app / "core/config.py").read_bytes(), original_core)
+            self.assertEqual(self.inside("git", "-C", "/opt/nodesmart", "rev-parse", "HEAD").stdout.strip(), baseline)
+            config = app / "config/nodesmart.json"
+            original_config = config.read_bytes()
+            bad_config = json.loads(original_config)
+            bad_config["web"]["port"] = 65534
+            config.write_text(json.dumps(bad_config))
+            failed = self.inside(*command, check=False)
+            config.write_bytes(original_config)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("ROLLBACK PASS", failed.stdout)
+            self.assertEqual((app / "web/index.html").read_bytes(), (candidate / "web/index.html").read_bytes())
+            self.assertNotIn("restart", (self.root / "systemctl.calls").read_text()[len(calls_before):])
+        finally:
+            server.terminate()
+            server.wait(timeout=5)
+
 
 
 if __name__ == "__main__":

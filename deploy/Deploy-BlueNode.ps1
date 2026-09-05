@@ -2,7 +2,8 @@
 param(
     [string]$SshTarget = "",
     [string]$RepositoryPath = "",
-    [switch]$PreflightOnly
+    [switch]$PreflightOnly,
+    [switch]$DashboardOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -224,6 +225,10 @@ report DASHBOARD "PASS http://127.0.0.1:$web_port/web/"
 report JOURNAL "PASS no-obvious-new-errors"
 report DEPLOYMENT "PASS commit=$target_commit backup=$backup"
 '@
+
+    if ($DashboardOnly) {
+        $remoteScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "dashboard-only.sh") -Raw
+    }
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = "ssh"
