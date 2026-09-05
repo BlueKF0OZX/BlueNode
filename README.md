@@ -89,9 +89,9 @@ BlueNode installs a project-specific sudoers file with a root-owned command
 broker, fixed helpers, and an exact restart permission. Services run as an
 unprivileged account; application code is root-owned.
 
-The dashboard does not provide native Internet-facing authentication. Keep it
-on a trusted network unless the optional authenticated HTTPS framework has been
-deliberately configured and enabled.
+Authentication is disabled on a default installation. Keep the dashboard on
+loopback or a trusted network. Remote access requires deliberately configured
+authenticated HTTPS and application-level Remote Admin; see the linked guides.
 
 ## Optional integrations
 

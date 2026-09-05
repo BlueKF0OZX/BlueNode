@@ -1,7 +1,8 @@
 # Fresh install / new user validation
 
-Validation date: 2026-09-05. Result: **PASS for public-tree clean-install
-simulation**, with physical-machine limits stated below.
+Validation date: 2026-09-05. Revalidated after weather wording commit `7088c39`.
+Result: **PASS WITH LIMITATIONS**. Public-tree installation is a **SIMULATED
+PASS**; physical ASL3 integration limits are stated below.
 
 ## Architecture and evidence
 
@@ -29,7 +30,7 @@ operations were checked through a constrained fake systemctl, not a live PID 1.
 Generic Asterisk/App_Rpt/radio configuration sentinels remained byte-identical.
 No firewall command or Asterisk restart was issued by the installer.
 
-## Defects corrected
+## Foundation defects corrected in earlier validation
 
 - Automatic firewall opening removed; new listener defaults to loopback.
 - Automatic Asterisk recovery made explicit opt-in, including runtime fallback
@@ -47,14 +48,28 @@ No firewall command or Asterisk restart was issued by the installer.
   code-only developer deployment rejects an unmigrated broker installation.
 - Linux scripts/helpers/units/Python files have explicit LF checkout rules.
 
+## Current new-user audit
+
+No new installer or backend defect was found. This pass corrects a misleading
+README statement about authentication, adds local-node identification and
+read-only Asterisk integrity guidance, and documents optional weather onboarding.
+The normal installer does not patch SkywarnPlus. New users without SkywarnPlus,
+the observer, Tailscale or Remote Admin can bootstrap the core dashboard.
+
+The installed-adapter fixture now explicitly checks absent/current/stale/partial
+and disabled weather telemetry, using the producer's atomic replacement contract.
+Neither upstream SkywarnPlus nor an external weather service is run by this test.
+
 ## Regression coverage
 
-- Python: **132 tests**, all passing on Debian ARM64, **zero skips**.
-- Windows Python: **132 tests**, passing with **two POSIX pseudo-terminal
+- Python: **145 tests**, all passing on Debian ARM64, **zero skips**.
+- Windows Python: **145 tests**, passing with **two POSIX pseudo-terminal
   skips**; those terminal tests passed inside the Debian fixture.
-- One clean-install integration lifecycle covering the stages above.
-- Three JavaScript suites: dashboard rendering/polling, whole-script empty
-  first load, and Remote Access/Remote Admin/Soft Radio framework checks.
+- Two isolated fixture tests: clean-install lifecycle and dashboard-only
+  deployment/repeat/rollback. System services and sudo execution are substituted.
+- Six JavaScript/browser suites, including five responsive viewport sizes,
+  authentication/session/CSRF and control routing, empty first load, dashboard
+  polling/rendering, and Remote Access framework checks.
 - Python compilation, shell syntax (including extensionless helpers), generated
   systemd/sudoers validation, deployment preflight fixtures, privacy guard,
   whitespace validation, and tracked-public-tree integrity checks.
@@ -85,6 +100,11 @@ real RF/audio behavior or live Internet reachability. No Asterisk restart,
 App_Rpt/radio change, intentional PTT/RF transmission, host firewall change,
 or public exposure was performed.
 
-Before UI/UX polish, repeat the documented install on that separate ASL3 machine
-and schedule any production installer migration deliberately. Soft Radio stays
-parked; Net Mode/NetMap remain deferred.
+Before broad recommendation to unrelated operators, repeat the documented
+installation on a genuinely disposable ASL3 host. Package installation,
+systemd boot/restart persistence, real sudo/PAM and Asterisk socket permissions,
+App_Rpt compatibility, and optional upstream/proxy integration are **NOT TESTABLE
+WITHOUT A DISPOSABLE ASL3 HOST** in this fixture. Sudoers parsing and unit syntax
+are real checks; authorization execution and service lifecycle are simulated.
+No production deployment is required for this documentation/test-only pass.
+Soft Radio stays parked; Net Mode/NetMap remain deferred.

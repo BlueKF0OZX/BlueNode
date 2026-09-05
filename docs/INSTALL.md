@@ -49,6 +49,13 @@ callsign. The placeholder identity is rejected on the next run. Leave
 `friendly_nodes` as `{}` unless you want optional labels. See
 [Configuration](CONFIGURATION.md) for the remaining settings.
 
+BlueNode does not discover or configure your local node automatically. Use the
+node number from your existing ASL3 setup. If unsure, inspect the node stanza
+headers in `/etc/asterisk/rpt.conf` read-only and confirm the intended local
+node in your ASL3 administration interface; do not use a linked remote node's
+number. On systems hosting multiple nodes, select the one BlueNode will monitor.
+Do not edit Asterisk configuration to match a BlueNode example.
+
 New installations default to `web.host: "127.0.0.1"`, port `8080`, and
 `recovery.asterisk_enabled: false`. Automatic Asterisk restart is opt-in;
 keep it disabled while validating your installation. Remote Admin and Soft
@@ -116,6 +123,11 @@ Missing optional data does not prevent service startup.
 - SkywarnPlus is detected at `/usr/local/bin/SkywarnPlus/config.yaml`, with
   controls through `SkyControl.py` in that directory. Install and configure it
   separately; otherwise Skywarn is unknown and its dashboard buttons disabled.
+  Weather awareness additionally requires the optional guarded
+  [snapshot observer](WEATHER_ALERTS.md), installed from the public checkout.
+  Missing, failed or partial snapshots show unavailable; old successful data
+  shows stale. Only a successful current empty snapshot means no active alerts.
+  Normal BlueNode installation neither installs nor updates this observer.
 - DODROPIN is optional: add your chosen node number with the label `DODROPIN`
   in `friendly_nodes`. No destination is shipped or inferred.
 - [Remote Admin](REMOTE_ADMIN.md) requires separate credential initialization
@@ -162,6 +174,11 @@ The last command is a read-only CLI check. Permission failures usually mean
 the installer was not rerun with the intended service account. A blank/failed
 dashboard should be checked at its configured address, followed by both unit
 journals. Do not create dummy healthy state files to hide startup errors.
+Before and after installation, compare `systemctl show asterisk -p MainPID
+-p ExecMainStartTimestamp` and confirm `systemctl is-active asterisk`; neither
+check changes node operation. Enabled BlueNode units start on subsequent boots,
+but real boot behavior must be checked on a disposable host, not by rebooting
+an operating radio node for validation.
 After config changes, restart only BlueNode:
 
 ```bash

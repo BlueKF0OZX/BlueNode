@@ -155,6 +155,9 @@ esac
         """First pass, invalid config, configured install, repeat, and failure."""
         app = self.root / "opt/nodesmart"
         self.assertFalse(app.exists())
+        self.assertFalse((self.root / 'usr/local/bin/SkywarnPlus').exists())
+        self.assertFalse((self.root / 'usr/bin/tailscale').exists())
+        self.assertFalse((self.root / 'etc/bluenode').exists())
         first = self.inside("bash", "/src/install/install.sh")
         self.assertIn("NOT been started", first.stdout)
         self.assertFalse((self.root / "systemctl.calls").exists())
@@ -190,6 +193,8 @@ state = monitor.run_health_cycle(Mock())
 assert state['asterisk'] == 'online', state
 assert state['connectivity']['diagnosis'] == 'unavailable', state['connectivity']
 assert state['skywarn'] == 'unknown'
+assert state['weather_alerts']['status'] == 'unavailable'
+assert state['weather_alerts']['alerts'] == []
 assert state['automation']['automation_armed'] is False
 assert not remote_admin._safe_config()['enabled']
 assert not emergency_mode.public_state()['active']
@@ -215,6 +220,32 @@ finally:
 print('Unprivileged first monitor cycle and installed dashboard PASS')
 """
         self.inside("python3", "-c", smoke, user="1234:1234")
+        # Exercise the installed adapter with generic local optional telemetry.
+        # No upstream program, API, host state, or radio command is invoked.
+        weather_smoke = """import sys,json,time,tempfile
+from pathlib import Path
+sys.path.insert(0, '/opt/nodesmart/core')
+import weather_alerts
+with tempfile.TemporaryDirectory() as folder:
+    weather_alerts.SNAPSHOT_FILE = Path(folder) / 'weather.json'
+    assert weather_alerts.public_state('enabled')['status'] == 'unavailable'
+    now = time.time()
+    snapshot = dict(schema_version=1, source='SkywarnPlus', last_attempt=now,
+        observed_at=now, last_success=now, collection_status='success',
+        in_progress=False, test_mode=False, configured_counties=1,
+        successful_counties=1, alerts=[])
+    weather_alerts.SNAPSHOT_FILE.write_text(json.dumps(snapshot))
+    assert weather_alerts.public_state('enabled', now)['status'] == 'current'
+    assert weather_alerts.public_state('enabled', now+181)['status'] == 'stale'
+    assert weather_alerts.public_state('disabled', now)['status'] == 'unavailable'
+    snapshot['collection_status'] = 'partial'
+    replacement = Path(folder) / 'replacement.json'
+    replacement.write_text(json.dumps(snapshot))
+    replacement.replace(weather_alerts.SNAPSHOT_FILE)  # Match the atomic producer contract.
+    assert weather_alerts.public_state('enabled', now)['status'] == 'unavailable'
+print('SIMULATED PASS installed optional weather: absent/current/stale/partial/disabled')
+"""
+        self.inside("python3", "-c", weather_smoke, user="1234:1234")
         self.inside("systemd-analyze", "verify", "/etc/systemd/system/nodesmart.service",
                     "/etc/systemd/system/nodesmart-web.service")
         for name in ("nodesmart", "nodesmart-web"):
@@ -267,7 +298,7 @@ print('Unprivileged first monitor cycle and installed dashboard PASS')
             self.assertEqual(path.read_bytes(), content)
         calls = (self.root / "systemctl.calls").read_text()
         self.assertNotIn("asterisk", calls)
-        print("CLEAN INSTALL: config, repeat, missing state, units, sudoers, permissions, safety PASS")
+        print("SIMULATED PASS clean install: config, repeat, missing state, optional weather, units, sudoers, permissions, safety; Asterisk/sudo/systemctl substituted")
 
     def test_dashboard_deployment_preserves_backend_and_rolls_back(self):
         import time
