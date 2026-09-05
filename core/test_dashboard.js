@@ -130,27 +130,36 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.equal(element('connectivity-details').style.display,'');
   const automationStart=html.indexOf('    function automationAge');
   const automationEnd=html.indexOf('    let statusLoading',automationStart);
-  context.fetch=async()=>({ok:true,json:async()=>({automation:{mode:'maintenance',maintenance_mode:true}})});
+  context.fetch=async()=>({ok:true,json:async()=>({automation:{mode:'maintenance',recovery_enabled:true,maintenance_mode:true}})});
   vm.runInContext(html.slice(automationStart,automationEnd),context);
-  context.renderAutomation({mode:'active',automation_armed:true,
+  context.renderAutomation({mode:'active',recovery_enabled:true,operator_attention_required:false,automation_armed:true,
     repeated_failure_protection:true,recovery_attempts_today:0,
     last_automation_check:new Date().toISOString()});
-  assert.equal(element('automation-title').textContent,'AUTOMATION — ACTIVE');
+  assert.equal(element('automation-title').textContent,'Monitoring active');
   assert.equal(element('automation-action').textContent,'No operator action required');
-  context.renderAutomation({mode:'active',automation_armed:true,connectivity_status:'offline'});
+  context.renderAutomation({mode:'active',recovery_enabled:true,operator_attention_required:false,automation_armed:true,connectivity_status:'offline'});
   assert.match(element('automation-summary').textContent,/no Asterisk restart/);
-  context.renderAutomation({mode:'recovering',automation_armed:true,last_result:'Verifying service health'});
-  assert.equal(element('automation-title').textContent,'AUTOMATION — RECOVERING');
-  context.renderAutomation({mode:'recovered',automation_armed:true,last_result:'Asterisk restored'});
-  assert.equal(element('automation-title').textContent,'AUTOMATION — RECOVERED');
-  context.renderAutomation({mode:'attention',operator_attention_required:true,
+  context.renderAutomation({mode:'recovering',recovery_enabled:true,automation_armed:true,last_result:'Verifying service health'});
+  assert.equal(element('automation-title').textContent,'Automated Operations — RECOVERING');
+  context.renderAutomation({mode:'recovered',recovery_enabled:true,automation_armed:true,last_result:'Asterisk restored'});
+  assert.equal(element('automation-title').textContent,'Automated Operations — RECOVERED');
+  context.renderAutomation({mode:'attention',recovery_enabled:true,operator_attention_required:true,
     automation_armed:false,escalation_reason:'Repeated instability detected'});
   assert.equal(element('automation-action').textContent,'Operator attention recommended');
   assert.equal(element('automation-recovery-armed').textContent,'Backed off');
-  context.renderAutomation({mode:'maintenance',maintenance_mode:true,automation_armed:false});
+  context.renderAutomation({mode:'maintenance',recovery_enabled:true,maintenance_mode:true,automation_armed:false});
   assert.equal(element('maintenance-toggle').textContent,'Disable Maintenance Mode');
   await context.toggleMaintenance(element('maintenance-toggle'));
-  assert.equal(element('automation-title').textContent,'AUTOMATION — MAINTENANCE');
+  assert.equal(element('automation-title').textContent,'Automated Operations — MAINTENANCE');
+  context.renderAutomation({mode:'active',recovery_enabled:false,operator_attention_required:false});
+  assert.equal(element('automation-title').textContent,'Monitoring active');
+  assert.equal(element('automation-summary').textContent,'Automatic recovery disabled');
+  for (const state of [null, {}, {mode:'active'}]) {
+    context.renderAutomation(state);
+    assert.match(element('automation-title').textContent,/STATUS UNAVAILABLE/);
+    assert.doesNotMatch(element('automation-action').textContent,/No operator action required/);
+    assert.equal(element('automation-attempts').textContent,'Unknown');
+  }
   context.renderNodeBehavior({assessment:'normal',stale:false,reasons:[]});
   assert.match(element('node-behavior-title').textContent,/NODE BEHAVIOR.*NORMAL/);
   assert.equal(element('node-behavior-summary').textContent,
@@ -169,7 +178,7 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.match(element('node-behavior-evidence').textContent,/RF behavior was not assessed/);
   context.renderEmergencyMode({active:true, mode:'emergency', elapsed_seconds:65,
     activated_at:new Date().toISOString()}, {status:'healthy',asterisk:'online',
-    connectivity:{diagnosis:'healthy'},intelligence:{attention_required:false}});
+    connectivity:{diagnosis:'healthy'},intelligence:{level:'normal',summary:'Healthy',attention_required:false}});
   assert.equal(context.document.body.classList.active,true);
   assert.match(element('emergency-meta').textContent,/00:01:05/);
   assert.match(element('emergency-summary').textContent,/Overall: HEALTHY.*No operator action required/);
@@ -180,6 +189,9 @@ const context = vm.createContext({Date, Number, Object, Error,
     /Overall: DEGRADED.*Connectivity: DNS FAILURE.*OPERATOR ATTENTION REQUIRED/);
   context.renderEmergencyMode({active:false,mode:'normal',elapsed_seconds:0});
   assert.equal(context.document.body.classList.active,false);
+  context.renderEmergencyMode(null);
+  assert.match(element('emergency-title').textContent,/STATUS UNAVAILABLE/);
+  assert.equal(element('emergency-enter').disabled,true);
   const statusStart=html.indexOf('    let statusLoading');
   const statusEnd=html.indexOf('    function setValue',statusStart);
   context.loadEmergencyMode=async()=>{};

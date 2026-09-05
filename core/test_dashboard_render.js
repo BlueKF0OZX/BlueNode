@@ -45,6 +45,8 @@ function fixture(detailed) {
       let detailed = true;
       let emergency = false;
       let missing = false;
+      let attentionUnavailable = false;
+      let intelligenceIncomplete = false;
       let releaseIntelligence;
       const intelligenceGate = new Promise(resolve => { releaseIntelligence = resolve; });
       await page.route('**/*', async route=>{
@@ -52,6 +54,7 @@ function fixture(detailed) {
         assert.equal(route.request().method(), 'GET', 'Render checks must never invoke controls');
         if (url.pathname === '/web/') return route.fulfill({contentType:'text/html',body:html});
         let body;
+        if (attentionUnavailable && ['/state/intelligence.json','/api/emergency-mode'].includes(url.pathname)) return route.fulfill({status:503,body:'Unavailable'});
         if (url.pathname === '/state/system.json' && !missing) body = fixture(detailed);
         if (url.pathname === '/state/intelligence.json' && !missing) {
           await intelligenceGate;
@@ -60,6 +63,7 @@ function fixture(detailed) {
           summary:'The node remains online. Review the service diagnostic details before taking action.',
           recommendation:{message:'Monitor the next diagnostic observation.'},
           incidents:[{component:'internet',resolved:true,summary:'A prior connection interruption was resolved.',started_at:now,duration_seconds:45}]};
+          if (intelligenceIncomplete) body = {level:'normal',summary:'A stale reassuring summary'};
         }
         if (url.pathname === '/api/admin/session') body = {enabled:true,authenticated:false};
         if (url.pathname === '/api/emergency-mode') body = {active:emergency,mode:emergency?'emergency':'normal',elapsed_seconds:65};
@@ -142,6 +146,20 @@ function fixture(detailed) {
       await page.evaluate(()=>loadStatus());
       assert.equal(await page.locator('#emergency-banner').isVisible(),true);
       assert.equal((await geometry()).overflow,false,`emergency overflow at ${width}`);
+      attentionUnavailable = true;
+      await page.evaluate(()=>loadStatus());
+      assert.match(await page.locator('#emergency-title').innerText(), /STATUS UNAVAILABLE/);
+      assert.equal(await page.locator('#emergency-exit').isDisabled(), true);
+      assert.match(await page.locator('#intelligence-details').innerText(), /Attention: UNKNOWN/);
+      assert.doesNotMatch(await page.locator('#intelligence-details').innerText(), /Attention: NO|failures: 0/);
+      assert.equal(await page.locator('#incident-list').innerText(), 'Incident history unavailable.');
+      assert.equal((await geometry()).overflow,false,`unavailable overflow at ${width}`);
+      attentionUnavailable = false;
+      intelligenceIncomplete = true;
+      await page.evaluate(()=>loadStatus());
+      assert.equal(await page.locator('#intelligence-summary').innerText(), 'Node intelligence is unavailable.');
+      assert.match(await page.locator('#intelligence-details').innerText(), /Attention: UNKNOWN/);
+      intelligenceIncomplete = false;
       missing = true;
       await page.evaluate(()=>loadStatus());
       assert.equal(await page.locator('#status').innerText(),'UNAVAILABLE');

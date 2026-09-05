@@ -82,9 +82,14 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         return response.status;
       });
       assert.equal(adminResult, authenticated ? 200 : 401);
-      await page.evaluate(() => runAdminAction('refresh-diagnostics', document.createElement('button')));
+      await page.evaluate(() => { void runAdminAction('refresh-diagnostics', document.createElement('button')); });
+      if (!authenticated) {
+        await page.waitForFunction(()=>pendingControl !== null);
+        await page.locator('#control-login-cancel').click();
+      }
+      await page.waitForFunction(()=>!controlRequestBusy);
       assert.equal(posts.at(-1).path, '/api/admin/action');
-      assert.match(await page.locator('#admin-result').innerText(), authenticated ? /Fixture accepted/ : /authentication required/);
+      assert.match(await page.locator('#admin-result').innerText(), authenticated ? /Fixture accepted/ : /cancelled/);
       await page.close();
       console.log('PASS control routing: ' + mode);
     }

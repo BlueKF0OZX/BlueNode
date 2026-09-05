@@ -397,6 +397,8 @@
       flex-wrap: wrap;
     }
     .emergency-banner h2 { margin: 0; color: #fecaca; letter-spacing: 0.06em; }
+    .emergency-banner[data-unavailable="true"] { background: var(--panel); border-color: var(--line); }
+    .emergency-banner[data-unavailable="true"] h2 { color: #cbd5e1; }
     .emergency-meta { margin-top: 8px; color: #f3f4f6; }
     .emergency-summary { margin-top: 8px; color: #d1d5db; }
 
@@ -841,7 +843,7 @@
     .session-stat-label { color: var(--muted); line-height: 1.4; }
     .session-stat-value { line-height: 1.4; font-variant-numeric: tabular-nums; }
     #admin-log-output { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-    #admin-login-result:not(:empty), #admin-result:not(:empty) { margin-top: 12px; }
+    #admin-login-result:not(:empty), #admin-result:not(:empty), #pending-control-result:not(:empty) { margin-top: 12px; }
     #error:empty { display: none; }
     @media (max-width: 1000px) {
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -887,7 +889,7 @@
 
     <section id="emergency-banner" class="emergency-banner" aria-live="polite">
       <div class="emergency-banner-heading">
-        <h2>EMERGENCY MODE ACTIVE</h2>
+        <h2 id="emergency-title">EMERGENCY MODE ACTIVE</h2>
         <button id="emergency-exit" class="control-button admin-danger"
                 onclick="toggleEmergencyMode(false, this)">Exit Emergency Mode</button>
       </div>
@@ -1197,10 +1199,10 @@
         <div>Repeated-failure protection: <span id="automation-protection">—</span></div>
         <div>Maintenance mode: <span id="automation-maintenance">—</span></div>
         <div>Last automation check: <span id="automation-last-check">—</span></div>
-        <div>Recovery attempts today: <span id="automation-attempts">0</span></div>
-        <div id="automation-backoff">Cooldown: None</div>
+        <div>Recovery attempts today: <span id="automation-attempts">Unknown</span></div>
+        <div id="automation-backoff">Cooldown: Unknown</div>
       </div>
-      <div id="automation-action" class="automation-action">No operator action required</div>
+      <div id="automation-action" class="automation-action">Status unavailable</div>
     </div>
 
     <section id="node-behavior-panel" class="behavior-panel behavior-stale" aria-live="polite">
@@ -1213,14 +1215,15 @@
       <h2>Remote Admin</h2>
       <div id="admin-login-view">
         <div>Sign in to operate controls. This browser stays signed in until the session expires or the web service restarts.</div>
-        <div class="admin-row">
+        <form class="admin-row" onsubmit="event.preventDefault(); adminLogin(document.getElementById('admin-submit'))">
           <input id="admin-username" aria-label="Remote Admin username" class="admin-field" autocomplete="username" placeholder="Username">
           <input id="admin-password" aria-label="Remote Admin password" class="admin-field" type="password" autocomplete="current-password" placeholder="Password">
-          <button class="control-button" onclick="adminLogin(this)">Sign in</button>
-        </div>
-        <button id="control-login-cancel" class="control-button" onclick="cancelPendingControl()">Cancel pending control</button>
+          <button id="admin-submit" type="submit" class="control-button">Sign in</button>
+        </form>
+        <button id="control-login-cancel" class="control-button" onclick="cancelPendingControl()" style="display:none">Cancel pending control</button>
         <div id="admin-login-result" role="status"></div>
       </div>
+      <div id="pending-control-result" role="status" tabindex="-1"></div>
       <div id="admin-auth-view" style="display:none">
         <div id="admin-status">Authenticated administrative session</div>
         <div class="admin-row">
@@ -1329,10 +1332,18 @@
     let pendingControl = null;
     let controlRequestBusy = false;
     let adminLoginBusy = false;
+    const pendingAdminActions = new Set(['admin-refresh-diagnostics', 'admin-restart-monitor', 'admin-restart-asterisk']);
     const ordinaryActions = new Set(['dodropin-connect', 'dodropin-disconnect',
       'skywarn-enable', 'skywarn-disable', 'node-connect', 'node-disconnect',
       'emergency-enable', 'emergency-disable', 'maintenance-enable', 'maintenance-disable']);
     function validateControl(action, payload) {
+      if (pendingAdminActions.has(action)) {
+        const keys = Object.keys(payload);
+        if (action === 'admin-restart-asterisk') {
+          if (keys.length !== 1 || keys[0] !== 'confirmation' || payload.confirmation !== 'RESTART ASTERISK') throw new Error('Restart confirmation required');
+        } else if (keys.length) throw new Error('Unexpected admin parameters');
+        return Object.freeze({...payload});
+      }
       if (!ordinaryActions.has(action)) throw new Error('Unsupported control');
       const keys = Object.keys(payload);
       if (action.startsWith('node-')) {
@@ -1340,6 +1351,16 @@
             !/^\d{1,10}$/.test(payload.node)) throw new Error('Invalid node number');
       } else if (keys.length) throw new Error('Unexpected control parameters');
       return Object.freeze({...payload});
+    }
+    function controlDescription(action, payload) {
+      const labels = {'dodropin-connect':'connect to DODROPIN', 'dodropin-disconnect':'disconnect DODROPIN',
+        'skywarn-enable':'enable SkywarnPlus', 'skywarn-disable':'disable SkywarnPlus',
+        'emergency-enable':'enter Emergency Mode', 'emergency-disable':'exit Emergency Mode',
+        'maintenance-enable':'enable Maintenance Mode', 'maintenance-disable':'disable Maintenance Mode',
+        'admin-refresh-diagnostics':'refresh diagnostics', 'admin-restart-monitor':'restart the BlueNode monitor',
+        'admin-restart-asterisk':'restart Asterisk'};
+      return action === 'node-connect' ? 'connect to node ' + payload.node :
+        action === 'node-disconnect' ? 'disconnect node ' + payload.node : labels[action];
     }
     function showControlLogin() {
       document.getElementById('remote-admin-panel').style.display = 'block';
@@ -1354,11 +1375,14 @@
     function cancelPendingControl(message = 'Pending control cancelled.') {
       const pending = pendingControl;
       pendingControl = null;
+      document.getElementById('control-login-cancel').style.display = 'none';
       if (pending) pending.reject(new Error(message));
       document.getElementById('admin-login-result').textContent = message;
     }
     async function postOrdinaryControl(action, payload) {
       validateControl(action, payload);
+      if (pendingAdminActions.has(action)) return fetch('/api/admin/action', {method:'POST',
+        headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify({action:action.slice(6), ...payload})});
       return fetch('/api/control/' + action, {method:'POST',
         headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)});
     }
@@ -1372,7 +1396,9 @@
         adminCsrfToken = null;
         return await new Promise((resolve, reject) => {
           pendingControl = {action, payload:validated, resolve, reject};
-          document.getElementById('admin-login-result').textContent = 'Sign in to complete: ' + action;
+          document.getElementById('admin-login-result').textContent = 'Sign in to ' + controlDescription(action, validated) + '. This action will run after sign-in.';
+          document.getElementById('pending-control-result').textContent = '';
+          document.getElementById('control-login-cancel').style.display = 'inline-block';
           showControlLogin();
         });
       } finally { controlRequestBusy = false; }
@@ -1424,11 +1450,19 @@
         if (!adminCsrfToken) throw new Error('Session could not be verified. Use the configured HTTPS dashboard.');
         const pending = pendingControl === loginPending ? pendingControl : null;
         if (pending) pendingControl = null;
+        document.getElementById('control-login-cancel').style.display = 'none';
         if (pending) {
+          const output = document.getElementById('pending-control-result');
+          output.textContent = 'Running: ' + controlDescription(pending.action, pending.payload) + '...';
           try {
             const response = await postOrdinaryControl(pending.action, pending.payload);
+            let result = {};
+            try { result = await response.clone().json(); } catch (_) {}
+            output.textContent = (response.ok ? 'Completed: ' : 'Failed: ') + controlDescription(pending.action, pending.payload) +
+              '. ' + (result.message || result.error || '');
+            output.focus();
             pending.resolve(response);
-          } catch (error) { pending.reject(error); }
+          } catch (error) { output.textContent = 'Action failed: ' + error.message; output.focus(); pending.reject(error); }
         }
       } catch (error) { cancelPendingControl(error.message); }
       finally {
@@ -1457,9 +1491,8 @@
       const output = document.getElementById('admin-result');
       output.textContent = 'Action accepted; running and verifying...';
       try {
-        const payload = {action}; if (confirmation) payload.confirmation = confirmation;
-        const response = await fetch('/api/admin/action', {method:'POST',
-          headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)});
+        const payload = {}; if (confirmation) payload.confirmation = confirmation;
+        const response = await requestOrdinaryControl('admin-' + action, payload);
         const result = await response.json(); output.textContent = result.message || result.error;
         await loadAdminStatus();
       } catch (error) { output.textContent = 'Action failed: ' + error.message; }
@@ -1968,6 +2001,7 @@
     }
 
     function updateEmergencyTimer() {
+      if (emergencyModeState.statusAvailable === false) return;
       if (!emergencyModeState.active) return;
       const extra = Math.max(0, Math.floor((Date.now() - emergencyModeRenderedAt) / 1000));
       document.getElementById('emergency-meta').textContent =
@@ -1979,6 +2013,20 @@
     }
 
     function renderEmergencyMode(state, systemState = {}) {
+      const known = state && typeof state.active === 'boolean' &&
+        state.mode === (state.active ? 'emergency' : 'normal');
+      const banner = document.getElementById('emergency-banner');
+      document.getElementById('emergency-enter').disabled = !known;
+      document.getElementById('emergency-exit').disabled = !known;
+      banner.style.display = known ? '' : 'block';
+      banner.dataset.unavailable = String(!known);
+      document.getElementById('emergency-title').textContent = known ? 'EMERGENCY MODE ACTIVE' : 'EMERGENCY MODE STATUS UNAVAILABLE';
+      if (!known) {
+        emergencyModeState = {...emergencyModeState, statusAvailable:false};
+        document.getElementById('emergency-meta').textContent = 'Current mode could not be verified.';
+        document.getElementById('emergency-summary').textContent = 'Waiting for Emergency Mode status; no normal-state conclusion is available.';
+        return;
+      }
       emergencyModeState = state || {active:false, mode:'normal', elapsed_seconds:0};
       emergencyModeRenderedAt = Date.now();
       document.body.classList.toggle('emergency-mode', emergencyModeState.active === true);
@@ -1987,7 +2035,9 @@
       if (!emergencyModeState.active) return;
       updateEmergencyTimer();
       const intelligence = systemState.intelligence || {};
-      const attention = intelligence.attention_required ? 'OPERATOR ATTENTION REQUIRED' : 'No operator action required';
+      const attention = intelligence.attention_required === true ? 'OPERATOR ATTENTION REQUIRED' :
+        intelligence.attention_required === false && ['normal','warning','critical'].includes(intelligence.level) &&
+          typeof intelligence.summary === 'string' && intelligence.summary.trim() ? 'No operator action required' : 'Intelligence status unavailable';
       document.getElementById('emergency-summary').textContent =
         'Overall: ' + String(systemState.status || 'unknown').toUpperCase() +
         ' \u00b7 Asterisk: ' + String(systemState.asterisk || 'unknown').toUpperCase() +
@@ -2001,7 +2051,7 @@
         if (!response.ok) throw new Error('Emergency Mode state unavailable');
         renderEmergencyMode(await response.json(), systemState);
       } catch (_) {
-        renderEmergencyMode({active:false, mode:'normal', elapsed_seconds:0}, systemState);
+        renderEmergencyMode(null, systemState);
       }
     }
 
@@ -2034,7 +2084,7 @@
       };
       panel.className = 'automation-panel automation-' + mode;
       document.getElementById('automation-title').textContent =
-        'AUTOMATION — ' + (labels[mode] || 'UNKNOWN');
+        mode === 'active' ? 'Monitoring active' : 'Automated Operations — ' + (labels[mode] || 'STATUS UNAVAILABLE');
       const summaries = {
         active: 'Monitoring continuously',
         recovering: (state.last_action || 'Asterisk became unavailable') +
@@ -2050,23 +2100,34 @@
       document.getElementById('automation-summary').textContent =
         summaries[mode] || 'Automation state unavailable';
       document.getElementById('automation-recovery-armed').textContent =
-        state.recovery_enabled === false ? 'Disabled in configuration' :
+        state.recovery_enabled === false ? 'Disabled' : state.recovery_enabled !== true ? 'Unknown' :
         state.automation_armed ? 'Armed' :
           (state.mode === 'attention' ? 'Backed off' : 'Suspended');
       document.getElementById('automation-protection').textContent =
         state.repeated_failure_protection === true ? 'Armed' : 'Unavailable';
       document.getElementById('automation-maintenance').textContent =
-        state.maintenance_mode ? 'On' : 'Off';
+        typeof state.maintenance_mode === 'boolean' ? (state.maintenance_mode ? 'On' : 'Off') : 'Unknown';
       document.getElementById('automation-last-check').textContent =
         automationAge(state.last_automation_check);
       document.getElementById('automation-attempts').textContent =
-        String(state.recovery_attempts_today || 0);
+        Number.isFinite(state.recovery_attempts_today) ? String(state.recovery_attempts_today) : 'Unknown';
       const until = state.backoff_until_iso || state.cooldown_until_iso;
       document.getElementById('automation-backoff').textContent =
-        until ? 'Backoff/cooldown until: ' + new Date(until).toLocaleString() : 'Cooldown: None';
+        until ? 'Backoff/cooldown until: ' + new Date(until).toLocaleString() :
+          Object.hasOwn(state, 'cooldown_until_iso') ? 'Cooldown: None' : 'Cooldown: Unknown';
       document.getElementById('automation-action').textContent =
         state.operator_attention_required ? 'Operator attention recommended' :
-        mode === 'maintenance' ? 'Automation intentionally paused' : 'No operator action required';
+        mode === 'maintenance' ? 'Automation intentionally paused' :
+        labels[mode] && typeof state.recovery_enabled === 'boolean' && state.operator_attention_required === false ? 'No operator action required' : 'Operator attention status unavailable';
+      if (!labels[mode] || typeof state.recovery_enabled !== 'boolean') {
+        document.getElementById('automation-title').textContent = 'Automated Operations — STATUS UNAVAILABLE';
+        panel.className = 'automation-panel automation-unavailable';
+        document.getElementById('automation-summary').textContent = 'Monitoring/recovery status is incomplete or unavailable.';
+      } else if (mode === 'active') {
+        document.getElementById('automation-summary').textContent = (state.recovery_enabled ?
+          'Automatic recovery enabled' : 'Automatic recovery disabled') +
+          (state.connectivity_status && !['healthy','unavailable'].includes(state.connectivity_status) ? '. ' + summaries.active : '');
+      }
       const button = document.getElementById('maintenance-toggle');
       button.textContent = state.maintenance_mode ? 'Disable Maintenance Mode' : 'Enable Maintenance Mode';
       button.dataset.enabled = state.maintenance_mode ? 'true' : 'false';
@@ -2188,7 +2249,10 @@
         const intelligenceDetails =
           document.getElementById('intelligence-details');
 
-        const intelligence = data.intelligence || {};
+        const receivedIntelligence = data.intelligence || {};
+        const intelligenceKnown = ['normal','warning','critical'].includes(receivedIntelligence.level) &&
+          typeof receivedIntelligence.attention_required === 'boolean' && typeof receivedIntelligence.summary === 'string' && receivedIntelligence.summary.trim();
+        const intelligence = intelligenceKnown ? receivedIntelligence : {};
 
         const intelligenceRecommendation =
           document.getElementById('intelligence-recommendation');
@@ -2213,28 +2277,28 @@
         if (intelligenceElement) {
           intelligenceElement.textContent =
             intelligence.summary ||
-            data.intelligence_summary ||
             'Node intelligence is unavailable.';
         }
 
         if (intelligenceDetails) {
+          const knownCounter = value => Number.isInteger(value) && value >= 0 ? value : 'Unknown';
           const level =
             String(intelligence.level || 'unknown').toUpperCase();
 
           const attention =
-            intelligence.attention_required ? 'YES' : 'NO';
+            intelligenceKnown ? (intelligence.attention_required ? 'YES' : 'NO') : 'UNKNOWN';
 
           const incidents =
-            intelligence.recent_incidents ?? 0;
+            knownCounter(intelligence.recent_incidents);
 
           const failures1h =
-            intelligence.asterisk_failures_1h ?? 0;
+            knownCounter(intelligence.asterisk_failures_1h);
 
           const failures24h =
-            intelligence.asterisk_failures_24h ?? 0;
+            knownCounter(intelligence.asterisk_failures_24h);
 
           const recoveries24h =
-            intelligence.recovery_successes_24h ?? 0;
+            knownCounter(intelligence.recovery_successes_24h);
 
           const unresolved =
             intelligence.unresolved_issues || [];
@@ -2271,7 +2335,7 @@
 
           if (!incidentRecords.length) {
 
-            incidentList.textContent = 'No recent incidents.';
+            incidentList.textContent = Array.isArray(intelligence.incidents) ? 'No recent incidents.' : 'Incident history unavailable.';
 
           } else {
 
@@ -2752,6 +2816,10 @@
         renderAutomation({mode:'unavailable', automation_armed:false});
         renderNodeBehavior(null);
         document.getElementById('intelligence-summary').textContent = 'Intelligence unavailable until monitoring data arrives.';
+        document.getElementById('intelligence-details').textContent = 'Attention: UNKNOWN; counters unavailable.';
+        document.getElementById('intelligence-recommendation').textContent = 'Recommendation unavailable.';
+        document.getElementById('incident-list').textContent = 'Incident history unavailable.';
+        document.getElementById('intelligence-panel').className = 'events-panel intelligence-unknown';
         await loadEmergencyMode();
 
       } finally {

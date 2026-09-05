@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     let sessionUnavailable = false;
     const executed = [], requests = [], errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('dialog', dialog => dialog.accept());
+    page.on('dialog', dialog => dialog.accept(dialog.type() === 'prompt' ? 'RESTART ASTERISK' : undefined));
     await page.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url());
       const authorized = authenticated && (request.headers().cookie || '').includes('bluenode_admin=fixture-session');
@@ -35,6 +35,15 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         status = authorized ? 200 : 401;
         body = {services:{monitor:{active:true},web:{active:true},asterisk:{active:true}},version:{commit:'fixture'}};
       } else if (url.pathname === '/api/soft-radio/status') body = {enabled:false};
+      else if (url.pathname === '/api/admin/action') {
+        const payload = JSON.parse(request.postData());
+        status = !authorized ? 401 : request.headers()['x-csrf-token'] !== 'fixture-csrf' ? 403 : 200;
+        if (status === 200) {
+          if (payload.action === 'restart-asterisk') assert.equal(payload.confirmation,'RESTART ASTERISK');
+          executed.push({action:'admin-' + payload.action,payload});
+          body = {ok:true,message:'Fixture admin completed'};
+        } else body = {error:'Authentication required'};
+      }
       else if (url.pathname === '/api/emergency-mode') body = {active:emergency,mode:emergency?'emergency':'normal'};
       else if (url.pathname.startsWith('/api/control/')) {
         status = !authorized ? 401 : csrfRejected || request.headers()['x-csrf-token'] !== 'fixture-csrf' ? 403 : 200;
@@ -51,11 +60,12 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     const login = async () => {
       await page.locator('#admin-username').fill('operator');
       await page.locator('#admin-password').fill('fixture password');
-      await page.locator('button[onclick="adminLogin(this)"]').click();
+      await page.locator('#admin-password').press('Enter');
       await page.waitForFunction(() => !adminLoginBusy && !controlRequestBusy);
     };
     await page.goto('https://bluenode.test/web/');
     await page.evaluate(() => loadAdminSession());
+    assert.equal(await page.locator('#control-login-cancel').isVisible(), false);
     const controls = [
       ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
       ['#btn-skywarn-on','skywarn-enable'], ['#btn-skywarn-off','skywarn-disable'],
@@ -73,11 +83,18 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       await page.waitForFunction(() => pendingControl !== null);
       assert.equal(executed.length, count);
       assert.equal(await page.locator('#admin-login-view').isVisible(), true);
+      assert.equal(await page.locator('#control-login-cancel').isVisible(), true);
+      const pendingLabel = await page.locator('#admin-login-result').textContent();
+      assert.match(pendingLabel, /This action will run after sign-in/);
+      assert.ok(!pendingLabel.includes(action), 'Do not expose internal action identifiers');
+      if (action.startsWith('node-')) assert.ok(pendingLabel.includes('12345'));
       // A second control cannot replace or duplicate the first one.
       await page.evaluate(() => runControl('skywarn-disable', document.createElement('button')));
       await login();
       assert.equal(executed.length, count + 1);
       assert.equal(executed.at(-1).action, action);
+      assert.match(await page.locator('#pending-control-result').textContent(), /Completed:.*Fixture completed/);
+      assert.equal(await page.locator('#control-login-cancel').isVisible(), false);
       if (action.startsWith('node-')) assert.deepEqual(executed.at(-1).payload, {node:'12345'});
       await page.evaluate(() => adminLogin(document.createElement('button')));
       assert.equal(executed.length, count + 1, 'another login must not replay consumed action');
@@ -129,13 +146,37 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     await page.evaluate(() => loadAdminSession());
     const requestCount = requests.length;
     await page.evaluate(async () => {
-      for (const [action,payload] of [['../admin/action',{}],['node-connect',{node:'123;bad'}],['skywarn-enable',{extra:true}]]) {
+      for (const [action,payload] of [['../admin/action',{}],['node-connect',{node:'123;bad'}],['skywarn-enable',{extra:true}],['admin-restart-asterisk',{}],['admin-restart-asterisk',{confirmation:'wrong'}],['admin-shell',{}]]) {
         let rejected = false;
         try { await requestOrdinaryControl(action,payload); } catch (_) { rejected = true; }
         if (!rejected) throw new Error('Malformed control accepted');
       }
     });
     assert.equal(requests.length, requestCount);
+    for (const action of ['refresh-diagnostics','restart-monitor','restart-asterisk']) {
+      authenticated = false;
+      const before = executed.length;
+      await page.evaluate(action => {
+        const button = document.createElement('button');
+        if (action === 'restart-asterisk') restartAsterisk(button);
+        else void runAdminAction(action, button);
+      },action);
+      await page.waitForFunction(()=>pendingControl !== null);
+      assert.equal(executed.length,before);
+      if (action === 'restart-asterisk') assert.match(await page.locator('#admin-login-result').textContent(),/Sign in to restart Asterisk/);
+      await page.locator('#admin-username').fill('operator');
+      await page.locator('#admin-password').fill('fixture password');
+      const loginCount = requests.filter(p=>p==='/api/admin/login').length;
+      await page.evaluate(()=>{
+        const form=document.getElementById('admin-submit').form;
+        form.requestSubmit(); form.requestSubmit();
+      });
+      await page.waitForFunction(()=>!adminLoginBusy && !controlRequestBusy);
+      assert.equal(requests.filter(p=>p==='/api/admin/login').length,loginCount+1);
+      assert.equal(executed.length,before+1);
+      assert.equal(executed.at(-1).action,'admin-'+action);
+      assert.match(await page.locator('#pending-control-result').textContent(),/Completed:.*Fixture admin completed/);
+    }
     assert.deepEqual(errors, []);
     console.log('PASS control auth UX: nine controls; resume once, expiry, reload, logout, failure, cancellation, CSRF and injection');
   } finally { await browser.close(); }
