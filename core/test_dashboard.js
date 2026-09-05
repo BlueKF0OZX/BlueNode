@@ -114,15 +114,17 @@ const context = vm.createContext({Date, Number, Object, Error,
   vm.runInContext(html.slice(connectivityStart,connectivityEnd),context);
   context.renderConnectivity({diagnosis:'healthy',last_check:new Date().toISOString(),
     checks:{interface:true,gateway:true,dns:true,internet:true,allstar:true}});
-  assert.match(element('connectivity-summary').textContent,/Healthy.*Gateway OK.*DNS OK.*AllStar OK/);
-  assert.match(element('connectivity-summary').textContent,/checked \d+s ago/);
+  assert.equal(element('connectivity-summary').textContent, 'Healthy');
+  assert.match(element('connectivity-checks').textContent,/Healthy.*Gateway OK.*DNS OK.*AllStar OK/);
+  assert.match(element('connectivity-checks').textContent,/checked \d+s ago/);
   assert.equal(element('connectivity-details').style.display,'none');
   context.renderConnectivity({diagnosis:'dns_failure',checks:{interface:true,gateway:true,
     dns:false,internet:true,allstar:true},message:'DNS resolution failed',
     operator_action:'Check DNS',layers:{local_network:{status:'ok'},gateway:{status:'ok'},
       dns:{status:'fail'},internet:{status:'ok'},
       allstar_services:{status:'blocked_by_upstream'}}});
-  assert.match(element('connectivity-summary').textContent,/DNS failure.*DNS FAIL.*Internet OK/);
+  assert.equal(element('connectivity-summary').textContent, 'DNS failure');
+  assert.match(element('connectivity-checks').textContent,/DNS failure.*DNS FAIL.*Internet OK/);
   assert.match(element('connectivity-details').textContent,
     /DNS resolution failed.*DNS FAIL.*Internet OK.*AllStar services BLOCKED_BY_UPSTREAM.*Action: Check DNS/);
   assert.equal(element('connectivity-details').style.display,'');
