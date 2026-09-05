@@ -920,6 +920,7 @@
         <div class="label">Asterisk</div>
 
         <div id="asterisk" class="value">Loading...</div>
+        <div id="asterisk-detail" class="small"></div>
 
       </div>
 
@@ -2154,6 +2155,9 @@
       const button = document.getElementById('maintenance-toggle');
       button.textContent = state.maintenance_mode ? 'Disable Maintenance Mode' : 'Enable Maintenance Mode';
       button.dataset.enabled = state.maintenance_mode ? 'true' : 'false';
+      if (state.recovery_safety_message) {
+        document.getElementById('automation-summary').textContent += ' ' + state.recovery_safety_message;
+      }
     }
 
     function renderNodeBehavior(state) {
@@ -2260,6 +2264,25 @@
         setValue('status', data.status);
 
         setValue('asterisk', data.asterisk);
+        const asteriskEvidence = data.asterisk_evidence;
+        const asteriskDetail = document.getElementById('asterisk-detail');
+        const asteriskAge = Date.now()/1000 - asteriskEvidence?.service?.observed_at;
+        const asteriskStale = asteriskEvidence && (!Number.isFinite(asteriskAge) || asteriskAge < 0 ||
+          asteriskAge > (asteriskEvidence.max_age_seconds || 30));
+        asteriskDetail.textContent = !asteriskEvidence ? '' : data.asterisk === 'unknown'
+          ? 'Service state unknown; automatic restart prohibited'
+          : data.asterisk === 'offline' ? 'Service stopped or failed'
+          : asteriskEvidence.query?.status !== 'available' ? 'Running; BlueNode cannot query Asterisk'
+          : asteriskEvidence.node?.status !== 'available' ? 'Configured App_Rpt node not observable'
+          : 'Service running; configured node observable';
+        if (!asteriskStale && asteriskEvidence && data.asterisk === 'online' &&
+            (asteriskEvidence.query?.status !== 'available' || asteriskEvidence.node?.status !== 'available')) {
+          setValue('asterisk', 'RUNNING / LIMITED');
+        }
+        if (asteriskStale) {
+          setValue('asterisk', 'UNKNOWN');
+          asteriskDetail.textContent = 'Observations outdated; service state unknown';
+        }
 
         setValue('internet', data.internet);
 
@@ -2842,6 +2865,7 @@
 
           'Waiting for BlueNode monitoring data. If this persists, check nodesmart.service.';
         for (const id of ['status', 'asterisk', 'internet', 'skywarn']) setValue(id, 'unavailable');
+        document.getElementById('asterisk-detail').textContent = 'Service observation unavailable';
         for (const id of ['lastcheck','cputemp','uptime','memory','disk']) document.getElementById(id).textContent = 'Unavailable';
         unavailableConnections();
         renderWeather(null);

@@ -17,6 +17,7 @@ import radio_activity
 import connectivity
 import node_behavior
 import weather_alerts
+import asterisk_observation
 
 
 
@@ -47,31 +48,8 @@ ALLSTAR_STATE_FILE = BASE_DIR / "events" / "allstar_state.json"
 
 
 def check_asterisk():
-
-    """Return online if Asterisk responds to its CLI."""
-
-    try:
-
-        result = subprocess.run(
-
-            ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "core show version"],
-
-            capture_output=True,
-
-            text=True,
-
-            timeout=5,
-
-        )
-
-        return "online" if result.returncode == 0 else "offline"
-
-    except (subprocess.SubprocessError, OSError):
-
-        return "offline"
-
-
-
+    """Legacy display value from independent service evidence only."""
+    return asterisk_observation.service_evidence()["status"]
 
 
 def check_internet():
@@ -301,7 +279,7 @@ def check_skywarn():
 
 
 def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent,
-                    connectivity_state=None):
+                    connectivity_state=None, asterisk_evidence=None):
 
     """Evaluate BlueNode component health and return overall status."""
 
@@ -327,11 +305,28 @@ def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent,
 
 
 
-    if asterisk != "online":
+    if asterisk == "offline":
 
         health["asterisk"] = "critical"
 
-        reasons.append("Asterisk is offline")
+        reasons.append("Asterisk service is stopped or failed.")
+    elif asterisk != "online":
+        health["asterisk"] = "unknown"
+        reasons.append("Asterisk service state is unknown; automatic restart is prohibited.")
+    if asterisk_evidence is not None:
+        query_available = asterisk_evidence.get("query", {}).get("status") == "available"
+        node_available = asterisk_evidence.get("node", {}).get("status") == "available"
+        health.update(asterisk_observation="normal",
+                      asterisk_query="normal" if query_available else "warning" if asterisk == "online" else "unknown",
+                      app_rpt="normal" if node_available else "warning" if query_available else "unknown")
+        if asterisk == "unknown":
+            health["asterisk_observation"] = "warning"
+        elif asterisk == "online":
+            message = asterisk_observation.warning(asterisk_evidence)
+            if message:
+                component = "asterisk_query" if asterisk_evidence["query"]["status"] != "available" else "app_rpt"
+                health[component] = "warning"
+                reasons.append(message)
 
 
 
@@ -437,7 +432,8 @@ def evaluate_health(asterisk, internet, cpu_temp, memory_percent, disk_percent,
 
 def build_state():
 
-    asterisk = check_asterisk()
+    evidence = asterisk_observation.collect()
+    asterisk = evidence["service"]["status"]
 
     connectivity_state = connectivity.public_state()
     internet = connectivity.legacy_internet_state(connectivity_state)
@@ -471,7 +467,7 @@ def build_state():
         memory_percent,
 
         disk_percent,
-        connectivity_state,
+        connectivity_state, evidence,
 
     )
 
@@ -491,6 +487,7 @@ def build_state():
         "health_reasons": health_reasons,
 
         "asterisk": asterisk,
+        "asterisk_evidence": evidence,
 
         "internet": internet,
         "connectivity": connectivity_state,
@@ -604,7 +601,8 @@ def log_state_changes(previous, current):
 
 
 
-    for component in ("asterisk", "internet", "cpu", "memory", "disk"):
+    for component in ("asterisk", "internet", "cpu", "memory", "disk",
+                      "asterisk_observation", "asterisk_query", "app_rpt"):
 
         old_state = old_health.get(component)
 
@@ -619,6 +617,10 @@ def log_state_changes(previous, current):
 
 
         message = f"{old_state} -> {new_state}"
+        labels = {"asterisk_observation": "Asterisk service observation",
+                  "asterisk_query": "Asterisk query access", "app_rpt": "Configured App_Rpt node observation"}
+        if component in labels:
+            message = labels[component] + (" restored" if new_state == "normal" else " unavailable")
 
 
 

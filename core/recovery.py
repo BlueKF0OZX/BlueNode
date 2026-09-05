@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import automation
+import asterisk_observation
 from config import load_config
 from event_logger import emit
 
@@ -27,27 +28,11 @@ RECOVERY_STATE_FILE = Path("/opt/nodesmart/state/recovery.json")
 
 
 def asterisk_online():
-    try:
-        result = subprocess.run(
-            ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "core show version"],
-            capture_output=True, text=True, timeout=5,
-        )
-        return result.returncode == 0
-    except (subprocess.SubprocessError, OSError):
-        return False
+    return asterisk_observation.query_evidence()["status"] == "available"
 
 
 def allstar_reachable():
-    if not NODE.isdigit():
-        return False
-    try:
-        result = subprocess.run(
-            ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", f"rpt lstats {NODE}"],
-            capture_output=True, text=True, timeout=5,
-        )
-        return result.returncode == 0
-    except (subprocess.SubprocessError, OSError):
-        return False
+    return asterisk_observation.node_evidence(NODE)["status"] == "available"
 
 
 def load_json(path):
@@ -99,7 +84,11 @@ def verify_recovery(started_at, timeout=None):
     stable = 0
     last_reason = "Waiting for post-recovery health state"
     while time.monotonic() <= deadline:
-        if not asterisk_online():
+        service = asterisk_observation.service_evidence()
+        if not (asterisk_observation.fresh(service) and service["status"] == "online"):
+            stable = 0
+            last_reason = "Independent Asterisk service health is not running"
+        elif not asterisk_online():
             stable = 0
             last_reason = "Asterisk CLI is not reachable"
         else:
@@ -115,7 +104,14 @@ def verify_recovery(started_at, timeout=None):
                 and INTELLIGENCE_FILE.stat().st_mtime >= started_at
             )
             component_normal = (system or {}).get("health", {}).get("asterisk") == "normal"
-            if (system and system.get("asterisk") == "online" and component_normal
+            collected = (system or {}).get("asterisk_evidence", {})
+            collected_service = collected.get("service", {})
+            trustworthy = (asterisk_observation.fresh(collected_service)
+                           and collected_service.get("status") == "online"
+                           and collected_service.get("observed_at", 0) >= started_at
+                           and collected.get("query", {}).get("status") == "available"
+                           and collected.get("node", {}).get("status") == "available")
+            if (system and trustworthy and system.get("asterisk") == "online" and component_normal
                     and allstar_reachable() and observed >= started_at
                     and intelligence_fresh and allstar_valid):
                 stable += 1
@@ -141,9 +137,14 @@ def recover_asterisk():
     state = load_system_state()
     if not state or state.get("asterisk") != "offline":
         return
+    if not automation.recovery_allowed(state):
+        return
+    if not asterisk_observation.confirmed_stopped(asterisk_observation.service_evidence()):
+        return
     time.sleep(5)
-    if asterisk_online():
-        message = "Asterisk responded during verification; restart not required"
+    if (not asterisk_observation.confirmed_stopped(asterisk_observation.service_evidence())
+            or asterisk_online()):
+        message = "Independent outage confirmation no longer permits restart"
         emit("RECOVERY.ASTERISK.CANCELLED", message)
         record_recovery_result("cancelled", message)
         return
@@ -152,10 +153,17 @@ def recover_asterisk():
     attempt = automation.begin_recovery()
     if attempt is None:
         return
-    emit("RECOVERY.ASTERISK.ATTEMPT",
-         f"Confirmed Asterisk offline; recovery attempt {attempt} started")
     started_at = time.time()
     try:
+        # Last external observation immediately before the mutating command.
+        if not asterisk_observation.confirmed_stopped(asterisk_observation.service_evidence()):
+            message = "Final service evidence does not confirm an outage; restart cancelled"
+            emit("RECOVERY.ASTERISK.CANCELLED", message)
+            record_recovery_result("cancelled", message)
+            automation.cancel_recovery(message)
+            return
+        emit("RECOVERY.ASTERISK.ATTEMPT",
+             f"Independently confirmed stopped service; recovery attempt {attempt} started")
         result = subprocess.run(
             ["sudo", "-n", "systemctl", "restart", "asterisk"],
             capture_output=True, text=True, timeout=20,

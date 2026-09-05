@@ -1014,6 +1014,9 @@ def build_incident_records(events):
 
     component_labels = {
 
+        "asterisk_observation": "Asterisk service observation",
+        "asterisk_query": "Asterisk query access",
+        "app_rpt": "Configured App_Rpt node observation",
         "cpu": "CPU",
 
         "memory": "Memory",
@@ -2134,11 +2137,13 @@ def build_summary(state=None):
 
     # Core services
 
-    parts.append(
-
-        f"Asterisk is {asterisk} and internet is {internet}."
-
-    )
+    evidence = state.get("asterisk_evidence")
+    if evidence:
+        from asterisk_observation import warning
+        parts.append(warning(evidence) or "Asterisk is running and the configured node is observable.")
+        parts.append(f"Internet is {internet}.")
+    else:
+        parts.append(f"Asterisk is {asterisk} and internet is {internet}.")
 
 
 

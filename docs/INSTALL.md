@@ -256,3 +256,46 @@ validates an absent `/opt/nodesmart`, onboarding, permissions, repeat execution,
 first monitor cycle, unit and sudoers syntax, failure reporting, and the full
 Python suite. This is an isolated integration fixture, not physical ASL3 or
 systemd PID 1 boot certification. See [validation evidence](FRESH_INSTALL_VALIDATION.md).
+
+## Asterisk observations and safe automatic recovery
+
+BlueNode separates three observations: the systemd Asterisk service/process,
+CLI query access through the restricted broker, and configured App_Rpt node
+telemetry. A running service with failed CLI access appears as **RUNNING / LIMITED**,
+with an explanation that BlueNode cannot query it. This needs investigation,
+but is not proof that Asterisk stopped. Missing or ambiguous systemd evidence
+appears as **UNKNOWN** and prohibits automatic restart. Invalid App_Rpt telemetry
+is reported separately; command exit success alone is insufficient.
+
+Automatic recovery remains disabled by default. When explicitly enabled, it
+requires fresh evidence (at most 30 seconds old) that the loaded Asterisk unit
+is inactive/dead or failed/failed with MainPID zero. BlueNode checks independently
+at worker entry, after the confirmation delay, and immediately before acting.
+A running PID, transitional state, failed probe or restored CLI response cancels
+recovery. Existing maintenance, cooldown, attempt limits and backoff still apply.
+After a restart, success requires independently running service evidence, valid
+CLI and App_Rpt telemetry, and fresh health/Intelligence observations.
+
+For query-access problems, verify the BlueNode service account's broker/sudo
+permissions and access to the Asterisk control socket. These read-only checks
+help separate process health from access problems (replace the example account):
+
+```sh
+systemctl show asterisk -p ActiveState -p SubState -p MainPID -p LoadState
+sudo -u bluenode sudo -n /usr/local/sbin/bluenode-asterisk -rx 'core show version'
+```
+
+Do not broaden sudo permissions or restart a working Asterisk service to work
+around query-access failures. Query access and configured-node observation have
+separate warning/resolution events; restoring access is not described as a
+process restart. Historical outage records from older versions are retained.
+A syntactically valid configuration pointing to another real local node cannot
+reveal the operator's intent: verify the configured node after installation.
+The final probe and systemctl action are separate OS operations; they are not
+an atomic service-manager transaction. Automatic recovery assumes the supported
+systemd-managed ASL3 service, rather than independently launched Asterisk processes.
+
+App_Rpt validation accepts the explicitly empty zero-link `RPT_ALINKS` emitted
+by upstream [rpt_update_links](https://github.com/AllStarLink/app_rpt/blob/master/apps/app_rpt/rpt_link.c).
+It still requires valid RX/TX fields and a present, structurally valid link field;
+an absent field or a successful command containing an error is not valid telemetry.

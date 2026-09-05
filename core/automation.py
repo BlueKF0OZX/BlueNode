@@ -15,6 +15,7 @@ from pathlib import Path
 
 from config import load_config
 from event_logger import emit
+import asterisk_observation
 
 try:
     import fcntl
@@ -49,6 +50,7 @@ DEFAULT_STATE = {
     "connectivity_status": "unavailable",
     "connectivity_failure_domain": "unavailable",
     "connectivity_action": "monitoring_only",
+    "recovery_safety_message": None,
 }
 _THREAD_LOCK = threading.RLock()
 
@@ -181,7 +183,13 @@ def observe_health(health, now=None):
     state["connectivity_status"] = connectivity.get("status", "unavailable")
     state["connectivity_failure_domain"] = connectivity.get("failure_domain", "unavailable")
     state["connectivity_action"] = "monitoring_only"
-    healthy = health.get("asterisk") == "online"
+    evidence = health.get("asterisk_evidence")
+    state["recovery_safety_message"] = None
+    if evidence and asterisk_observation.warning(evidence) and health.get("asterisk") != "offline":
+        state["recovery_safety_message"] = "Automatic restart prohibited: no confirmed stopped-service evidence."
+    healthy = (health.get("asterisk") == "online"
+               and health.get("health", {}).get("asterisk_query", "normal") == "normal"
+               and health.get("health", {}).get("app_rpt", "normal") == "normal")
     if healthy:
         if not state.get("healthy_since"):
             state["healthy_since"] = state["last_automation_check"]
@@ -231,9 +239,14 @@ def set_maintenance(enabled, now=None):
 
 @locked
 def recovery_allowed(health, now=None):
-    now = int(time.time() if now is None else now)
+    observation_now = time.time() if now is None else now
+    now = int(observation_now)
     state = load_state()
     _prune(state, now)
+    evidence = health.get("asterisk_evidence", {})
+    if (not asterisk_observation.confirmed_stopped(evidence.get("service"), observation_now)
+            or evidence.get("query", {}).get("status") == "available"):
+        return False
     if health.get("asterisk") != "offline" or state["maintenance_mode"]:
         return False
     if state["backoff_until"] > now or state["cooldown_until"] > now:
@@ -272,6 +285,19 @@ def begin_recovery(now=None):
     save_state(state)
     emit("AUTOMATION.RECOVERY.STARTED", state["last_action"])
     return attempt
+
+
+@locked
+def cancel_recovery(message):
+    """Release a reserved attempt without claiming a restart or failed verification."""
+    state = load_state()
+    if state["recent_recovery_attempts"]:
+        state["recent_recovery_attempts"].pop()
+    state["mode"] = "maintenance" if state["maintenance_mode"] else "active"
+    state["last_action"] = "Recovery cancelled"
+    state["last_result"] = message
+    save_state(state)
+    emit("AUTOMATION.RECOVERY.CANCELLED", message)
 
 
 @locked

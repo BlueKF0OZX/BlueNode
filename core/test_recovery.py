@@ -1,6 +1,7 @@
 import json
 import subprocess
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,10 @@ class RecoveryTests(unittest.TestCase):
         enabled = patch.object(recovery, "ASTERISK_RECOVERY_ENABLED", True)
         enabled.start()
         self.addCleanup(enabled.stop)
+        service = patch.object(recovery.asterisk_observation, "service_evidence", side_effect=lambda: {
+            "status": "offline", "observed_at": time.time(), "main_pid": 0,
+            "active_state": "inactive", "sub_state": "dead", "load_state": "loaded"})
+        service.start(); self.addCleanup(service.stop)
 
     def test_post_recovery_requires_fresh_stable_state(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -23,6 +28,8 @@ class RecoveryTests(unittest.TestCase):
             allstar = root / "allstar.json"
             system.write_text(json.dumps({
                 "asterisk": "online",
+                "asterisk_evidence": {"service": {"status": "online", "observed_at": time.time()},
+                                      "query": {"status": "available"}, "node": {"status": "available"}},
                 "health": {"asterisk": "normal"},
                 "last_health_check": datetime.now(timezone.utc).isoformat(),
             }))
@@ -32,6 +39,8 @@ class RecoveryTests(unittest.TestCase):
                  patch.object(recovery, "INTELLIGENCE_FILE", intelligence), \
                  patch.object(recovery, "ALLSTAR_STATE_FILE", allstar), \
                  patch.object(recovery, "VERIFY_STABLE_CHECKS", 1), \
+                 patch.object(recovery.asterisk_observation, "service_evidence", side_effect=lambda: {
+                     "status": "online", "observed_at": time.time(), "main_pid": 123}), \
                  patch.object(recovery, "asterisk_online", return_value=True), \
                  patch.object(recovery, "allstar_reachable", return_value=True):
                 passed, _ = recovery.verify_recovery(0, timeout=1)

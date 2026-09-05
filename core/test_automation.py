@@ -7,6 +7,12 @@ from unittest.mock import patch
 import automation
 
 
+def stopped(now):
+    return {"asterisk": "offline", "asterisk_evidence": {"service": {
+        "status": "offline", "observed_at": now, "load_state": "loaded",
+        "active_state": "inactive", "sub_state": "dead", "main_pid": 0}}}
+
+
 class AutomationTests(unittest.TestCase):
     def setUp(self):
         enabled = patch.object(automation, "RECOVERY_ENABLED", True)
@@ -25,7 +31,7 @@ class AutomationTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_isolated_recovery_verifies_and_resumes(self):
-        self.assertTrue(automation.recovery_allowed({"asterisk": "offline"}, 1000))
+        self.assertTrue(automation.recovery_allowed(stopped(1000), 1000))
         self.assertEqual(automation.begin_recovery(1000), 1)
         recovered = automation.finish_recovery(True, "verified", 1010)
         self.assertEqual(recovered["mode"], "recovered")
@@ -44,7 +50,7 @@ class AutomationTests(unittest.TestCase):
         state = automation.load_state()
         self.assertEqual(state["mode"], "attention")
         self.assertGreater(state["backoff_until"], 1020)
-        self.assertFalse(automation.recovery_allowed({"asterisk": "offline"}, 1030))
+        self.assertFalse(automation.recovery_allowed(stopped(1030), 1030))
 
     def test_failed_verification_escalates(self):
         automation.begin_recovery(1000)
@@ -62,10 +68,10 @@ class AutomationTests(unittest.TestCase):
         self.assertTrue(maintenance["maintenance_mode"])
         observed = automation.observe_health({"asterisk": "offline"}, 1001)
         self.assertIsNotNone(observed["last_automation_check"])
-        self.assertFalse(automation.recovery_allowed({"asterisk": "offline"}, 1001))
+        self.assertFalse(automation.recovery_allowed(stopped(1001), 1001))
         resumed = automation.set_maintenance(False, 1002)
         self.assertTrue(resumed["automation_armed"])
-        self.assertTrue(automation.recovery_allowed({"asterisk": "offline"}, 1002))
+        self.assertTrue(automation.recovery_allowed(stopped(1002), 1002))
 
     def test_persistence_and_malformed_state(self):
         automation.set_maintenance(True, 1000)

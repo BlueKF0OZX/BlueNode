@@ -45,6 +45,7 @@ function fixture(detailed) {
       const errors = [];
       page.on('pageerror', error=>errors.push(error.message));
       let detailed = true;
+      let asteriskCase = null;
       let emergency = false;
       let missing = false;
       let attentionUnavailable = false;
@@ -60,6 +61,11 @@ function fixture(detailed) {
         let body;
         if (attentionUnavailable && ['/state/intelligence.json','/api/emergency-mode'].includes(url.pathname)) return route.fulfill({status:503,body:'Unavailable'});
         if (url.pathname === '/state/system.json' && !missing) body = fixture(detailed);
+        if (url.pathname === '/state/system.json' && body && asteriskCase) {
+          body.asterisk = asteriskCase.service;
+          body.asterisk_evidence = {service:{status:asteriskCase.service,observed_at:Date.now()/1000-(asteriskCase.stale?60:0)},
+            query:{status:asteriskCase.query}, node:{status:asteriskCase.node},max_age_seconds:30};
+        }
         if (url.pathname === '/state/system.json' && body && observedZero) {
           body.connected_nodes=[];body.connected_since={};
           body.connection_stats={connections_today:0,active_connections:0,connected_seconds_today:0,
@@ -183,6 +189,21 @@ function fixture(detailed) {
       connectionUnavailable = true;
       await page.evaluate(()=>loadStatus());
       assert.equal(await page.locator('#active-connections').innerText(),'Observation unavailable');
+      for (const item of [
+        {service:'online',query:'available',node:'available',label:'ONLINE',detail:/configured node observable/},
+        {service:'online',query:'unavailable',node:'unknown',label:'RUNNING / LIMITED',detail:/cannot query/},
+        {service:'online',query:'available',node:'unavailable',label:'RUNNING / LIMITED',detail:/App_Rpt node not observable/},
+        {service:'unknown',query:'unavailable',node:'unknown',label:'UNKNOWN',detail:/automatic restart prohibited/},
+        {service:'offline',query:'unavailable',node:'unknown',label:'OFFLINE',detail:/stopped or failed/},
+        {service:'offline',query:'unavailable',node:'unknown',stale:true,label:'UNKNOWN',detail:/outdated/}
+      ]) {
+        asteriskCase = item;
+        await page.evaluate(()=>loadStatus());
+        assert.equal(await page.locator('#asterisk').innerText(),item.label);
+        assert.match(await page.locator('#asterisk-detail').innerText(),item.detail);
+        assert.equal((await geometry()).overflow,false,`Asterisk evidence overflow at ${width}`);
+      }
+      asteriskCase = null;
       missing = true;
       await page.evaluate(()=>loadStatus());
       assert.equal(await page.locator('#connections-today').innerText(), 'Observation unavailable');

@@ -96,6 +96,7 @@ case "$*" in
   'is-active --quiet nodesmart'|'is-active --quiet nodesmart-web') [[ ! -f /fail-start ]]; exit $?;;
   'status nodesmart --no-pager'|'stop nodesmart.service nodesmart-web.service'|'restart nodesmart.service nodesmart-web.service') exit 0;;
   'show nodesmart.service -p User --value') echo operator;;
+  'show asterisk -p ActiveState -p SubState -p MainPID -p LoadState') printf 'ActiveState=active\\nSubState=running\\nMainPID=42\\nLoadState=loaded\\n';;
   'is-active --quiet nodesmart.service'|'is-active --quiet nodesmart-web.service') exit 0;;
   *) echo "Forbidden fixture service operation: $*" >&2; exit 99;;
 esac
@@ -108,7 +109,7 @@ exec "$@"
         cls.script("usr/sbin/asterisk", '''#!/bin/bash
 echo "$*" >> /tmp/asterisk.calls
 case "$*" in
-  '-rx core show version') echo 'Asterisk fixture';;
+  '-rx core show version') echo 'Asterisk 22.0 fixture';;
   '-rx rpt show variables '*) printf 'RPT_RXKEYED=0\\nRPT_TXKEYED=0\\nRPT_ALINKS=0\\n';;
   '-rx rpt lstats '*) echo 'No links';;
   *) exit 90;;
@@ -193,6 +194,8 @@ import monitor, allstar_status, remote_admin, emergency_mode, recovery
 allstar_status.check_changes()
 state = monitor.run_health_cycle(Mock())
 assert state['asterisk'] == 'online', state
+assert state['asterisk_evidence']['query']['status'] == 'available'
+assert state['asterisk_evidence']['node']['status'] == 'available'
 assert state['connectivity']['diagnosis'] == 'unavailable', state['connectivity']
 assert state['skywarn'] == 'unknown'
 assert state['weather_alerts']['status'] == 'unavailable'
@@ -323,7 +326,8 @@ print('SIMULATED PASS installed optional weather: absent/current/stale/partial/d
         for path, content in self.sentinels.items():
             self.assertEqual(path.read_bytes(), content)
         calls = (self.root / "systemctl.calls").read_text()
-        self.assertNotIn("asterisk", calls)
+        for operation in ("restart", "stop", "reload", "start"):
+            self.assertNotIn(operation + " asterisk", calls)
         print("SIMULATED PASS clean install: config, repeat, missing state, optional weather, units, sudoers, permissions, safety; Asterisk/sudo/systemctl substituted")
 
     def test_dashboard_deployment_preserves_backend_and_rolls_back(self):

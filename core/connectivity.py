@@ -338,7 +338,7 @@ def _message(domain, checks):
         "external_internet": "The LAN and gateway are reachable, but the external Internet probe failed",
         "allstar_services": "General Internet access works, but the AllStar service endpoint is unreachable",
         "allstar_registration": "AllStar services and Asterisk are available, but App_Rpt is not registered",
-        "asterisk": "Network connectivity works, but the local Asterisk service is unavailable",
+        "asterisk": "Network connectivity works, but BlueNode cannot query the local Asterisk service",
         "iax": "Asterisk is available, but its IAX link layer is not running",
         "remote_link": "Core services are healthy, but App_Rpt reports a remote link is not established",
         "unavailable": "Connectivity diagnostics are incomplete or unavailable",
