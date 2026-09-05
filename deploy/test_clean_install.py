@@ -58,7 +58,7 @@ hosts: files
         binaries = ("bash", "python3", "install", "id", "mkdir", "cp", "rm", "mv", "rmdir",
                     "mktemp", "sed", "chown", "chmod", "find", "dirname", "visudo",
                     "systemd-analyze", "git", "ip", "ping", "free", "df", "getent", "sleep", "ln", "tee", "basename", "cmp",
-                    "head", "cat", "stat", "tar", "date", "grep", "awk", "tr", "cut", "wc", "flock", "sync", "xargs", "sha256sum", "readlink", "realpath", "sort")
+                    "head", "cat", "stat", "tar", "gzip", "date", "grep", "awk", "tr", "cut", "wc", "flock", "sync", "xargs", "sha256sum", "readlink", "realpath", "sort")
         for name in binaries:
             binary = shutil.which(name)
             if not binary:
@@ -94,7 +94,9 @@ case "$*" in
   'show asterisk -p MainPID -p ActiveEnterTimestampMonotonic') printf 'MainPID=42\\nActiveEnterTimestampMonotonic=1000\\n'; exit 0;;
   'is-active --quiet asterisk') exit 0;;
   'is-active --quiet nodesmart'|'is-active --quiet nodesmart-web') [[ ! -f /fail-start ]]; exit $?;;
-  'status nodesmart --no-pager') exit 0;;
+  'status nodesmart --no-pager'|'stop nodesmart.service nodesmart-web.service'|'restart nodesmart.service nodesmart-web.service') exit 0;;
+  'show nodesmart.service -p User --value') echo operator;;
+  'is-active --quiet nodesmart.service'|'is-active --quiet nodesmart-web.service') exit 0;;
   *) echo "Forbidden fixture service operation: $*" >&2; exit 99;;
 esac
 ''')
@@ -246,6 +248,30 @@ with tempfile.TemporaryDirectory() as folder:
 print('SIMULATED PASS installed optional weather: absent/current/stale/partial/disabled')
 """
         self.inside("python3", "-c", weather_smoke, user="1234:1234")
+        # Legacy credential migration preserves bytes and creates durable intent.
+        self.assertFalse((self.root / "etc/bluenode/remote-admin.intent").exists())
+        security = self.root / "etc/bluenode"
+        security.mkdir(mode=0o750, exist_ok=True)
+        os.chown(security, 0, 1234)
+        remote_config = security / "remote-admin.json"
+        credentials = json.dumps(dict(enabled=True, username="operator", password_salt="ab" * 24,
+                                      password_hash="cd" * 32, session_secret="ef" * 32))
+        remote_config.write_text(credentials); remote_config.chmod(0o640)
+        os.chown(remote_config, 0, 1234)
+        initializer = "/opt/nodesmart/install/remote-admin-init.py"
+        for _ in range(2):
+            self.inside("python3", initializer, "migrate-intent", "--service-user", "operator")
+            self.assertEqual(remote_config.read_text(), credentials)
+        policy = "import sys; sys.path.insert(0,'/opt/nodesmart/core'); import remote_admin; print(remote_admin._safe_config()['state'])"
+        self.assertEqual(self.inside("python3", "-c", policy, user="1234:1234").stdout.strip(), "ENABLED")
+        remote_config.unlink()
+        self.assertEqual(self.inside("python3", "-c", policy, user="1234:1234").stdout.strip(), "CONFIG_ERROR")
+        self.inside("python3", initializer, "disable", "--service-user", "operator")
+        self.assertEqual(self.inside("python3", "-c", policy, user="1234:1234").stdout.strip(), "DISABLED")
+        marker = security / "remote-admin.intent"
+        self.assertEqual(marker.stat().st_uid, 0)
+        self.assertEqual(marker.stat().st_mode & 0o777, 0o640)
+        print("SIMULATED PASS Remote Admin legacy migration, repeat, lost config across processes, explicit disable")
         self.inside("systemd-analyze", "verify", "/etc/systemd/system/nodesmart.service",
                     "/etc/systemd/system/nodesmart-web.service")
         for name in ("nodesmart", "nodesmart-web"):
@@ -358,6 +384,41 @@ print('SIMULATED PASS installed optional weather: absent/current/stale/partial/d
         finally:
             server.terminate()
             server.wait(timeout=5)
+
+    def test_full_deployment_intent_rollback(self):
+        """Execute the supported deployment's rollback in the isolated chroot."""
+        app = self.root / "opt/nodesmart"
+        candidate = self.root / "candidate"
+        source = (SOURCE / "deploy/Deploy-BlueNode.ps1").read_text()
+        script = source.split("    $remoteScript = @'\n", 1)[1].split("\n'@", 1)[0]
+        (self.root / "full-deploy.sh").write_text(script)
+        (candidate / "core/deliberately_invalid_fixture.py").write_text("invalid fixture syntax !\n")
+        self.inside("git", "-C", "/candidate", "add", "core/deliberately_invalid_fixture.py")
+        self.inside("git", "-C", "/candidate", "-c", "user.name=Fixture",
+                    "-c", "user.email=fixture@example.invalid", "commit", "-m", "Fixture failure")
+        self.inside("git", "-C", "/candidate", "push", "origin", "main")
+        target = self.inside("git", "-C", "/candidate", "rev-parse", "HEAD").stdout.strip()
+        baseline = self.inside("git", "-C", "/opt/nodesmart", "rev-parse", "HEAD").stdout.strip()
+        marker = self.root / "etc/bluenode/remote-admin.intent"
+        credentials = self.root / "etc/bluenode/remote-admin.json"
+        original_credentials = credentials.read_bytes()
+        original_marker = marker.read_bytes()
+        radio_calls = (self.root / "tmp/asterisk.calls").read_bytes()
+        for present in (False, True):
+            with self.subTest(previous_intent=present):
+                if present:
+                    marker.write_bytes(original_marker); marker.chmod(0o640)
+                else:
+                    marker.unlink(missing_ok=True)
+                result = self.inside("bash", "/full-deploy.sh", target, "/remote.git", check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ROLLBACK PASS", result.stdout, result.stdout + result.stderr)
+                self.assertEqual(marker.exists(), present)
+                if present: self.assertEqual(marker.read_bytes(), original_marker)
+                self.assertEqual(credentials.read_bytes(), original_credentials)
+                self.assertEqual(self.inside("git", "-C", "/opt/nodesmart", "rev-parse", "HEAD").stdout.strip(), baseline)
+                self.assertEqual((self.root / "tmp/asterisk.calls").read_bytes(), radio_calls)
+        print("SIMULATED PASS supported full-deployment rollback: application, absent/existing intent, credentials, Asterisk untouched")
 
 
 

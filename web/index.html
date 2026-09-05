@@ -1386,8 +1386,13 @@
       validateControl(action, payload);
       if (pendingAdminActions.has(action)) return fetch('/api/admin/action', {method:'POST',
         headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify({action:action.slice(6), ...payload})});
-      return fetch('/api/control/' + action, {method:'POST',
+      const response = await fetch('/api/control/' + action, {method:'POST',
         headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)});
+      if (response.status === 503) {
+        const failure = await response.clone().json().catch(() => ({}));
+        if (failure.state === 'CONFIG_ERROR') await loadAdminSession();
+      }
+      return response;
     }
     async function requestOrdinaryControl(action, payload = {}) {
       const validated = validateControl(action, payload);
@@ -1412,9 +1417,11 @@
         const response = await fetch('/api/admin/session', {cache:'no-store'});
         if (!response.ok) throw new Error('Authentication state unavailable');
         const state = await response.json();
+        const configError = state.state === 'CONFIG_ERROR';
+        if (configError) cancelPendingControl('Remote Admin configuration error; controls locked until configuration is corrected.');
         document.getElementById('remote-admin-panel').style.display = state.enabled ? 'block' : 'none';
         adminCsrfToken = state.authenticated ? state.csrf_token : null;
-        document.getElementById('control-auth-status').textContent = !state.enabled ? 'Controls available / Remote Admin disabled' :
+        document.getElementById('control-auth-status').textContent = configError ? 'Remote Admin configuration error; controls locked until configuration is corrected' : !state.enabled ? 'Controls available / Remote Admin disabled' :
           state.authenticated ? 'Controls unlocked' : 'Controls locked / Sign in required';
         document.getElementById('control-sign-in').style.display = state.enabled && !state.authenticated ? 'inline-block' : 'none';
         document.getElementById('control-sign-out').style.display = state.authenticated ? 'inline-block' : 'none';

@@ -99,3 +99,40 @@ result before deliberately trying again. Viewing and monitoring require no login
 Browser coverage: `node core/test_control_auth.js` and
 `node core/test_control_routing.js` (Playwright; optional `BLUENODE_BROWSER_PATH`).
 All test control requests are intercepted and never reach a production node.
+
+## Configuration errors and locked controls
+
+Remote Admin reports one of three policy states:
+
+- `DISABLED`: a never-configured installation, or an explicit root-managed
+  `enabled: false` configuration. Existing local control behavior is retained;
+  the loopback listener and secured gateway remain important boundaries.
+- `ENABLED`: valid credentials and policy. Ordinary controls require a session
+  and CSRF token; administrative endpoints always require authentication.
+- `CONFIG_ERROR`: invalid, unreadable, unsafe or lost configuration. All ordinary
+  mutations are rejected before any command or state change. Monitoring remains
+  available. The dashboard reports a configuration error and locked controls.
+
+The supported installer/deployer migrates existing configuration by creating a
+root-owned `/etc/bluenode/remote-admin.intent` marker. Credential initialization
+also creates this marker before prompting. It contains no credentials and is
+retained when Remote Admin is explicitly disabled. If configuration disappears
+later, including across a service restart, controls remain locked. Back up this
+marker with `remote-admin.json`; deleting both loses the durable configuration
+history and is not a supported way to disable Remote Admin.
+
+Do not upgrade by copying backend files alone: an enabled legacy configuration
+without the intent marker stays locked until the supported migration runs.
+Use `sudo NODESMART_USER=bluenode bash /opt/nodesmart/install/remote-admin.sh status`
+to inspect the policy state. Replace the example service account with the actual
+BlueNode account. Correct configuration from a trusted administrative shell or
+restore a verified backup; never delete configuration to work around an error.
+Use the lifecycle helper's `disable` command for intentional local-only mode.
+
+Security files must be regular, root-owned, not world-accessible or group-writable,
+inside a root-owned directory that is not group/world-writable. The initializer
+uses mode `0640` and the service group. Secure cookies are required; invalid
+cookie settings, malformed credential encoding and invalid numeric types are
+configuration errors. Unknown non-security fields are ignored. Error responses
+never include credential data. A web-service restart invalidates existing
+sessions, so sign in again through the configured HTTPS dashboard after updating.

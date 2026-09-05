@@ -93,11 +93,12 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
     def do_GET(self):
+        self.__dict__.pop("_admin_policy", None)
 
         path = self.path.split("?", 1)[0]
 
         if path == "/api/admin/session":
-            self.send_json(200, ADMIN.public_state(self.admin_cookie()))
+            self.send_json(200, ADMIN.public_state(self.admin_cookie(), self.admin_policy()))
             return
 
         if path == "/api/emergency-mode":
@@ -242,13 +243,18 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
         except Exception:
             return None
 
+    def admin_policy(self):
+        if not hasattr(self, "_admin_policy"):
+            self._admin_policy = _safe_config()
+        return self._admin_policy
+
     def require_admin(self, csrf=False):
         token = self.admin_cookie()
-        if ADMIN.authenticate(token) is None:
+        if ADMIN.authenticate(token, self.admin_policy()) is None:
             ADMIN.audit("authorization", "rejected")
             self.send_json(401, {"ok": False, "error": "Remote Admin authentication required"})
             return False
-        if csrf and not ADMIN.csrf_valid(token, self.headers.get("X-CSRF-Token")):
+        if csrf and not ADMIN.csrf_valid(token, self.headers.get("X-CSRF-Token"), self.admin_policy()):
             ADMIN.audit("csrf", "rejected")
             self.send_json(403, {"ok": False, "error": "Invalid CSRF token"})
             return False
@@ -312,7 +318,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
             return None
 
     def send_admin_cookie(self, token, clear=False):
-        config = _safe_config()
+        config = self.admin_policy()
         parts = [f"bluenode_admin={'' if clear else token}", "Path=/", "HttpOnly",
                  "SameSite=Strict", f"Max-Age={0 if clear else config['session_seconds']}"]
         if config.get("secure_cookie", True):
@@ -322,6 +328,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
     def do_POST(self):
+        self.__dict__.pop("_admin_policy", None)
 
         path = self.path.split("?", 1)[0]
         if path == "/api/admin/login":
@@ -331,7 +338,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
                 return
             status, result, token = ADMIN.login(payload.get("username", ""),
                                                 payload.get("password", ""),
-                                                self.client_address[0])
+                                                self.client_address[0], self.admin_policy())
             if token:
                 # Replace this browser's previous session; never reuse a supplied token.
                 ADMIN.logout(self.admin_cookie())
@@ -411,7 +418,14 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
 
-        if _safe_config()["enabled"] and not self.require_admin(csrf=True):
+        policy = self.admin_policy()
+        if policy["state"] == "CONFIG_ERROR":
+            ADMIN.authenticate(None, policy)
+            ADMIN.audit("authorization", "config_error")
+            self.send_json(503, {"ok": False, "state": "CONFIG_ERROR",
+                                 "error": "Remote Admin configuration error; controls locked"})
+            return
+        if policy["state"] == "ENABLED" and not self.require_admin(csrf=True):
             return
 
         action = path[len(prefix):].strip("/")
@@ -433,7 +447,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "error": "Unexpected parameters"})
                 return
             enabled = action == "emergency-enable"
-            source = "remote_admin" if _safe_config()["enabled"] else "local_dashboard"
+            source = "remote_admin" if policy["state"] == "ENABLED" else "local_dashboard"
             state = emergency_mode.set_emergency(enabled, source=source)
             ADMIN.audit("emergency-mode", "activated" if enabled else "deactivated")
             self.send_json(200, {

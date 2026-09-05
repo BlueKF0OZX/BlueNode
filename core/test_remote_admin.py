@@ -47,8 +47,7 @@ class RemoteAdminTests(unittest.TestCase):
         config = json.loads(self.config.read_text())
         config['secure_cookie'] = False
         self.config.write_text(json.dumps(config))
-        self.assertTrue(remote_admin._safe_config()['enabled'])
-        self.assertEqual(remote_admin._safe_config()['session_seconds'], 86400)
+        self.assertEqual(remote_admin._safe_config()['state'], 'CONFIG_ERROR')
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -63,7 +62,7 @@ class RemoteAdminTests(unittest.TestCase):
             if command[:2] == ["sudo", "-n"] and "core show uptime seconds" in command:
                 return Result(0, "System uptime: 10\n")
             return Result()
-        self.patches = [patch.object(remote_admin, "CONFIG_FILE", self.config),
+        self.patches = [patch.object(remote_admin, "CONFIG_OWNER_UID", getattr(os, "geteuid", lambda: 0)()), patch.object(remote_admin, "CONFIG_FILE", self.config),
                         patch.object(remote_admin, "AUDIT_FILE", self.audit),
                         patch.object(remote_admin, "APP_ROOT", self.root)]
         for item in self.patches: item.start()
@@ -77,16 +76,18 @@ class RemoteAdminTests(unittest.TestCase):
         salt, digest = remote_admin.hash_password("correct horse battery staple", iterations=200000)
         self.config.write_text(json.dumps({"enabled": True, "username": "operator",
             "password_salt": salt, "password_hash": digest, "password_iterations": 200000,
-            "session_secret": "fixture-only-not-a-real-secret", "session_seconds": session_seconds,
+            "session_secret": "ab" * 32, "session_seconds": session_seconds,
             "secure_cookie": True, "max_login_attempts": attempts,
             "login_window_seconds": 60}), encoding="utf-8")
         os.chmod(self.config, 0o640)
+        self.config.with_suffix(".intent").write_text(remote_admin.INTENT_CONTENT)
+        self.config.with_suffix(".intent").chmod(0o640)
 
-    def test_disabled_and_malformed_config_fail_closed(self):
-        self.assertFalse(self.admin.public_state()["enabled"])
+    def test_disabled_and_rejected_config_are_distinct(self):
+        self.assertEqual(self.admin.public_state()["state"], "DISABLED")
         self.config.write_text("not json", encoding="utf-8"); os.chmod(self.config, 0o640)
-        self.assertFalse(self.admin.public_state()["enabled"])
-        self.assertEqual(self.admin.login("operator", "anything", "peer")[0], 404)
+        self.assertEqual(self.admin.public_state()["state"], "CONFIG_ERROR")
+        self.assertEqual(self.admin.login("operator", "anything", "peer")[0], 503)
         self.enable()
         data = json.loads(self.config.read_text(encoding="utf-8"))
         data["permissions"] = ["arbitrary_shell"]

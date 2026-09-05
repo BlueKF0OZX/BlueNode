@@ -35,41 +35,88 @@ def _utc_now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+CONFIG_OWNER_UID = 0
+INTENT_CONTENT = "configured\n"
+
+
+def _read_security_file(path):
+    """Bounded, non-following read; reject writable/untrusted security files."""
+    import stat
+    if path.is_symlink():
+        raise ValueError("Unsafe security file")
+    if os.name == "posix":
+        parent = path.parent.stat()
+        if path.parent.is_symlink() or parent.st_uid != CONFIG_OWNER_UID or parent.st_mode & 0o022:
+            raise ValueError("Unsafe security directory")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("Not a regular security file")
+        if os.name == "posix" and (info.st_uid != CONFIG_OWNER_UID or info.st_mode & 0o027):
+            raise ValueError("Unsafe security file permissions")
+        data = handle.read(MAX_BODY_BYTES + 1)
+        if len(data) > MAX_BODY_BYTES:
+            raise ValueError("Security file too large")
+        return data.decode("utf-8")
+
+
 def _safe_config():
-    """Return validated public settings, never secrets; disabled on any error."""
-    base = {"enabled": False, "session_seconds": 2592000, "secure_cookie": True,
-            "max_login_attempts": 5, "login_window_seconds": 300}
+    """Explicit policy; invalid configuration must never select local mode."""
+    base = {"enabled": False, "state": "CONFIG_ERROR", "session_seconds": 2592000,
+            "secure_cookie": True, "max_login_attempts": 5, "login_window_seconds": 300}
     try:
-        if CONFIG_FILE.is_symlink() or (os.name == "posix" and CONFIG_FILE.stat().st_mode & 0o007):
+        intent = CONFIG_FILE.with_suffix(".intent")
+        try:
+            marked = _read_security_file(intent).splitlines() == ["configured"]
+            if not marked:
+                return base
+        except FileNotFoundError:
+            marked = False
+        try:
+            raw = json.loads(_read_security_file(CONFIG_FILE))
+        except FileNotFoundError:
+            if not marked:
+                base["state"] = "DISABLED"
             return base
-        raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict) or raw.get("enabled") is not True:
+        if not isinstance(raw, dict) or type(raw.get("enabled")) is not bool:
             return base
+        if raw["enabled"] is False:
+            # An explicit root-managed disable remains supported after enablement.
+            base["state"] = "DISABLED"
+            return base
+        if not marked:
+            return base  # Supported installer migrates legacy enabled intent first.
         required = ("username", "password_salt", "password_hash", "session_secret")
         if any(not isinstance(raw.get(key), str) or not raw[key] for key in required):
             return base
-        iterations = int(raw.get("password_iterations", 600000))
-        session_seconds = int(raw.get("session_seconds", 2592000))
-        attempts = int(raw.get("max_login_attempts", 5))
-        window = int(raw.get("login_window_seconds", 300))
+        username = raw["username"]
+        if len(username) > 64 or not all(c.isalnum() or c in "._@-" for c in username):
+            return base
+        for key, size in (("password_salt", 24), ("password_hash", 32), ("session_secret", 32)):
+            value = raw[key]
+            if len(value) != size * 2 or any(c not in "0123456789abcdef" for c in value):
+                return base
+        numbers = {"password_iterations": (600000, 200000, 5000000),
+                   "session_seconds": (2592000, 300, 2592000),
+                   "max_login_attempts": (5, 1, 20), "login_window_seconds": (300, 30, 3600)}
+        for key, (default, low, high) in numbers.items():
+            value = raw.get(key, default)
+            if type(value) is not int or not low <= value <= high:
+                return base
+        if raw.get("secure_cookie", True) is not True:
+            return base
         permissions = raw.get("permissions", [])
-        if not 200000 <= iterations <= 5000000:
+        if not isinstance(permissions, list) or any(
+                not isinstance(item, str) or item not in ALLOWED_PERMISSIONS for item in permissions):
             return base
-        if not 300 <= session_seconds <= 2592000 or not 1 <= attempts <= 20:
-            return base
-        if session_seconds > 86400 and raw.get("secure_cookie", True) is not True:
-            session_seconds = 86400
-        if not 30 <= window <= 3600:
-            return base
-        if (not isinstance(permissions, list) or
-                any(item not in ALLOWED_PERMISSIONS for item in permissions)):
-            return base
-        base.update(raw)
-        base.update({"password_iterations": iterations, "session_seconds": session_seconds,
-                     "max_login_attempts": attempts, "login_window_seconds": window,
-                     "permissions": tuple(permissions)})
-        return base
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        # Harmless unknown fields are ignored, never allowed to replace policy state.
+        result = dict(base, **{key: raw[key] for key in required})
+        result.update({key: raw.get(key, bounds[0]) for key, bounds in numbers.items()})
+        result.update(enabled=True, state="ENABLED", permissions=tuple(permissions))
+        return result
+    except (OSError, ValueError, TypeError, OverflowError, RecursionError):
         return base
 
 
@@ -169,10 +216,10 @@ class RemoteAdmin:
         # Any credential, permission, duration or cookie-policy change revokes sessions.
         return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).digest()
 
-    def public_state(self, cookie_token=None):
-        config = _safe_config()
+    def public_state(self, cookie_token=None, config=None):
+        config = config if config is not None else _safe_config()
         session = self.authenticate(cookie_token, config)
-        return {"enabled": config["enabled"], "authenticated": session is not None,
+        return {"enabled": config["enabled"], "state": config["state"], "authenticated": session is not None,
                 "csrf_token": session["csrf"] if session else None,
                 "expires_at": session["expires_at"] if session else None}
 
@@ -183,7 +230,7 @@ class RemoteAdmin:
                 del self.sessions[token]
 
     def authenticate(self, token, config=None):
-        config = config or _safe_config()
+        config = config if config is not None else _safe_config()
         if not config["enabled"]:
             with self.lock:
                 self.sessions.clear()
@@ -205,8 +252,12 @@ class RemoteAdmin:
         session = self.authenticate(token)
         return bool(session and permission in session.get("permissions", ()))
 
-    def login(self, username, password, client_key):
-        config = _safe_config()
+    def login(self, username, password, client_key, config=None):
+        config = config if config is not None else _safe_config()
+        if config["state"] == "CONFIG_ERROR":
+            self.authenticate(None, config)
+            self.audit("login", "config_error")
+            return 503, {"ok": False, "error": "Remote Admin configuration error; controls locked"}, None
         if not config["enabled"]:
             self.audit("login", "disabled")
             return 404, {"ok": False, "error": "Remote Admin is disabled"}, None
@@ -219,7 +270,7 @@ class RemoteAdmin:
             if len(attempts) >= config["max_login_attempts"]:
                 self.audit("login", "rate_limited")
                 return 429, {"ok": False, "error": "Too many authentication attempts"}, None
-        valid_user = hmac.compare_digest(str(username), config["username"])
+        valid_user = hmac.compare_digest(str(username).encode("utf-8"), config["username"].encode("utf-8"))
         valid_password = verify_password(str(password), config)
         if not (valid_user and valid_password):
             with self.lock:
@@ -244,8 +295,8 @@ class RemoteAdmin:
             existed = bool(token and self.sessions.pop(token, None))
         self.audit("logout", "success" if existed else "no_session")
 
-    def csrf_valid(self, token, csrf):
-        session = self.authenticate(token)
+    def csrf_valid(self, token, csrf, config=None):
+        session = self.authenticate(token, config)
         return bool(session and csrf and hmac.compare_digest(session["csrf"], str(csrf)))
 
     def audit(self, action, outcome):

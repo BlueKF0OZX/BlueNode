@@ -61,6 +61,8 @@ class WebAdminTests(unittest.TestCase):
         cls.soft_config = root / "soft-radio.json"
         cls.config_patch = patch.object(remote_admin, "CONFIG_FILE", cls.config)
         cls.audit_patch = patch.object(remote_admin, "AUDIT_FILE", cls.audit)
+        cls.owner_patch = patch.object(remote_admin, "CONFIG_OWNER_UID", getattr(os, "geteuid", lambda: 0)())
+        cls.owner_patch.start()
         cls.config_patch.start(); cls.audit_patch.start()
         cls.soft_patch = patch.object(soft_radio, "CONFIG_FILE", cls.soft_config)
         cls.soft_patch.start()
@@ -78,6 +80,7 @@ class WebAdminTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown(); cls.server.server_close(); cls.thread.join()
+        cls.owner_patch.stop()
         cls.admin_patch.stop(); cls.emergency_emit_patch.stop(); cls.emergency_patch.stop(); cls.soft_patch.stop(); cls.audit_patch.stop(); cls.config_patch.stop(); cls.temp.cleanup()
 
     def request(self, method, path, payload=None, headers=None):
@@ -93,16 +96,19 @@ class WebAdminTests(unittest.TestCase):
         salt, digest = remote_admin.hash_password("correct horse battery staple", iterations=200000)
         self.config.write_text(json.dumps({"enabled":True, "username":"operator",
             "password_salt":salt, "password_hash":digest, "password_iterations":200000,
-            "session_secret":"fixture-not-secret", "session_seconds":300,
+            "session_secret":"ab" * 32, "session_seconds":300,
             "secure_cookie":True, "max_login_attempts":5, "login_window_seconds":60}))
         data = json.loads(self.config.read_text())
         data["permissions"] = list(permissions or [])
         self.config.write_text(json.dumps(data))
         os.chmod(self.config, 0o640)
+        self.config.with_suffix(".intent").write_text(remote_admin.INTENT_CONTENT)
+        self.config.with_suffix(".intent").chmod(0o640)
 
     def setUp(self):
         self.admin.sessions.clear(); self.admin.login_attempts.clear()
         if self.config.exists(): self.config.unlink()
+        self.config.with_suffix(".intent").unlink(missing_ok=True)
         if self.soft_config.exists(): self.soft_config.unlink()
         if self.emergency_file.exists(): self.emergency_file.unlink()
         soft_radio.SOFT_RADIO.tickets.clear()

@@ -177,6 +177,9 @@ echo "Validating Python files..."
 
 echo "Firewall and network settings are unchanged. See docs/INSTALL.md for access guidance."
 
+# Preserve legacy configured intent before the new authorization policy starts.
+/usr/bin/python3 "$INSTALL_ROOT/install/remote-admin-init.py" migrate-intent --service-user "$SERVICE_USER"
+
 echo "Enabling and starting BlueNode..."
 /usr/bin/systemctl enable nodesmart nodesmart-web
 /usr/bin/systemctl restart nodesmart nodesmart-web

@@ -107,6 +107,8 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 backup="$backup_root/nodesmart-$stamp-${target_commit:0:12}.tar.gz"
 failed_copy="$backup_root/failed-$stamp-${target_commit:0:12}"
 deploy_epoch="$(date +%s)"
+intent_file=/etc/bluenode/remote-admin.intent
+intent_present=0
 backup_ready=0
 deployment_started=0
 rolling_back=0
@@ -125,6 +127,11 @@ rollback() {
     fi
     mkdir -p "$app_root" || return 1
     tar -xzf "$backup" -C "$app_root" || return 1
+    if (( intent_present == 1 )); then
+        cp -a "$backup.intent" "$intent_file" || return 1
+    else
+        rm -f -- "$intent_file" || return 1
+    fi
     systemctl restart nodesmart.service nodesmart-web.service || return 1
     systemctl is-active --quiet nodesmart.service || return 1
     systemctl is-active --quiet nodesmart-web.service || return 1
@@ -159,6 +166,12 @@ tar -czf "$backup" -C "$app_root" .
 tar -tzf "$backup" >/dev/null
 backup_sha256="$(sha256sum "$backup" | awk '{print $1}')"
 [[ -n "$backup_sha256" ]]
+if [[ -e "$intent_file" || -L "$intent_file" ]]; then
+    [[ -f "$intent_file" && ! -L "$intent_file" ]]
+    cp -a "$intent_file" "$backup.intent"
+    cmp "$intent_file" "$backup.intent"
+    intent_present=1
+fi
 backup_ready=1
 report BACKUP "PASS path=$backup sha256=$backup_sha256"
 
@@ -188,6 +201,8 @@ for path in events history logs state; do
     fi
 done
 
+# Root-managed durable intent migration; never changes credentials or gateways.
+python3 "$app_root/install/remote-admin-init.py" migrate-intent --service-user "$service_user"
 python3 -m compileall -q "$app_root/core"
 systemctl restart nodesmart.service nodesmart-web.service
 systemctl is-active --quiet nodesmart.service

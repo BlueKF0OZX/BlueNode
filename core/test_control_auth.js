@@ -11,7 +11,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
   try {
     const page = await browser.newPage();
     let authenticated = false, validPassword = true, csrfRejected = false, emergency = false;
-    let sessionUnavailable = false;
+    let sessionUnavailable = false, configError = false;
     const executed = [], requests = [], errors = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('dialog', dialog => dialog.accept(dialog.type() === 'prompt' ? 'RESTART ASTERISK' : undefined));
@@ -46,14 +46,15 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       }
       else if (url.pathname === '/api/emergency-mode') body = {active:emergency,mode:emergency?'emergency':'normal'};
       else if (url.pathname.startsWith('/api/control/')) {
-        status = !authorized ? 401 : csrfRejected || request.headers()['x-csrf-token'] !== 'fixture-csrf' ? 403 : 200;
+        status = configError ? 503 : !authorized ? 401 : csrfRejected || request.headers()['x-csrf-token'] !== 'fixture-csrf' ? 403 : 200;
         if (status === 200) {
           const payload = JSON.parse(request.postData());
           executed.push({action:url.pathname.split('/').pop(),payload});
           if (url.pathname.includes('emergency-')) emergency = url.pathname.endsWith('-enable');
           body = {ok:true,message:'Fixture completed',emergency_mode:{active:emergency,mode:emergency?'emergency':'normal'},automation:{mode:'active'}};
-        } else body = {ok:false,error:status===401?'Remote Admin authentication required':'Invalid CSRF token'};
+        } else body = configError ? {ok:false,state:'CONFIG_ERROR',error:'Remote Admin configuration error; controls locked'} : {ok:false,error:status===401?'Remote Admin authentication required':'Invalid CSRF token'};
       } else { status = 404; }
+      if (url.pathname === '/api/admin/session' && configError) body = {state:'CONFIG_ERROR',enabled:false,authenticated:false};
       if (url.pathname === '/api/admin/session' && sessionUnavailable) status = 503;
       return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(body)});
     });
@@ -176,6 +177,31 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       assert.equal(executed.length,before+1);
       assert.equal(executed.at(-1).action,'admin-'+action);
       assert.match(await page.locator('#pending-control-result').textContent(),/Completed:.*Fixture admin completed/);
+    }
+    authenticated = false;
+    await page.locator('#btn-dodropin-connect').click();
+    await page.waitForFunction(() => pendingControl !== null);
+    const beforeError = executed.length;
+    configError = true;
+    await page.evaluate(() => loadAdminSession());
+    assert.equal(executed.length, beforeError);
+    assert.equal(await page.evaluate(() => pendingControl), null);
+    assert.match(await page.locator('#control-auth-status').textContent(), /configuration error.*controls locked/);
+    assert.doesNotMatch(await page.locator('#control-auth-status').textContent(), /Controls available|disabled/);
+    assert.equal(await page.locator('#control-sign-in').isVisible(), false);
+    assert.equal(await page.locator('#control-sign-out').isVisible(), false);
+    configError = false;
+    await page.evaluate(() => loadAdminSession());
+    configError = true;
+    await page.locator('#btn-skywarn-on').click();
+    await page.waitForFunction(() => !controlRequestBusy);
+    assert.equal(executed.length, beforeError);
+    assert.equal(await page.evaluate(() => pendingControl), null);
+    assert.match(await page.locator('#control-auth-status').textContent(), /configuration error.*controls locked/);
+    assert.match(await page.locator('#control-result').textContent(), /configuration error/);
+    for (const width of [320,390,768,1024,1440]) {
+      await page.setViewportSize({width,height:1000});
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'config-error overflow at ' + width);
     }
     assert.deepEqual(errors, []);
     console.log('PASS control auth UX: nine controls; resume once, expiry, reload, logout, failure, cancellation, CSRF and injection');
