@@ -83,7 +83,7 @@ def main():
     salt, digest = hash_password(first)
     write_config({"enabled": True, "username": username, "password_salt": salt,
                   "password_hash": digest, "password_iterations": 600000,
-                  "session_secret": secrets.token_hex(32), "session_seconds": 1800,
+                  "session_secret": secrets.token_hex(32), "session_seconds": 2592000,
                   "secure_cookie": True, "max_login_attempts": 5,
                   "login_window_seconds": 300, "permissions": []}, args.service_user)
     print("Remote Admin credentials initialized outside Git; restart nodesmart-web.service")

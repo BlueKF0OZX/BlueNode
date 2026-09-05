@@ -19,6 +19,37 @@ class Clock:
 
 
 class RemoteAdminTests(unittest.TestCase):
+    def test_persistent_lifetime_revocation_and_policy_changes(self):
+        self.enable(session_seconds=2592000)
+        _, _, token = self.admin.login('operator', 'correct horse battery staple', 'fixture')
+        self.clock.now += 2591999
+        self.assertIsNotNone(self.admin.authenticate(token))
+        self.clock.now += 1
+        self.assertIsNone(self.admin.authenticate(token))
+        for key, value in [('password_hash', 'changed'), ('session_secret', 'rotated'),
+                           ('permissions', ['soft_radio_rx']), ('session_seconds', 600)]:
+            self.enable(session_seconds=2592000)
+            _, _, token = self.admin.login('operator', 'correct horse battery staple', 'fixture')
+            config = json.loads(self.config.read_text())
+            config[key] = value
+            self.config.write_text(json.dumps(config))
+            self.assertIsNone(self.admin.authenticate(token), key)
+        self.enable(session_seconds=2592000)
+        _, _, token = self.admin.login('operator', 'correct horse battery staple', 'fixture')
+        self.assertIsNone(remote_admin.RemoteAdmin().authenticate(token), 'restart invalidates sessions')
+        self.admin.logout(token)
+        self.assertIsNone(self.admin.authenticate(token))
+
+    def test_long_sessions_require_secure_cookie_and_bounded_lifetime(self):
+        self.enable(session_seconds=2592001)
+        self.assertFalse(remote_admin._safe_config()['enabled'])
+        self.enable(session_seconds=2592000)
+        config = json.loads(self.config.read_text())
+        config['secure_cookie'] = False
+        self.config.write_text(json.dumps(config))
+        self.assertTrue(remote_admin._safe_config()['enabled'])
+        self.assertEqual(remote_admin._safe_config()['session_seconds'], 86400)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)

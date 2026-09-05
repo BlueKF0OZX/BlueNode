@@ -333,6 +333,8 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
                                                 payload.get("password", ""),
                                                 self.client_address[0])
             if token:
+                # Replace this browser's previous session; never reuse a supplied token.
+                ADMIN.logout(self.admin_cookie())
                 body = json.dumps(result).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")

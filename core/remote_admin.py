@@ -37,7 +37,7 @@ def _utc_now():
 
 def _safe_config():
     """Return validated public settings, never secrets; disabled on any error."""
-    base = {"enabled": False, "session_seconds": 1800, "secure_cookie": True,
+    base = {"enabled": False, "session_seconds": 2592000, "secure_cookie": True,
             "max_login_attempts": 5, "login_window_seconds": 300}
     try:
         if CONFIG_FILE.is_symlink() or (os.name == "posix" and CONFIG_FILE.stat().st_mode & 0o007):
@@ -49,14 +49,16 @@ def _safe_config():
         if any(not isinstance(raw.get(key), str) or not raw[key] for key in required):
             return base
         iterations = int(raw.get("password_iterations", 600000))
-        session_seconds = int(raw.get("session_seconds", 1800))
+        session_seconds = int(raw.get("session_seconds", 2592000))
         attempts = int(raw.get("max_login_attempts", 5))
         window = int(raw.get("login_window_seconds", 300))
         permissions = raw.get("permissions", [])
         if not 200000 <= iterations <= 5000000:
             return base
-        if not 300 <= session_seconds <= 86400 or not 1 <= attempts <= 20:
+        if not 300 <= session_seconds <= 2592000 or not 1 <= attempts <= 20:
             return base
+        if session_seconds > 86400 and raw.get("secure_cookie", True) is not True:
+            session_seconds = 86400
         if not 30 <= window <= 3600:
             return base
         if (not isinstance(permissions, list) or
@@ -162,6 +164,11 @@ class RemoteAdmin:
         self.sessions = {}
         self.login_attempts = defaultdict(deque)
 
+    @staticmethod
+    def _session_policy(config):
+        # Any credential, permission, duration or cookie-policy change revokes sessions.
+        return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).digest()
+
     def public_state(self, cookie_token=None):
         config = _safe_config()
         session = self.authenticate(cookie_token, config)
@@ -177,12 +184,19 @@ class RemoteAdmin:
 
     def authenticate(self, token, config=None):
         config = config or _safe_config()
-        if not config["enabled"] or not token:
+        if not config["enabled"]:
+            with self.lock:
+                self.sessions.clear()
+            return None
+        if not token:
             return None
         with self.lock:
             self._purge()
             session = self.sessions.get(token)
             if not session:
+                return None
+            if session["policy"] != self._session_policy(config):
+                del self.sessions[token]
                 return None
             return {"csrf": session["csrf"], "expires_at": session["expires_at"],
                     "permissions": tuple(config.get("permissions", ()))}
@@ -216,7 +230,9 @@ class RemoteAdmin:
         expires = now + config["session_seconds"]
         with self.lock:
             self.login_attempts.pop(key, None)
+            self._purge()
             self.sessions[token] = {"csrf": csrf, "expires": expires,
+                                    "policy": self._session_policy(config),
                                     "expires_at": datetime.fromtimestamp(
                                         expires, timezone.utc).isoformat(timespec="seconds")}
         self.audit("login", "success")

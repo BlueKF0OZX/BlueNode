@@ -1,5 +1,9 @@
 # Dashboard control routing investigation
 
+Historical findings below describe the investigation at `6aaf643`. The subsequent
+authenticated-control UX retains the same security boundary and now offers login
+and one-time action resumption after HTTP 401; see `REMOTE_ADMIN.md`.
+
 The reported post-polish login regression was investigated against the pre-polish
 `bf91361` dashboard and the published `2e84860` dashboard. Browser clicks in both
 versions use the same `/api/control/*` endpoints for ordinary controls, without
@@ -28,8 +32,8 @@ node core/test_control_routing.js
 ```
 
 Set `BLUENODE_BROWSER_PATH` to an installed Chromium-compatible browser when
-needed. Set `BLUENODE_TEST_HTML` to a saved historical HTML file to run exactly
-the same tests against that version. All network requests are intercepted and
+needed. Historical HTML comparison was supported by the test at `6aaf643`;
+the current suite tests the new pending-control flow. All requests are intercepted and
 fulfilled by synthetic fixtures; no control request reaches an actual node.
 
 The tests click DODROPIN, Skywarn, manual node, Emergency Mode, and maintenance

@@ -1041,6 +1041,11 @@
     <div class="controls-panel">
       <div class="controls-heading">
         <h2>BlueNode Controls</h2>
+      <div class="admin-row" aria-live="polite">
+        <span id="control-auth-status">Checking control authentication...</span>
+        <button id="control-sign-in" class="control-button" onclick="showControlLogin()" style="display:none">Sign in</button>
+        <button id="control-sign-out" class="control-button" onclick="adminLogout()" style="display:none">Sign out</button>
+      </div>
         <button id="emergency-enter" class="control-button emergency-enter"
                 onclick="toggleEmergencyMode(true, this)">Enter Emergency Mode</button>
       </div>
@@ -1186,13 +1191,14 @@
     <div id="remote-admin-panel" class="remote-admin-panel">
       <h2>Remote Admin</h2>
       <div id="admin-login-view">
-        <div>Administrative controls require a separate expiring BlueNode session.</div>
+        <div>Sign in to operate controls. This browser stays signed in until the session expires or the web service restarts.</div>
         <div class="admin-row">
           <input id="admin-username" aria-label="Remote Admin username" class="admin-field" autocomplete="username" placeholder="Username">
           <input id="admin-password" aria-label="Remote Admin password" class="admin-field" type="password" autocomplete="current-password" placeholder="Password">
           <button class="control-button" onclick="adminLogin(this)">Sign in</button>
         </div>
-        <div id="admin-login-result"></div>
+        <button id="control-login-cancel" class="control-button" onclick="cancelPendingControl()">Cancel pending control</button>
+        <div id="admin-login-result" role="status"></div>
       </div>
       <div id="admin-auth-view" style="display:none">
         <div id="admin-status">Authenticated administrative session</div>
@@ -1299,12 +1305,69 @@
     let emergencyModeRenderedAt = Date.now();
     function adminHeaders(extra = {}) { return adminCsrfToken ? {...extra, 'X-CSRF-Token': adminCsrfToken} : extra; }
 
+    let pendingControl = null;
+    let controlRequestBusy = false;
+    let adminLoginBusy = false;
+    const ordinaryActions = new Set(['dodropin-connect', 'dodropin-disconnect',
+      'skywarn-enable', 'skywarn-disable', 'node-connect', 'node-disconnect',
+      'emergency-enable', 'emergency-disable', 'maintenance-enable', 'maintenance-disable']);
+    function validateControl(action, payload) {
+      if (!ordinaryActions.has(action)) throw new Error('Unsupported control');
+      const keys = Object.keys(payload);
+      if (action.startsWith('node-')) {
+        if (keys.length !== 1 || keys[0] !== 'node' || typeof payload.node !== 'string' ||
+            !/^\d{1,10}$/.test(payload.node)) throw new Error('Invalid node number');
+      } else if (keys.length) throw new Error('Unexpected control parameters');
+      return Object.freeze({...payload});
+    }
+    function showControlLogin() {
+      document.getElementById('remote-admin-panel').style.display = 'block';
+      document.getElementById('admin-login-view').style.display = 'block';
+      document.getElementById('admin-auth-view').style.display = 'none';
+      document.getElementById('control-auth-status').textContent = 'Controls locked / Sign in required';
+      document.getElementById('control-sign-in').style.display = 'inline-block';
+      document.getElementById('control-sign-out').style.display = 'none';
+      document.getElementById('admin-username').focus();
+      document.getElementById('admin-username').scrollIntoView({block:'center'});
+    }
+    function cancelPendingControl(message = 'Pending control cancelled.') {
+      const pending = pendingControl;
+      pendingControl = null;
+      if (pending) pending.reject(new Error(message));
+      document.getElementById('admin-login-result').textContent = message;
+    }
+    async function postOrdinaryControl(action, payload) {
+      validateControl(action, payload);
+      return fetch('/api/control/' + action, {method:'POST',
+        headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)});
+    }
+    async function requestOrdinaryControl(action, payload = {}) {
+      const validated = validateControl(action, payload);
+      if (controlRequestBusy) throw new Error('Finish or cancel the current control first.');
+      controlRequestBusy = true;
+      try {
+        const response = await postOrdinaryControl(action, validated);
+        if (response.status !== 401) return response;
+        adminCsrfToken = null;
+        return await new Promise((resolve, reject) => {
+          pendingControl = {action, payload:validated, resolve, reject};
+          document.getElementById('admin-login-result').textContent = 'Sign in to complete: ' + action;
+          showControlLogin();
+        });
+      } finally { controlRequestBusy = false; }
+    }
+
     async function loadAdminSession() {
       try {
         const response = await fetch('/api/admin/session', {cache:'no-store'});
+        if (!response.ok) throw new Error('Authentication state unavailable');
         const state = await response.json();
         document.getElementById('remote-admin-panel').style.display = state.enabled ? 'block' : 'none';
         adminCsrfToken = state.authenticated ? state.csrf_token : null;
+        document.getElementById('control-auth-status').textContent = !state.enabled ? 'Controls available / Remote Admin disabled' :
+          state.authenticated ? 'Controls unlocked' : 'Controls locked / Sign in required';
+        document.getElementById('control-sign-in').style.display = state.enabled && !state.authenticated ? 'inline-block' : 'none';
+        document.getElementById('control-sign-out').style.display = state.authenticated ? 'inline-block' : 'none';
         document.getElementById('admin-login-view').style.display = state.authenticated ? 'none' : 'block';
         document.getElementById('admin-auth-view').style.display = state.authenticated ? 'block' : 'none';
         if (state.authenticated) {
@@ -1315,12 +1378,17 @@
           document.getElementById('soft-radio-panel').style.display = 'none';
         }
       } catch (_) {
+        adminCsrfToken = null;
+        document.getElementById('control-auth-status').textContent = 'Control authentication unavailable';
         stopSoftRadio();
         document.getElementById('remote-admin-panel').style.display = 'none';
         document.getElementById('soft-radio-panel').style.display = 'none';
       }
     }
     async function adminLogin(button) {
+      if (adminLoginBusy) return;
+      adminLoginBusy = true;
+      const loginPending = pendingControl;
       button.disabled = true;
       try {
         const credentials = {username:document.getElementById('admin-username').value};
@@ -1330,14 +1398,31 @@
         const result = await response.json();
         document.getElementById('admin-password').value = '';
         if (!response.ok) throw new Error(result.error || 'Authentication failed');
-        adminCsrfToken = result.csrf_token; await loadAdminSession();
-      } catch (error) { document.getElementById('admin-login-result').textContent = error.message; }
-      finally { button.disabled = false; }
+        adminCsrfToken = null;
+        await loadAdminSession();
+        if (!adminCsrfToken) throw new Error('Session could not be verified. Use the configured HTTPS dashboard.');
+        const pending = pendingControl === loginPending ? pendingControl : null;
+        if (pending) pendingControl = null;
+        if (pending) {
+          try {
+            const response = await postOrdinaryControl(pending.action, pending.payload);
+            pending.resolve(response);
+          } catch (error) { pending.reject(error); }
+        }
+      } catch (error) { cancelPendingControl(error.message); }
+      finally {
+        document.getElementById('admin-password').value = '';
+        button.disabled = false; adminLoginBusy = false;
+      }
     }
     async function adminLogout() {
+      cancelPendingControl('Pending control cleared by sign out.');
       stopSoftRadio();
-      await fetch('/api/admin/logout', {method:'POST', headers:adminHeaders()});
-      adminCsrfToken = null; await loadAdminSession();
+      try {
+        const response = await fetch('/api/admin/logout', {method:'POST', headers:adminHeaders()});
+        if (!response.ok && response.status !== 401) throw new Error('Sign out failed; session may still be active.');
+        adminCsrfToken = null; await loadAdminSession();
+      } catch (error) { document.getElementById('control-auth-status').textContent = error.message; }
     }
     async function loadAdminStatus() {
       const response = await fetch('/api/admin/status', {cache:'no-store'});
@@ -1449,7 +1534,10 @@
       const panel = document.getElementById('soft-radio-panel');
       if (panel && panel.style.display !== 'none') setSoftRadioPresentation('idle', message);
     }
-    window.addEventListener('pagehide', () => stopSoftRadio());
+    window.addEventListener('pagehide', () => {
+      if (pendingControl) cancelPendingControl('Pending control cleared on leaving the page.');
+      stopSoftRadio();
+    });
 
     async function runControl(action, button) {
       const resultElement = document.getElementById('control-result');
@@ -1460,9 +1548,7 @@
       resultElement.textContent = '';
 
       try {
-        const response = await fetch('/api/control/' + action, {
-          method: 'POST', headers: adminHeaders()
-        });
+        const response = await requestOrdinaryControl(action);
 
         const result = await response.json();
 
@@ -1515,21 +1601,7 @@
 
       try {
 
-        const response = await fetch('/api/control/' + action, {
-
-          method: 'POST',
-
-          headers: adminHeaders({
-
-            'Content-Type': 'application/json'
-
-          }),
-
-          body: JSON.stringify({ node: node })
-
-        });
-
-
+        const response = await requestOrdinaryControl(action, {node});
 
         const result = await response.json();
 
@@ -1883,9 +1955,7 @@
       if (!confirm(prompt)) return;
       button.disabled = true;
       try {
-        const response = await fetch('/api/control/emergency-' + (enable ? 'enable' : 'disable'), {
-          method: 'POST', headers: adminHeaders({'Content-Type':'application/json'}), body: '{}'
-        });
+        const response = await requestOrdinaryControl('emergency-' + (enable ? 'enable' : 'disable'));
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Emergency Mode control failed');
         renderEmergencyMode(result.emergency_mode);
@@ -1971,9 +2041,7 @@
       const enable = button.dataset.enabled !== 'true';
       button.disabled = true;
       try {
-        const response = await fetch('/api/control/maintenance-' + (enable ? 'enable' : 'disable'), {
-          method: 'POST', headers: adminHeaders({'Content-Type': 'application/json'}), body: '{}'
-        });
+        const response = await requestOrdinaryControl('maintenance-' + (enable ? 'enable' : 'disable'));
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Maintenance control failed');
         renderAutomation(result.automation);

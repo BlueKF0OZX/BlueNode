@@ -1,11 +1,11 @@
 'use strict';
 // Browser-only contract checks. Every request is fulfilled locally; no radio commands run.
-// Optional: BLUENODE_TEST_HTML selects a saved pre-polish dashboard for comparison.
+// Tests the current authenticated-control UX, including cancellation after HTTP 401.
 const {chromium} = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const html = fs.readFileSync(process.env.BLUENODE_TEST_HTML || path.join(__dirname, '../web/index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
 (async () => {
   const browser = await chromium.launch({headless:true,
     ...(process.env.BLUENODE_BROWSER_PATH ? {executablePath:process.env.BLUENODE_BROWSER_PATH} : {})});
@@ -59,11 +59,16 @@ const html = fs.readFileSync(process.env.BLUENODE_TEST_HTML || path.join(__dirna
       for (const [selector, action] of controls) {
         const before = posts.length;
         await page.locator(selector).click();
+        if (mode === 'signed-out') {
+          await page.waitForFunction(() => pendingControl !== null);
+          assert.equal(await page.locator('#admin-login-view').isVisible(), true);
+          await page.locator('#control-login-cancel').click();
+        }
         await page.waitForFunction(selector => !document.querySelector(selector).disabled, selector);
         assert.equal(posts.length, before + 1);
         assert.equal(posts.at(-1).path, '/api/control/' + action);
         if (action.startsWith('node-')) assert.deepEqual(JSON.parse(posts.at(-1).body), {node:'12345'});
-        if (mode === 'signed-out') assert.match(await page.locator(action.startsWith('maintenance-') ? '#automation-action' : '#control-result').innerText(), /authentication required/);
+        if (mode === 'signed-out') assert.match(await page.locator(action.startsWith('maintenance-') ? '#automation-action' : '#control-result').innerText(), /cancelled/);
       }
       assert.equal(await page.evaluate(() => window.loginCalls), 0, 'ordinary controls must not invoke login');
       assert.equal(posts.some(request => request.path === '/api/admin/login'), false);

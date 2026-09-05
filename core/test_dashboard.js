@@ -41,7 +41,7 @@ assert.doesNotMatch(html, /<h2>Automatic Recovery<\/h2>|id="recovery-panel"|load
   'The redundant standalone recovery presentation must remain removed');
 assert.match(html, /async function loadAdminSession\(\)/);
 assert.match(html, /Type RESTART ASTERISK/);
-assert.match(html, /adminHeaders\(\{'Content-Type': 'application\/json'\}\)/);
+assert.match(html, /adminHeaders\(\{'Content-Type':\s*'application\/json'\}\)/);
 assert.match(html, /\/api\/soft-radio\/ticket/);
 assert.match(html, /\/api\/soft-radio\/ws`,\s*\['bluenode-rx', `ticket\.\$\{result\.ticket\}`\]/);
 assert.match(html, /new AudioWorkletNode\(softRadioContext, 'bluenode-ulaw-player'/);
@@ -90,7 +90,7 @@ for (const handler of ["runControl('dodropin-connect', this)",
 }
 assert.match(html, /fetch\('\/api\/control\/' \+ action/,
   'Control API endpoint must remain unchanged');
-assert.match(html, /\/api\/control\/maintenance-/,
+assert.match(html, /requestOrdinaryControl\('maintenance-/,
   'Maintenance Mode must use the protected control API');
 assert.match(html, /\.controls-grid\s*{[^}]*grid-template-columns:\s*repeat\(4,/s,
   'Quick actions must use a four-column desktop row');

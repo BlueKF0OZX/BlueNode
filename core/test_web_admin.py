@@ -24,6 +24,34 @@ class Result:
 
 
 class WebAdminTests(unittest.TestCase):
+    def test_persistent_cookie_rotation_and_all_control_auth_guards(self):
+        self.enable()
+        config = json.loads(self.config.read_text())
+        config['session_seconds'] = 2592000
+        self.config.write_text(json.dumps(config))
+        actions = ['node-connect', 'node-disconnect', 'dodropin-connect', 'dodropin-disconnect',
+                   'skywarn-enable', 'skywarn-disable', 'emergency-enable', 'emergency-disable',
+                   'maintenance-enable', 'maintenance-disable']
+        for action in actions:
+            self.assertEqual(self.request('POST', '/api/control/' + action, {})[0], 401)
+        self.assertEqual(self.request('POST', '/api/admin/action', {'action':'refresh-diagnostics'})[0], 401)
+        credentials = {'username':'operator', PASSWORD_KEY:'correct horse battery staple'}
+        _, headers, login = self.request('POST', '/api/admin/login', credentials)
+        for attribute in ['Max-Age=2592000', 'HttpOnly', 'Secure', 'SameSite=Strict']:
+            self.assertIn(attribute, headers['Set-Cookie'])
+        cookie = headers['Set-Cookie'].split(';', 1)[0]
+        for action in actions:
+            self.assertEqual(self.request('POST', '/api/control/' + action, {}, {'Cookie':cookie})[0], 403)
+        self.assertTrue(self.request('GET', '/api/admin/session', headers={'Cookie':cookie})[2]['authenticated'])
+        _, rotated, _ = self.request('POST', '/api/admin/login', credentials, {'Cookie':cookie})
+        self.assertNotEqual(rotated['Set-Cookie'], headers['Set-Cookie'])
+        self.assertFalse(self.request('GET', '/api/admin/session', headers={'Cookie':cookie})[2]['authenticated'])
+        new_cookie = rotated['Set-Cookie'].split(';', 1)[0]
+        now = self.admin.clock()
+        with patch.object(self.admin, 'clock', return_value=now + 2592001):
+            self.assertEqual(self.request('POST', '/api/control/node-connect', {'node':'12345'},
+                                         {'Cookie':new_cookie, 'X-CSRF-Token':login['csrf_token']})[0], 401)
+
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
