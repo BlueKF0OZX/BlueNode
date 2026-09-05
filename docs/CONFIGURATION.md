@@ -5,9 +5,9 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `node`: local AllStar node number
 - `callsign`: station callsign
 - `friendly_nodes`: node-number to friendly-name mappings
-- `web.host` / `web.port`: dashboard listener
+- `web.host` / `web.port`: dashboard IPv4 listener; defaults to `127.0.0.1:8080`. Choose a trusted LAN IPv4 address for LAN access; no firewall changes are automatic. Ports must be integers from 1024 to 65535
 - `health`: CPU, memory, and disk warning/critical thresholds
-- `recovery.asterisk_enabled`: enables automatic Asterisk recovery
+- `recovery.asterisk_enabled`: explicit boolean opt-in for automatic Asterisk recovery; defaults to `false`. Enabling this permits automatic Asterisk restarts and can interrupt node operation
 - `recovery.display_reset_hours`: hours successful or cancelled recovery results remain prominently displayed before returning to READY. Failed results clear from the current display when Asterisk is observed online; recovery records and restart limits remain preserved
 - `recovery.verification_timeout_seconds`: maximum time to wait for fresh post-restart health and Intelligence state
 - `recovery.verification_stable_checks`: consecutive healthy checks required before recovery is verified
@@ -41,6 +41,8 @@ The live configuration is `/opt/nodesmart/config/nodesmart.json`. A Git-safe exa
 - `connectivity.allstar_service_host` / `allstar_service_port`: official AllStar endpoint used for the service-layer TCP probe (default `register.allstarlink.org:443`)
 
 The DODROPIN helper looks for a friendly node whose name is `DODROPIN` (case-insensitive).
+
+Use `sudo nano /opt/nodesmart/config/nodesmart.json` to edit the root-owned live config. Restart only `nodesmart` and `nodesmart-web` after edits. The normal installer does not need environment variables other than `NODESMART_USER`; `NODESMART_CONFIG` is a developer/test override, not an alternate runtime-root setting. Remote Admin and Soft Radio environment overrides are likewise not needed for standard installation.
 
 The live config is intentionally ignored by Git. Back it up before upgrades or major changes.
 

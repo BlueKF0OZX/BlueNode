@@ -1,5 +1,14 @@
 # Deployment
 
+This developer workflow requires an existing Git checkout at `/opt/nodesmart`.
+New-user installs use a separate public checkout and the installer update path
+in [Installation](INSTALL.md). Before deploying code that uses the restricted
+Asterisk broker, run the current installer from a separate checkout with the
+existing service user. The code-only deployment refuses an unmigrated host
+before changing application files; it cannot install helpers, sudo rules, or
+unit changes. This validation run does not deploy to the live radio node.
+
+
 After an approved change has been tested, committed, and pushed to `main`, run
 the deployment from a Windows PowerShell prompt at the repository root:
 

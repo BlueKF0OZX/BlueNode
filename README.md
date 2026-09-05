@@ -32,25 +32,29 @@ AllStarLink v3, Python 3, Asterisk with `rpt`, systemd, sudo, and a Linux servic
 
 ## Install
 
+Start from the public checkout on a working ASL3 node:
+
 ```bash
-sudo ./install/install.sh
+sudo apt-get update
+sudo apt-get install git python3 sudo iproute2 iputils-ping
+git clone https://github.com/BlueKF0OZX/BlueNode.git
+cd BlueNode
+sudo useradd --system --user-group --home-dir /opt/nodesmart --no-create-home --shell /usr/sbin/nologin bluenode
+sudo NODESMART_USER=bluenode bash ./install/install.sh
 ```
 
-On a first install, edit:
+The first run creates configuration and stops. Edit it with
+`sudo nano /opt/nodesmart/config/nodesmart.json`, set your node number and
+callsign, then rerun the installer with the same `NODESMART_USER`.
 
-```text
-/opt/nodesmart/config/nodesmart.json
-```
+New installs listen on **127.0.0.1:8080** and leave automatic Asterisk recovery
+**disabled**. Choose a trusted LAN IPv4 listener deliberately, or use an SSH
+local forward. The installer does not change firewall/network settings or
+Asterisk/radio configuration and does not restart Asterisk.
 
-Then rerun the installer.
-
-The dashboard defaults to:
-
-```text
-http://NODE_IP:8080/web/
-```
-
-See `docs/INSTALL.md` and `docs/CONFIGURATION.md`.
+Follow [Installation](docs/INSTALL.md) for dashboard access, prerequisites,
+verification, optional integrations, updates, recovery, and troubleshooting.
+See [Configuration](docs/CONFIGURATION.md) for operator settings.
 
 For the guarded Windows-to-node deployment workflow, see
 `docs/DEPLOYMENT.md`.
@@ -66,9 +70,9 @@ expiring sessions, CSRF protection, fixed action/log allowlists, and a minimal
 audit trail without exposing shell access. See `docs/REMOTE_ADMIN.md` for the
 security model and safe initialization procedure.
 
-Optional Soft Radio Phase A provides separately authorized browser RX with no
-transmit path and is disabled by default. See `docs/SOFT_RADIO_RX.md` for its
-layered RX-only design and activation gate.
+Soft Radio is parked/disabled pending a verified read-only audio tap.
+`docs/SOFT_RADIO_RX.md` records the experimental design and safety gates; it is
+not part of new-user installation. Net Mode/NetMap remain deferred.
 
 Emergency Mode reprioritizes existing health, connectivity, Skywarn, connected
 node, Intelligence, incident, recovery, and event information without changing
@@ -81,7 +85,9 @@ corrective actions. See `docs/NODE_BEHAVIOR.md`.
 
 ## Security
 
-BlueNode installs a project-specific sudoers file rather than requiring blanket passwordless root access. The alpha privilege model may be tightened further in future releases.
+BlueNode installs a project-specific sudoers file with a root-owned command
+broker, fixed helpers, and an exact restart permission. Services run as an
+unprivileged account; application code is root-owned.
 
 The dashboard does not provide native Internet-facing authentication. Keep it
 on a trusted network unless the optional authenticated HTTPS framework has been
