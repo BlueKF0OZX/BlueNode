@@ -245,7 +245,7 @@ print('Unprivileged first monitor cycle and installed dashboard PASS')
         self.inside("python3", "-m", "compileall", "-q", "/opt/nodesmart/core")
         shell_scripts = list((self.root / "src/install").rglob("*.sh"))
         shell_scripts += [p for p in (self.root / "src/install/helpers").iterdir()
-                          if p.read_text().startswith("#!/bin/bash")]
+                          if p.is_file() and p.read_text().startswith("#!/bin/bash")]
         for script in shell_scripts:
             self.inside("bash", "-n", "/" + str(script.relative_to(self.root)))
         # Existing state and auth permissions survive subsequent installation.
