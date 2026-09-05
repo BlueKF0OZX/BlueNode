@@ -12,7 +12,7 @@ Run these commands in your regular operator account, outside `/opt/nodesmart`:
 
 ```bash
 sudo apt-get update
-sudo apt-get install git python3 sudo iproute2 iputils-ping
+sudo apt-get install git python3 sudo iproute2 iputils-ping curl nano
 git clone https://github.com/BlueKF0OZX/BlueNode.git
 cd BlueNode
 ```

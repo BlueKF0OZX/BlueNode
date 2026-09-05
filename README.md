@@ -36,7 +36,7 @@ Start from the public checkout on a working ASL3 node:
 
 ```bash
 sudo apt-get update
-sudo apt-get install git python3 sudo iproute2 iputils-ping
+sudo apt-get install git python3 sudo iproute2 iputils-ping curl nano
 git clone https://github.com/BlueKF0OZX/BlueNode.git
 cd BlueNode
 sudo useradd --system --user-group --home-dir /opt/nodesmart --no-create-home --shell /usr/sbin/nologin bluenode
