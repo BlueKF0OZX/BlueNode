@@ -9,6 +9,9 @@ import automation
 
 class AutomationTests(unittest.TestCase):
     def setUp(self):
+        enabled = patch.object(automation, "RECOVERY_ENABLED", True)
+        enabled.start()
+        self.addCleanup(enabled.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.state_file = Path(self.directory.name) / "automation.json"
         self.state_patch = patch.object(automation, "STATE_FILE", self.state_file)

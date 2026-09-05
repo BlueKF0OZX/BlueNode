@@ -16,7 +16,7 @@ CONFIG = load_config()
 RECOVERY_CONFIG = CONFIG.get("recovery", {})
 NODE = str(CONFIG.get("node", ""))
 DISPLAY_RESET_HOURS = int(RECOVERY_CONFIG.get("display_reset_hours", 6))
-ASTERISK_RECOVERY_ENABLED = RECOVERY_CONFIG.get("asterisk_enabled", True)
+ASTERISK_RECOVERY_ENABLED = RECOVERY_CONFIG.get("asterisk_enabled", False) is True
 VERIFY_TIMEOUT_SECONDS = int(RECOVERY_CONFIG.get("verification_timeout_seconds", 30))
 VERIFY_STABLE_CHECKS = int(RECOVERY_CONFIG.get("verification_stable_checks", 2))
 VERIFY_INTERVAL_SECONDS = int(RECOVERY_CONFIG.get("verification_interval_seconds", 2))
@@ -29,7 +29,7 @@ RECOVERY_STATE_FILE = Path("/opt/nodesmart/state/recovery.json")
 def asterisk_online():
     try:
         result = subprocess.run(
-            ["sudo", "-n", "asterisk", "-rx", "core show version"],
+            ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "core show version"],
             capture_output=True, text=True, timeout=5,
         )
         return result.returncode == 0
@@ -42,7 +42,7 @@ def allstar_reachable():
         return False
     try:
         result = subprocess.run(
-            ["sudo", "-n", "asterisk", "-rx", f"rpt lstats {NODE}"],
+            ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", f"rpt lstats {NODE}"],
             capture_output=True, text=True, timeout=5,
         )
         return result.returncode == 0

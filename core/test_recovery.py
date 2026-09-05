@@ -10,6 +10,11 @@ import recovery
 
 
 class RecoveryTests(unittest.TestCase):
+    def setUp(self):
+        enabled = patch.object(recovery, "ASTERISK_RECOVERY_ENABLED", True)
+        enabled.start()
+        self.addCleanup(enabled.stop)
+
     def test_post_recovery_requires_fresh_stable_state(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

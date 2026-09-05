@@ -29,7 +29,7 @@ SOFT_RADIO.audit = ADMIN.audit
 
 CONFIG = load_config()
 WEB_CONFIG = CONFIG.get("web", {})
-HOST = str(WEB_CONFIG.get("host", "0.0.0.0"))
+HOST = str(WEB_CONFIG.get("host", "127.0.0.1"))
 PORT = int(WEB_CONFIG.get("port", 8080))
 
 ROOT = Path("/opt/nodesmart")
@@ -518,7 +518,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
                 result = subprocess.run(
 
-                    ["sudo", "-n", "asterisk", "-rx", rpt_command],
+                    ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", rpt_command],
 
                     capture_output=True,
 

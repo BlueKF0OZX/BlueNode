@@ -53,7 +53,7 @@ def check_asterisk():
 
         result = subprocess.run(
 
-            ["sudo", "-n", "asterisk", "-rx", "core show version"],
+            ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "core show version"],
 
             capture_output=True,
 

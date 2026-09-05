@@ -99,12 +99,12 @@ def tcp_reachable(host, port):
 
 
 def asterisk_available():
-    result = _run(["sudo", "-n", "asterisk", "-rx", "core show uptime seconds"])
+    result = _run(["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "core show uptime seconds"])
     return None if result is None else result.returncode == 0 and "uptime" in result.stdout.lower()
 
 
 def iax_available():
-    result = _run(["sudo", "-n", "asterisk", "-rx", "module show like chan_iax2"])
+    result = _run(["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "module show like chan_iax2"])
     if result is None or result.returncode != 0:
         return None
     output = result.stdout.lower()
@@ -114,7 +114,7 @@ def iax_available():
 
 
 def remote_link_states():
-    result = _run(["sudo", "-n", "asterisk", "-rx", f"rpt lstats {NODE}"])
+    result = _run(["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", f"rpt lstats {NODE}"])
     if result is None or result.returncode != 0:
         return None
     links = []
@@ -132,7 +132,7 @@ def remote_link_states():
 
 
 def allstar_registered():
-    result = _run(["sudo", "-n", "asterisk", "-rx", "rpt show registrations"])
+    result = _run(["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "rpt show registrations"])
     if result is None or result.returncode != 0:
         return None
     lines = [line.split() for line in result.stdout.splitlines() if line.split()]

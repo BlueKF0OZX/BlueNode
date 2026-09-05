@@ -22,6 +22,7 @@ except ImportError:  # Windows test runtime
     fcntl = None
 
 
+RECOVERY_ENABLED = load_config().get("recovery", {}).get("asterisk_enabled", False) is True
 CONFIG = load_config().get("automation", {})
 STATE_FILE = Path("/opt/nodesmart/state/automation.json")
 
@@ -156,8 +157,9 @@ def public_state(state=None, now=None):
                          if now - stamp < 86400)
     result = dict(state)
     result.update({
+        "recovery_enabled": RECOVERY_ENABLED,
         "automation_armed": (
-            not state["maintenance_mode"]
+            RECOVERY_ENABLED and not state["maintenance_mode"]
             and float(state.get("backoff_until") or 0) <= now
         ),
         "repeated_failure_protection": True,

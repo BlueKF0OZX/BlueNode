@@ -1,64 +1,36 @@
-
 {
-
   "node": "12345",
-
   "callsign": "N0CALL",
-
-  "friendly_nodes": {
-
-    "54321": "Example Node"
-
-  },
-
+  "friendly_nodes": {},
   "web": {
-
-    "host": "0.0.0.0",
-
+    "host": "127.0.0.1",
     "port": 8080
-
   },
-
   "health": {
-
     "cpu_warning_c": 70,
-
     "cpu_critical_c": 80,
-
     "memory_warning_percent": 75,
-
     "memory_critical_percent": 90,
-
     "disk_warning_percent": 80,
-
     "disk_critical_percent": 90
-
   },
-
   "recovery": {
-
-    "asterisk_enabled": true,
-
+    "asterisk_enabled": false,
     "display_reset_hours": 6,
     "verification_timeout_seconds": 30,
     "verification_stable_checks": 2,
     "verification_interval_seconds": 2
   },
-
   "automation": {
     "attempt_window_seconds": 3600,
     "max_attempts": 3,
     "minimum_cooldown_seconds": 600,
     "maximum_backoff_seconds": 3600,
     "healthy_reset_seconds": 900
-
   },
-
   "radio_activity": {
     "stale_seconds": 6
-
   },
-
   "node_behavior": {
     "evaluation_interval_seconds": 10,
     "event_window_seconds": 300,
@@ -81,7 +53,6 @@
     "automation_notice_count": 2,
     "automation_warning_count": 3
   },
-
   "node_metadata": {
     "source_url": "https://allmondb.allstarlink.org/allmondb.php",
     "success_ttl_seconds": 86400,
@@ -89,9 +60,7 @@
     "refresh_retry_seconds": 300,
     "timeout_seconds": 5,
     "maximum_download_bytes": 8000000
-
   },
-
   "connectivity": {
     "interval_seconds": 30,
     "timeout_seconds": 1.5,
@@ -103,7 +72,5 @@
     "external_test_port": 443,
     "allstar_service_host": "register.allstarlink.org",
     "allstar_service_port": 443
-
   }
-
 }

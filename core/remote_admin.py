@@ -265,7 +265,7 @@ class RemoteAdmin:
         return {"active": result.returncode == 0 and result.stdout.strip() == "active"}
 
     def _asterisk_reachable(self):
-        result = self._run(["sudo", "-n", "asterisk", "-rx", "core show uptime seconds"], 8)
+        result = self._run(["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", "core show uptime seconds"], 8)
         return {"active": result.returncode == 0}
 
     def _version(self):

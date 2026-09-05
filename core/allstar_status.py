@@ -53,7 +53,7 @@ def get_telemetry():
 
     result = subprocess.run(
 
-        ["sudo", "-n", "asterisk", "-rx", f"rpt show variables {NODE}"],
+        ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", f"rpt show variables {NODE}"],
 
         capture_output=True,
 

@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+umask 027
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -25,10 +27,17 @@ fi
 
 id "${SERVICE_USER}" >/dev/null 2>&1 || fail "User ${SERVICE_USER} does not exist."
 SERVICE_GROUP="$(id -gn "${SERVICE_USER}")"
+[[ "$SERVICE_USER" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || fail "Unsupported service user name"
+[[ "$SERVICE_GROUP" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || fail "Unsupported service group name"
 
-for cmd in /usr/bin/python3 /usr/sbin/asterisk /usr/bin/systemctl /usr/sbin/visudo; do
+for cmd in /usr/bin/python3 /usr/sbin/asterisk /usr/bin/systemctl /usr/sbin/visudo /usr/bin/sudo; do
   [[ -x "${cmd}" ]] || fail "Required command not found: ${cmd}"
 done
+
+for cmd in ip ping getent; do
+  command -v "$cmd" >/dev/null || fail "Required command not found: $cmd (install iproute2, iputils-ping, libc-bin)"
+done
+[[ -f "$REPO_ROOT/install/validate-config.py" ]] || fail "Missing config validator"
 
 [[ -f "${REPO_ROOT}/config/nodesmart.example.json" ]] || fail "Missing config/nodesmart.example.json"
 [[ -f "${REPO_ROOT}/systemd/nodesmart.service" ]] || fail "Missing systemd/nodesmart.service"
@@ -44,13 +53,64 @@ done
 [[ -f "${REPO_ROOT}/install/soft-radio-transaction.sh" ]] || fail "Missing Soft Radio RX transaction helper"
 [[ -f "${REPO_ROOT}/install/soft-radio/websocket-client.conf.template" ]] || fail "Missing Soft Radio RX Asterisk template"
 
+# Validate the complete public source before replacing any installed files.
+/usr/bin/python3 - "$REPO_ROOT" <<'PY'
+import ast, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+for directory in ('core', 'web', 'install/helpers'):
+    if not (root / directory).is_dir():
+        raise SystemExit('Missing source directory: ' + directory)
+for source in [*(root / 'core').glob('*.py'), *(root / 'install').glob('*.py'),
+               root / 'install/helpers/bluenode-asterisk']:
+    ast.parse(source.read_text(), filename=str(source))
+for name in ('dodropin', 'dodropoff', 'skywarnon', 'skywarnoff', 'bluenode-asterisk'):
+    if not (root / 'install/helpers' / name).is_file():
+        raise SystemExit('Missing helper: ' + name)
+for name in ('install/remote-access.conf.example', 'web/index.html'):
+    if not (root / name).is_file():
+        raise SystemExit('Missing source: ' + name)
+PY
+
+# First pass only prepares configuration. No units, privileges, or services yet.
+if [[ ! -f "$INSTALL_ROOT/config/nodesmart.json" ]]; then
+  install -d -o root -g "$SERVICE_GROUP" -m 0750 "$INSTALL_ROOT" "$INSTALL_ROOT/config"
+  install -o root -g "$SERVICE_GROUP" -m 0640 \
+    "$REPO_ROOT/config/nodesmart.example.json" "$INSTALL_ROOT/config/nodesmart.json"
+  echo "Configuration created: $INSTALL_ROOT/config/nodesmart.json"
+  echo "Edit with sudo: set your node and callsign; choose a trusted listener address."
+  echo "Rerun this installer. BlueNode has NOT been started yet."
+  exit 0
+fi
+
+/usr/bin/python3 "$REPO_ROOT/install/validate-config.py" "$INSTALL_ROOT/config/nodesmart.json"
+
+echo "Installing restricted sudo permissions..."
+tmp_sudoers="$(mktemp)"
+tmp_service=""
+tmp_web_service=""
+staging=""
+cleanup() {
+  rm -f "${tmp_sudoers:-}" "${tmp_service:-}" "${tmp_web_service:-}"
+  if [[ -n "$staging" && "$staging" == "$INSTALL_ROOT"/.install.* ]]; then
+    rm -rf -- "$staging"
+  fi
+}
+trap cleanup EXIT
+sed "s/NODESMART_USER/${SERVICE_USER}/g" "${REPO_ROOT}/install/nodesmart.sudoers.example" > "${tmp_sudoers}"
+/usr/sbin/visudo -cf "${tmp_sudoers}" >/dev/null || fail "Generated sudoers file failed validation."
+
 echo "Preparing BlueNode files and directories..."
 mkdir -p "${INSTALL_ROOT}"
 
 if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
+  # Copy both trees completely before replacing the existing application.
+  staging="$(mktemp -d "$INSTALL_ROOT/.install.XXXXXXXX")"
+  cp -a "$REPO_ROOT/core" "$staging/core"
+  cp -a "$REPO_ROOT/web" "$staging/web"
   rm -rf "${INSTALL_ROOT}/core" "${INSTALL_ROOT}/web"
-  cp -a "${REPO_ROOT}/core" "${INSTALL_ROOT}/core"
-  cp -a "${REPO_ROOT}/web" "${INSTALL_ROOT}/web"
+  mv "$staging/core" "$INSTALL_ROOT/core"
+  mv "$staging/web" "$INSTALL_ROOT/web"
+  rmdir "$staging"
   mkdir -p "${INSTALL_ROOT}/config" "${INSTALL_ROOT}/install/helpers" "${INSTALL_ROOT}/install/remote-access" "${INSTALL_ROOT}/install/soft-radio" "${INSTALL_ROOT}/systemd"
   cp -f "${REPO_ROOT}/config/nodesmart.example.json" "${INSTALL_ROOT}/config/"
   cp -f "${REPO_ROOT}/install/nodesmart.sudoers.example" "${INSTALL_ROOT}/install/"
@@ -72,45 +132,41 @@ fi
 mkdir -p "${INSTALL_ROOT}/events" "${INSTALL_ROOT}/history" "${INSTALL_ROOT}/logs" "${INSTALL_ROOT}/state"
 
 echo "Installing helper commands..."
+install -d -o root -g root -m 0755 /usr/local/sbin
+install -o root -g root -m 0755 "$INSTALL_ROOT/install/helpers/bluenode-asterisk" /usr/local/sbin/bluenode-asterisk
 for helper in dodropin dodropoff skywarnon skywarnoff; do
   src="${INSTALL_ROOT}/install/helpers/${helper}"
   [[ -f "${src}" ]] || fail "Missing helper: ${src}"
   install -o root -g root -m 0755 "${src}" "/usr/local/bin/${helper}"
 done
 
-echo "Installing restricted sudo permissions..."
-tmp_sudoers="$(mktemp)"
-tmp_service=""
-tmp_web_service=""
-trap 'rm -f "${tmp_sudoers:-}" "${tmp_service:-}" "${tmp_web_service:-}"' EXIT
-sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/install/nodesmart.sudoers.example" > "${tmp_sudoers}"
-/usr/sbin/visudo -cf "${tmp_sudoers}" >/dev/null || fail "Generated sudoers file failed validation."
 install -o root -g root -m 0440 "${tmp_sudoers}" "${SUDOERS_FILE}"
 
 echo "Installing systemd services..."
 tmp_service="$(mktemp)"
-sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/systemd/nodesmart.service" > "${tmp_service}"
+sed -e "s/NODESMART_USER/${SERVICE_USER}/g" -e "s/NODESMART_GROUP/${SERVICE_GROUP}/g" "${INSTALL_ROOT}/systemd/nodesmart.service" > "${tmp_service}"
 install -o root -g root -m 0644 "${tmp_service}" "${SERVICE_FILE}"
 tmp_web_service="$(mktemp)"
-sed "s/NODESMART_USER/${SERVICE_USER}/g" "${INSTALL_ROOT}/systemd/nodesmart-web.service" > "${tmp_web_service}"
+sed -e "s/NODESMART_USER/${SERVICE_USER}/g" -e "s/NODESMART_GROUP/${SERVICE_GROUP}/g" "${INSTALL_ROOT}/systemd/nodesmart-web.service" > "${tmp_web_service}"
 install -o root -g root -m 0644 "${tmp_web_service}" "${WEB_SERVICE_FILE}"
 /usr/bin/systemctl daemon-reload
 
-if [[ ! -f "${INSTALL_ROOT}/config/nodesmart.json" ]]; then
-  cp "${INSTALL_ROOT}/config/nodesmart.example.json" "${INSTALL_ROOT}/config/nodesmart.json"
-  chown "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}/config/nodesmart.json"
-  chmod 0644 "${INSTALL_ROOT}/config/nodesmart.json"
-  chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}"
-  echo
-  echo "BlueNode configuration created:"
-  echo "  ${INSTALL_ROOT}/config/nodesmart.json"
-  echo "Edit the node number, callsign, and friendly nodes, then rerun this installer."
-  echo "BlueNode has NOT been started yet."
-  exit 0
-fi
-
-chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_ROOT}"
-find "${INSTALL_ROOT}" -type d -exec chmod 0755 {} \;
+# Never make root-invoked installers or application code writable by the web user.
+chown root:root "$INSTALL_ROOT"
+chmod 0755 "$INSTALL_ROOT"
+for directory in core web install systemd; do
+  chown -R root:root "$INSTALL_ROOT/$directory"
+  find "$INSTALL_ROOT/$directory" -type d -exec chmod 0755 {} \;
+  find "$INSTALL_ROOT/$directory" -type f -exec chmod a+r,go-w {} \;
+done
+chown root:"$SERVICE_GROUP" "$INSTALL_ROOT/config" "$INSTALL_ROOT/config/nodesmart.json"
+chmod 0750 "$INSTALL_ROOT/config"
+chmod 0640 "$INSTALL_ROOT/config/nodesmart.json"
+for directory in events history logs state; do
+  chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_ROOT/$directory"
+  find "$INSTALL_ROOT/$directory" -type d -exec chmod 0750 {} \;
+  find "$INSTALL_ROOT/$directory" -type f -exec chmod 0640 {} \;
+done
 
 if [[ ! -e "/usr/local/bin/SkywarnPlus/SkyControl.py" ]]; then
   echo "WARNING: SkywarnPlus was not detected. Skywarn controls will not work until it is installed."
@@ -119,35 +175,12 @@ fi
 echo "Validating Python files..."
 /usr/bin/python3 -m py_compile "${INSTALL_ROOT}/core/config.py" "${INSTALL_ROOT}/core/monitor.py" || fail "Python syntax validation failed."
 
-echo "Configuring dashboard firewall access..."
-WEB_PORT="$("/usr/bin/python3" -c 'import json,sys; print(json.load(open(sys.argv[1]))["web"]["port"])' "${INSTALL_ROOT}/config/nodesmart.json")"
-
-[[ "${WEB_PORT}" =~ ^[0-9]+$ ]] || fail "Invalid web.port in nodesmart.json"
-(( WEB_PORT >= 1 && WEB_PORT <= 65535 )) || fail "web.port must be between 1 and 65535"
-
-if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
-  DEFAULT_INTERFACE="$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')"
-  FIREWALL_ZONE=""
-
-  if [[ -n "${DEFAULT_INTERFACE}" ]]; then
-    FIREWALL_ZONE="$(firewall-cmd --get-zone-of-interface="${DEFAULT_INTERFACE}" 2>/dev/null || true)"
-  fi
-
-  if [[ -z "${FIREWALL_ZONE}" || "${FIREWALL_ZONE}" == "no zone" ]]; then
-    FIREWALL_ZONE="$(firewall-cmd --get-default-zone)"
-  fi
-
-  firewall-cmd --permanent --zone="${FIREWALL_ZONE}" --add-port="${WEB_PORT}/tcp" >/dev/null
-  firewall-cmd --reload >/dev/null
-  echo "Allowed BlueNode dashboard TCP port ${WEB_PORT} in firewalld zone ${FIREWALL_ZONE}."
-else
-  echo "WARNING: Active firewalld was not detected."
-  echo "Ensure TCP port ${WEB_PORT} is allowed on the host firewall for dashboard access."
-fi
+echo "Firewall and network settings are unchanged. See docs/INSTALL.md for access guidance."
 
 echo "Enabling and starting BlueNode..."
 /usr/bin/systemctl enable nodesmart nodesmart-web
 /usr/bin/systemctl restart nodesmart nodesmart-web
+sleep 2
 
 if /usr/bin/systemctl is-active --quiet nodesmart && /usr/bin/systemctl is-active --quiet nodesmart-web; then
   echo "BlueNode installation complete."

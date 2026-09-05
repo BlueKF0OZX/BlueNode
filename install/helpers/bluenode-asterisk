@@ -1,0 +1,24 @@
+#!/usr/bin/python3 -I
+"""Root-owned, shell-free boundary for the dashboard's Asterisk commands."""
+import re
+import subprocess
+import sys
+
+
+def allowed(arguments):
+    if len(arguments) != 2 or arguments[0] != "-rx":
+        return False
+    command = arguments[1]
+    return command in {
+        "core show version", "core show uptime seconds",
+        "module show like chan_iax2", "rpt show registrations",
+    } or re.fullmatch(
+        r"rpt (?:show variables [0-9]{1,10}|lstats [0-9]{1,10}|"
+        r"fun [0-9]{1,10} \*[13][0-9]{1,10})", command) is not None
+
+
+if __name__ == "__main__":
+    if not allowed(sys.argv[1:]):
+        sys.exit("BlueNode: Asterisk command not permitted")
+    sys.exit(subprocess.run(["/usr/sbin/asterisk", *sys.argv[1:]],
+                            timeout=10, env={"PATH": "/usr/sbin:/usr/bin:/bin"}).returncode)

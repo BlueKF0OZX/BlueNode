@@ -10,6 +10,9 @@ After=network.target
 Type=simple
 
 User=NODESMART_USER
+Group=NODESMART_GROUP
+UMask=0027
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 WorkingDirectory=/opt/nodesmart
 

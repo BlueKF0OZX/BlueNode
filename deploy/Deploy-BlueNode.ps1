@@ -147,6 +147,12 @@ on_error() {
 trap 'on_error $LINENO' ERR
 
 [[ -d "$app_root/.git" ]]
+# Code-only deployment cannot migrate system helpers or privileges.
+if [[ ! -x /usr/local/sbin/bluenode-asterisk ]] ||
+   ! grep -q /usr/local/sbin/bluenode-asterisk /etc/sudoers.d/nodesmart; then
+    report FAIL "Run the current installer from a separate checkout first; see docs/INSTALL.md"
+    exit 1
+fi
 mkdir -p "$backup_root"
 tar -czf "$backup" -C "$app_root" .
 tar -tzf "$backup" >/dev/null
@@ -175,7 +181,7 @@ git_live reset --hard --quiet "$target_commit"
 
 # Git never cleans these ignored machine-specific paths. Restore their service
 # ownership explicitly so a prior root operation cannot block runtime writes.
-for path in config/nodesmart.json events history logs state; do
+for path in events history logs state; do
     if [[ -e "$app_root/$path" ]]; then
         chown -R "$service_user:$service_group" "$app_root/$path"
     fi

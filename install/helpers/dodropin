@@ -1,16 +1,18 @@
-
 #!/bin/bash
-
-
-
-CONFIG="/opt/nodesmart/config/nodesmart.json"
-
-
-
-NODE=$(python3 -c 'import json; print(json.load(open("'"$CONFIG"'"))["node"])')
-
-TARGET=$(python3 -c 'import json; d=json.load(open("'"$CONFIG"'")); print(next(k for k,v in d.get("friendly_nodes",{}).items() if str(v).upper()=="DODROPIN"))')
-
-
-
-asterisk -rx "rpt fun ${NODE} *3${TARGET}"
+set -euo pipefail
+[[ $# -eq 0 ]] || exit 1
+mapfile -t values < <(/usr/bin/python3 -I - <<'PY'
+import json
+with open('/opt/nodesmart/config/nodesmart.json') as handle:
+    config = json.load(handle)
+node = str(config['node'])
+target = next((str(k) for k, v in config.get('friendly_nodes', {}).items()
+               if str(v).upper() == 'DODROPIN'), '')
+if not (node.isascii() and node.isdigit() and target.isascii() and target.isdigit()):
+    raise SystemExit('Configure a numeric DODROPIN friendly-node mapping first')
+print(node)
+print(target)
+PY
+)
+[[ ${#values[@]} -eq 2 ]] || exit 1
+exec /usr/local/sbin/bluenode-asterisk -rx "rpt fun ${values[0]} *3${values[1]}"
