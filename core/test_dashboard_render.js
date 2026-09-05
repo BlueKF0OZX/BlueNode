@@ -84,6 +84,9 @@ function fixture(detailed) {
       assert.equal(await page.locator('.weather-link').evaluate(e=>getComputedStyle(e,'::after').content), 'none', 'weather link must not inherit connectivity diagnostic caption');
       assert.equal(await page.locator('#weather-alerts img').count(), 0, 'weather descriptions must remain text');
       assert.match(await page.locator('#weather-alerts').innerText(), /XXC001/);
+      assert.equal(await page.locator('#weather-overview').textContent(), 'Up to date');
+      assert.match(await page.locator('#weather-freshness').textContent(), /^Last updated: /);
+      assert.doesNotMatch(await page.locator('#weather-disclosure').textContent(), /Last complete|Grouped by|CURRENT/);
       await page.locator('#weather-alerts details summary').first().click();
       await page.evaluate(()=>renderWeather(weatherSource));
       assert.equal(await page.locator('#weather-alerts details').first().evaluate(e=>e.open), true, 'refresh preserves expanded description');
@@ -95,9 +98,18 @@ function fixture(detailed) {
         await page.evaluate(status=>renderWeather({status,alerts:[]}),status);
         assert.match(await page.locator('#weather-summary').innerText(), /Alert information/);
         assert.equal(await page.locator('#weather-alerts .weather-alert').count(),0);
+        const label = status === 'stale' ? 'Information may be outdated' : 'Weather information unavailable';
+        assert.equal(await page.locator('#weather-overview').textContent(), label);
+        assert.equal(await page.locator('#weather-alerts').textContent(), label);
+        assert.equal(await page.locator('#weather-freshness').textContent(), '');
+        assert.doesNotMatch(await page.locator('#weather-disclosure').textContent(), /No active weather alerts/);
       }
       await page.evaluate(()=>renderWeather({status:'current',last_success:Date.now()/1000,alerts:[]}));
       assert.equal(await page.locator('#weather-summary').innerText(),'No active weather alerts');
+      assert.equal(await page.locator('#weather-overview').textContent(), 'Up to date');
+      assert.equal(await page.locator('#weather-alerts').textContent(), 'No active weather alerts');
+      assert.match(await page.locator('#weather-freshness').textContent(), /^Last updated: /);
+      assert.equal(await page.locator('#weather-alerts').evaluate(e=>e.nextElementSibling.id), 'weather-freshness');
       await page.evaluate(()=>renderWeather({status:'current',last_success:Date.now()/1000,alerts:
         ['Tornado Warning','Flash Flood Warning'].map(event=>({event,county_code:'XXC001',severity:4,end_time:Date.now()/1000+60}))}));
       assert.equal(await page.locator('#weather-summary').innerText(),'2 ACTIVE ALERT TYPES');

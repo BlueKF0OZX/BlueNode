@@ -1044,10 +1044,10 @@
 
 
     <details id="weather-disclosure" class="connectivity-panel">
-      <summary><span>Current Weather Alerts</span><span id="weather-overview">Unavailable</span></summary>
+      <summary><span>Current Weather Alerts</span><span id="weather-overview">Weather information unavailable</span></summary>
       <div class="connectivity-body">
+        <div id="weather-alerts">Weather information unavailable</div>
         <p id="weather-freshness"></p>
-        <div id="weather-alerts">Alert information unavailable</div>
       </div>
     </details>
 
@@ -1886,16 +1886,16 @@
         status === 'stale' ? 'Alert information stale' : 'Alert information unavailable';
       document.getElementById('weather-summary').textContent = message;
       document.getElementById('weather-primary').textContent = events[0] || '';
-      document.getElementById('weather-overview').textContent = status.toUpperCase();
+      const detailStatus = {current: 'Up to date', stale: 'Information may be outdated', unavailable: 'Weather information unavailable'}[status];
+      document.getElementById('weather-overview').textContent = detailStatus;
       document.getElementById('weather-freshness').textContent =
-        (Number.isFinite(s.last_success) ? 'Last complete SkywarnPlus check: ' + new Date(s.last_success * 1000).toLocaleString() + '. ' : '') +
-        (status !== 'current' ? (s.reason || message) : 'Grouped by the alert types SkywarnPlus supplies.');
+        Number.isFinite(s.last_success) ? 'Last updated: ' + new Date(s.last_success * 1000).toLocaleString() : '';
       const markup = alerts.length ? events.map(event =>
         `<article class="weather-alert ${significant(event) ? 'weather-important' : ''}"><h3>${esc(event)}</h3>` +
         alerts.filter(a => a.event === event).map(a => `<p>Area: ${esc(a.area || a.county_code)} (${esc(a.county_code)}) &middot; SkywarnPlus severity: ${esc(a.severity)}/4</p>` +
           `<p>Ends: ${esc(new Date(a.end_time * 1000).toLocaleString())}</p>` +
           (a.description ? `<details><summary>Description</summary><div class="weather-description">${esc(a.description)}</div></details>` : '')).join('') + '</article>'
-      ).join('') : esc(message);
+      ).join('') : esc(status === 'current' ? message : detailStatus);
       if (markup !== weatherMarkup) {
         document.getElementById('weather-alerts').innerHTML = markup;
         weatherMarkup = markup;
