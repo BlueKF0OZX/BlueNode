@@ -1,7 +1,7 @@
 {
   "node": "12345",
   "callsign": "N0CALL",
-  "friendly_nodes": {},
+  "friendly_nodes": {"50241": "DODROPIN"},
   "web": {
     "host": "127.0.0.1",
     "port": 8080

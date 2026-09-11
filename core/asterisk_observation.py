@@ -103,7 +103,7 @@ def node_evidence(node=None):
         else:
             reason = 'invalid_or_incomplete_node_response'
         return dict(base, reason=reason)
-    return dict(base, status='available', reason=None)
+    return dict(base, status='available', reason=None, links=sample['links'])
 
 
 def collect():

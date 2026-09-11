@@ -1917,7 +1917,10 @@
       const skywarnOnButton = document.getElementById('btn-skywarn-on');
       const skywarnOffButton = document.getElementById('btn-skywarn-off');
 
-      if (connectButton) connectButton.disabled = dodropinConnected;
+      if (connectButton) {
+        connectButton.disabled = !dodropinNode || dodropinConnected;
+        connectButton.title = dodropinNode ? '' : 'Configure the DODROPIN friendly-node mapping, or use Manual Node Connection.';
+      }
       if (disconnectButton) disconnectButton.disabled = !dodropinConnected;
 
 

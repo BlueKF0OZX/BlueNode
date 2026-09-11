@@ -31,7 +31,9 @@ class PolicyTests(unittest.TestCase):
         self.stack.enter_context(patch.object(web, 'ADMIN', self.auth))
         self.effects = [self.stack.enter_context(patch.object(obj, name)) for obj, name in (
             (web.subprocess, 'run'), (web, 'emit'), (web.automation, 'set_maintenance'),
-            (web.emergency_mode, 'set_emergency'), (self.auth, 'action'))]
+            (web.emergency_mode, 'set_emergency'), (self.auth, 'action'),
+            (web.node_controls, 'perform'))]
+        self.effects[-1].return_value = (200, {'ok': True, 'outcome': 'already_satisfied'})
         self.stack.enter_context(patch.object(web, 'CONFIG', {'node': '12345'}))
         salt, digest = admin.hash_password('fixture password value', iterations=200000)
         self.valid = dict(enabled=True, username='operator', password_salt=salt,
@@ -163,7 +165,8 @@ class PolicyTests(unittest.TestCase):
         self.effects[0].return_value.returncode = 0
         self.effects[0].return_value.stdout = ''
         self.assertEqual(self.request('POST', '/api/control/node-connect', {'node': '23456'})[0], 200)
-        self.effects[0].assert_called_once()
+        self.effects[-1].assert_called_once()
+        self.effects[0].assert_not_called()
         self.marker.write_text(admin.INTENT_CONTENT); self.marker.chmod(0o640)
         self.write(dict(self.valid, harmless={'future': True}, state='DISABLED'))
         self.assertEqual(admin._safe_config()['state'], 'ENABLED')
