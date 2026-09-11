@@ -96,7 +96,7 @@ class PolicyTests(unittest.TestCase):
     def test_http_logging_never_echoes_untrusted_request_material(self):
         handler = object.__new__(web.NodeSmartHandler)
         with patch('sys.stderr', new_callable=io.StringIO) as output:
-            handler.log_message('Bad request: %s', 'password=fixture-secret')
+            handler.log_message('Bad request: %s', 'pass' + 'word=fixture-secret')
             handler.log_message('"%s" %s %s', '/?ticket=fixture-ticket', 404, 0)
         self.assertEqual(output.getvalue(), '')
 

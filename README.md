@@ -6,12 +6,14 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 ## Dashboard
 
 ![BlueNode Dashboard](bluenode-dashboard.jpeg)
+
+Current dashboard with synthetic example observations. See [Testing](docs/TESTING.md) and [radio-origin limits](docs/TX_ORIGIN.md).
 ## Features
 
 - Live AllStar, Asterisk, Internet, CPU, memory, disk, and uptime monitoring
 - HEALTHY / DEGRADED / FAULT health states
 - Connection/session tracking with friendly node names
-- Live local RX, node PTT, and keyed AllStar-link activity telemetry
+- Passive backend local-RF and adjacent-peer telemetry with explicit attribution limits
 - Cached callsign and registered-location enrichment for active remote nodes
 - Cached layered diagnostics for LAN, gateway, DNS, Internet, and AllStar connectivity
 - Manual connect/disconnect controls
@@ -28,7 +30,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 
 ## Requirements
 
-AllStarLink v3, Python 3, Asterisk with `rpt`, systemd, sudo, and a Linux service user. SkywarnPlus is optional.
+AllStarLink v3 (Debian/systemd), Python 3.9 or newer, Asterisk with `rpt`, systemd, sudo, and a Linux service user. SkywarnPlus is optional.
 
 ## Install
 
@@ -56,10 +58,8 @@ Follow [Installation](docs/INSTALL.md) for dashboard access, prerequisites,
 verification, optional integrations, updates, recovery, and troubleshooting.
 See [Configuration](docs/CONFIGURATION.md) for operator settings.
 
-For the guarded Windows-to-node deployment workflow, see
-`docs/DEPLOYMENT.md`.
-It documents the canonical identity check, `git push origin main`, and the
-single-command deployment/live-verification path for routine changes.
+See [Upgrade and rollback](docs/UPGRADE.md) before updating an existing node.
+The separate [maintainer deployment workflow](docs/DEPLOYMENT.md) requires an existing installed Git checkout.
 
 Optional authenticated remote access is disabled by default. Its preparation,
 security model, direct Apache mode, and provider-neutral tunnel guidance are in
@@ -101,7 +101,7 @@ existing collection cycle. See [Weather Alerts](docs/WEATHER_ALERTS.md) for the
 explicit installation check, freshness rules and update compatibility. Without
 the observer, alert telemetry is unavailable. Manage SkywarnPlus directly through its own tools.
 
-Friendly node controls can be configured using entries in friendly_nodes.
+The example friendly_nodes mapping includes 50241 ? DODROPIN. Existing operator mappings are preserved. Node controls verify fresh App_Rpt state; unavailable observations do not count as successful connections. Manual controls do not depend on the online node directory.
 
 ## Project layout
 

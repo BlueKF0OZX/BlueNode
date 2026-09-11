@@ -149,11 +149,10 @@ queries and numeric connect/disconnect commands BlueNode uses. The rule also
 allows the exact Asterisk restart command for opt-in recovery and deliberate
 Remote Admin actions. It grants no arbitrary Asterisk CLI or shell access.
 Four root-owned optional helpers are installed in `/usr/local/bin`:
-`dodropin`, `dodropoff`, `skywarnon`, and `skywarnoff`.
+`dodropin`, `dodropoff`, `skywarnon`, and `skywarnoff`. The Skywarn helpers are non-executing compatibility stubs without sudo grants.
 
 Installation never writes Asterisk/App_Rpt or radio configuration, restarts
-Asterisk, originates channels, sends DTMF, or keys PTT. Clicking connection or
-Skywarn controls later is a deliberate operational action and can affect radio
+Asterisk, originates channels, sends DTMF, or keys PTT. Clicking node connection controls later is a deliberate operational action and can affect radio
 operation. Monitoring alone does not invoke those controls.
 
 ## First startup and optional integrations
@@ -165,15 +164,15 @@ UNAVAILABLE while evidence is incomplete. Emergency Mode defaults to normal.
 Missing optional data does not prevent service startup.
 
 - SkywarnPlus is detected at `/usr/local/bin/SkywarnPlus/config.yaml`, with
-  controls through `SkyControl.py` in that directory. Install and configure it
-  separately; otherwise Skywarn is unknown and its dashboard buttons disabled.
+  read-only status observations. Install and configure it separately. BlueNode
+  does not execute SkywarnPlus; its former On/Off buttons remain disabled.
   Weather awareness additionally requires the optional guarded
   [snapshot observer](WEATHER_ALERTS.md), installed from the public checkout.
   Missing, failed or partial snapshots show unavailable; old successful data
   shows stale. Only a successful current empty snapshot means no active alerts.
   Normal BlueNode installation neither installs nor updates this observer.
 - DODROPIN is optional: add your chosen node number with the label `DODROPIN`
-  in `friendly_nodes`. No destination is shipped or inferred.
+  in `friendly_nodes`. The example maps 50241 to DODROPIN; existing mappings are preserved.
 - [Remote Admin](REMOTE_ADMIN.md) requires separate credential initialization
   and trusted HTTPS. Use the same `NODESMART_USER=bluenode` when invoking its
   lifecycle helper. There are no default credentials. Journal access may need
@@ -184,6 +183,8 @@ Missing optional data does not prevent service startup.
   not activate it as part of installation validation. Net Mode/NetMap are deferred.
 
 ## Updating and recovering
+
+Follow [Upgrade and rollback](UPGRADE.md) for the complete backup set, managed-file customizations, migration boundaries, and restoration procedure.
 
 Keep the public checkout separate from `/opt/nodesmart`. Back up the live
 configuration and runtime data to a private location, then from that checkout:

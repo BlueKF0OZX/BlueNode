@@ -6,7 +6,7 @@ in [Installation](INSTALL.md). Before deploying code that uses the restricted
 Asterisk broker, run the current installer from a separate checkout with the
 existing service user. The code-only deployment refuses an unmigrated host
 before changing application files; it cannot install helpers, sudo rules, or
-unit changes. This validation run does not deploy to the live radio node.
+unit changes. Use this maintainer workflow only for an explicitly selected installation.
 
 
 After an approved change has been tested, committed, and pushed to `main`, run
@@ -18,7 +18,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy-BlueNode.ps1
 
 The command refuses to deploy a dirty tree, a branch other than `main`, a local
 `main` that differs from `origin/main`, or any configured/commit author identity
-other than `BlueKF0OZX <bluedrummer1985@outlook.com>`. It deploys the recorded
+other than the project-maintainer identity enforced by the script. It deploys the recorded
 commit through an explicitly configured operator SSH target.
 
 Configure the target outside tracked files using one of these methods:
@@ -70,10 +70,9 @@ commit, backup path, and dashboard checksum are recorded under
 recorded overlay and refuses unknown tracked changes. A later full application
 migration must account for the recorded UI version.
 
-## Canonical autonomous workflow
+## Maintainer workflow
 
-Use these stable commands for routine work so execution approvals remain narrow
-and reusable:
+The commands below are separate operations; pushing and deployment require an explicit operator decision:
 
 ```powershell
 # Before committing: verify branch, official origin, and exact Git identity.
@@ -106,4 +105,4 @@ and common private-key, Tailscale, GitHub, cloud-key, password, and token
 signatures. It scans tracked and staged text content, while ignored local
 runtime data remains outside the public repository. It also rejects known
 operator-specific fixture identifiers while preserving the intentional
-`BlueKF0OZX <bluedrummer1985@outlook.com>` project identity.
+project-maintainer identity.

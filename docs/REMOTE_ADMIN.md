@@ -76,8 +76,7 @@ For an existing installation, `session_seconds` in the root-managed
 `/etc/bluenode/remote-admin.json` can be set to `2592000` after installing the
 updated session backend. This is a 30-day absolute maximum, not a sliding expiry.
 Keep `secure_cookie: true` and use the existing HTTPS access path. Explicit shorter
-lifetimes remain supported (minimum 300 seconds). Legacy configurations with
-insecure cookies are capped at 24 hours; the UI does not change this setting.
+lifetimes remain supported (minimum 300 seconds). Configurations with insecure cookies are rejected as CONFIG_ERROR; the UI does not change this setting.
 Changing the lifetime revokes old sessions, so sign in again once. Use Sign out
 on shared devices; do not choose a long duration on a browser others can access.
 No password, session token, or pending control is stored in localStorage or
@@ -88,7 +87,7 @@ A control rejected with HTTP 401 is retained in memory while the existing sign-i
 panel is focused. Successful login must be followed by a verified session and CSRF
 token before the original control resumes once. Emergency confirmation still
 happens before queuing. Only the enumerated ordinary controls and validated numeric
-node parameters can be queued. Administrative service actions are not queued.
+node parameters can be queued. The fixed administrative service actions can also be queued; Asterisk restart requires its explicit confirmation before queuing.
 
 Failed login, Cancel pending control, sign-out, leaving the page, or reload
 clears the pending action. One ordinary control can be outstanding at a time;
