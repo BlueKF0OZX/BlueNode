@@ -81,7 +81,7 @@ class ObservationTests(unittest.TestCase):
         if command[:3] == ['systemctl', 'show', 'asterisk']:
             value = self.service_results[0]
             if len(self.service_results) > 1: self.service_results.pop(0)
-        elif 'restart' in command:
+        elif 'start' in command:
             if self.after_restart:
                 self.service_results = [service()]
                 self.query = subprocess.CompletedProcess([], 0, 'Asterisk 22.0 fixture', '')
@@ -101,7 +101,7 @@ class ObservationTests(unittest.TestCase):
         return monitor.run_health_cycle(coordinator)
 
     def assert_no_restart(self):
-        self.assertFalse(any('restart' in command for command in self.calls))
+        self.assertFalse(any('restart' in command or 'start' in command for command in self.calls))
         self.assertFalse(any(event['event'] == 'RECOVERY.ASTERISK.ATTEMPT' for event in self.events))
 
     def test_original_false_restart_matrix_real_pipeline(self):
@@ -158,7 +158,7 @@ class ObservationTests(unittest.TestCase):
                 self.service_results = [service(active, sub, 0)]
                 self.query = PermissionError('fixture')
                 self.cycle()
-                self.assertEqual(sum('restart' in c for c in self.calls), 1)
+                self.assertEqual(sum('start' in c for c in self.calls), 1)
                 self.assertEqual(self.verified_results[-1][0], 'success')
 
     def test_service_changes_during_confirmation_and_final_race(self):

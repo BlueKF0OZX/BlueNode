@@ -146,8 +146,8 @@ readable, mode `0640`; units use umask `0027`.
 The installer installs `/etc/sudoers.d/nodesmart` with mode `0440` after
 `visudo` validation. `/usr/local/sbin/bluenode-asterisk` allows only the status
 queries and numeric connect/disconnect commands BlueNode uses. The rule also
-allows the exact Asterisk restart command for opt-in recovery and deliberate
-Remote Admin actions. It grants no arbitrary Asterisk CLI or shell access.
+allows an exact non-disruptive Asterisk start command for opt-in recovery and a
+separate explicit restart command for deliberate Remote Admin actions. It grants no arbitrary Asterisk CLI or shell access.
 Four root-owned optional helpers are installed in `/usr/local/bin`:
 `dodropin`, `dodropoff`, `skywarnon`, and `skywarnoff`. The Skywarn helpers are non-executing compatibility stubs without sudo grants.
 

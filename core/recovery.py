@@ -155,7 +155,9 @@ def recover_asterisk():
         return
     started_at = time.time()
     try:
-        # Last external observation immediately before the mutating command.
+        # Retain authoritative evidence, then use an idempotent start job.
+        # If Asterisk starts after this probe, systemd leaves it running.
+        # Fail rather than replace a conflicting queued stop/restart job.
         if not asterisk_observation.confirmed_stopped(asterisk_observation.service_evidence()):
             message = "Final service evidence does not confirm an outage; restart cancelled"
             emit("RECOVERY.ASTERISK.CANCELLED", message)
@@ -165,14 +167,14 @@ def recover_asterisk():
         emit("RECOVERY.ASTERISK.ATTEMPT",
              f"Independently confirmed stopped service; recovery attempt {attempt} started")
         result = subprocess.run(
-            ["sudo", "-n", "systemctl", "restart", "asterisk"],
+            ["sudo", "-n", "/usr/bin/systemctl", "--job-mode=fail", "start", "asterisk"],
             capture_output=True, text=True, timeout=20,
         )
     except subprocess.TimeoutExpired:
-        _failed("Asterisk restart command timed out")
+        _failed("Asterisk start command timed out")
         return
     except OSError as exc:
-        _failed(f"Unable to execute restart: {exc}")
+        _failed(f"Unable to execute start: {exc}")
         return
     if result.returncode != 0:
         _failed(result.stderr.strip() or result.stdout.strip()
@@ -180,7 +182,7 @@ def recover_asterisk():
         return
     verified, message = verify_recovery(started_at)
     if not verified:
-        _failed(f"Restart completed but verification failed: {message}")
+        _failed(f"Start completed but verification failed: {message}")
         return
     emit("RECOVERY.ASTERISK.SUCCESS", message)
     record_recovery_result("success", message)
