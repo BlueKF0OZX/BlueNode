@@ -2580,7 +2580,7 @@
         }
 
         const connectionStats = data.connection_stats || {};
-        connectionsObserved = allstarObserved && data.radio_activity?.telemetry_available === true && data.radio_activity?.stale === false &&
+        connectionsObserved = connectionStats.state_available !== false && allstarObserved && data.radio_activity?.telemetry_available === true && data.radio_activity?.stale === false &&
           Array.isArray(data.connected_nodes) && ['connections_today','connected_seconds_today','active_connections',
             'completed_connections_today','completed_connected_seconds_today'].every(k => Number.isFinite(connectionStats[k]) && connectionStats[k] >= 0) &&
           Array.isArray(connectionStats.recent_sessions);

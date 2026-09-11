@@ -48,7 +48,7 @@ class RuntimeIOTests(unittest.TestCase):
     def test_history_skips_corrupt_and_non_object_records(self):
         self.path.write_text('null\n[]\n{\n{"node":"50241"}\n')
         with patch.object(connection_stats, 'HISTORY_FILE', self.path):
-            self.assertEqual(connection_stats.load_history(), [{'node': '50241'}])
+            self.assertEqual(connection_stats.load_history(), [])
 
     def test_logging_failure_does_not_interrupt_monitoring(self):
         with patch.object(event_logger, 'append_bounded', side_effect=OSError('fixture')):

@@ -1,3 +1,4 @@
+import connection_state
 
 import subprocess
 
@@ -77,49 +78,7 @@ def get_links(sample=None):
 
 
 def load_state():
-
-    if not os.path.exists(STATE_FILE):
-
-        return {
-
-            "links": [],
-
-            "connected_since": {}
-
-        }
-
-
-
-    try:
-
-        with open(STATE_FILE, "r") as f:
-
-            data = json.load(f)
-
-
-
-        return {
-
-            "links": data.get("links", []),
-
-            "connected_since": data.get("connected_since", {})
-
-        }
-
-
-
-    except (OSError, ValueError, TypeError, AttributeError, RecursionError):
-
-        return {
-
-            "links": [],
-
-            "connected_since": {}
-
-        }
-
-
-
+    return connection_state.load(STATE_FILE)
 
 
 def save_state(links, connected_since):

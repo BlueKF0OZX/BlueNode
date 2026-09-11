@@ -1,5 +1,9 @@
 """Exercise real health -> events/incidents -> scheduling -> recovery, without effects."""
 import copy
+import tempfile
+from pathlib import Path
+import connection_stats
+import connection_state
 import subprocess
 import time
 import threading
@@ -103,6 +107,23 @@ class ObservationTests(unittest.TestCase):
     def assert_no_restart(self):
         self.assertFalse(any('restart' in command or 'start' in command for command in self.calls))
         self.assertFalse(any(event['event'] == 'RECOVERY.ASTERISK.ATTEMPT' for event in self.events))
+
+    def test_corrupt_connections_do_not_prevent_fresh_health_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'allstar.json'
+            path.write_text('{"links":["50241"],"connected_since":[]}')
+            with patch.object(health, 'get_allstar_state', side_effect=lambda: connection_state.load(path)), \
+                 patch.object(health, 'summarize_connections', side_effect=connection_stats.summarize_connections), \
+                 patch.object(connection_stats, 'ALLSTAR_STATE_FILE', path), \
+                 patch.object(connection_stats, 'HISTORY_FILE', path.parent / 'missing-history'):
+                before = time.time()
+                state = self.cycle()
+            self.assertEqual(state['asterisk'], 'online')
+            self.assertGreaterEqual(datetime.fromisoformat(self.state['last_health_check']).timestamp(), before - 1)
+            self.assertFalse(state['connection_stats']['state_available'])
+            self.assertEqual(state['connection_stats']['active_connections'], 0)
+            self.assertEqual(state['connected_nodes'], [])
+            self.assert_no_restart()
 
     def test_original_false_restart_matrix_real_pipeline(self):
         failures = [subprocess.CompletedProcess([], 1, '', reason) for reason in

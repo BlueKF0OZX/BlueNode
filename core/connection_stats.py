@@ -4,6 +4,7 @@
 
 
 import json
+import connection_state
 from runtime_io import tail_lines, HISTORY_BYTES
 
 from datetime import datetime, timezone, time
@@ -27,7 +28,11 @@ def load_history():
     for line in tail_lines(HISTORY_FILE, HISTORY_BYTES, backups=2):
         try:
             record = json.loads(line)
-            if isinstance(record, dict):
+            started = parse_datetime(record.get('connected_at')) if isinstance(record, dict) else None
+            ended = parse_datetime(record.get('disconnected_at')) if isinstance(record, dict) else None
+            if (started is not None and ended is not None and started <= ended <= datetime.now(timezone.utc)
+                    and connection_state.numeric(record.get('node'))
+                    and isinstance(record.get('name', ''), str)):
                 records.append(record)
         except (ValueError, TypeError, RecursionError):
             continue
@@ -35,55 +40,11 @@ def load_history():
 
 
 def load_active_connections():
-
-    try:
-
-        with ALLSTAR_STATE_FILE.open() as file:
-
-            data = json.load(file)
-
-
-
-        return data.get("connected_since", {})
-
-
-
-    except (OSError, ValueError, TypeError, AttributeError, RecursionError):
-
-        return {}
-
-
-
+    return connection_state.load(ALLSTAR_STATE_FILE)['connected_since']
 
 
 def parse_datetime(value):
-
-    if not value:
-
-        return None
-
-
-
-    try:
-
-        dt = datetime.fromisoformat(value)
-
-    except (ValueError, TypeError):
-
-        return None
-
-
-
-    if dt.tzinfo is None:
-
-        dt = dt.replace(tzinfo=timezone.utc)
-
-
-
-    return dt.astimezone(timezone.utc)
-
-
-
+    return connection_state.timestamp(value)
 
 
 def overlap_seconds(started, ended, window_start, window_end):
@@ -110,7 +71,8 @@ def summarize_connections():
 
     records = load_history()
 
-    active_connections = load_active_connections()
+    observed = connection_state.load(ALLSTAR_STATE_FILE)
+    active_connections = observed['connected_since']
 
 
 
@@ -315,6 +277,8 @@ def summarize_connections():
 
 
     return {
+
+        "state_available": observed["state_available"],
 
         "connections_today":
 

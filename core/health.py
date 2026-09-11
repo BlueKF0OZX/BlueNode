@@ -1,3 +1,4 @@
+import connection_state
 
 import json
 
@@ -174,39 +175,7 @@ def get_disk_usage():
 
 
 def get_allstar_state():
-
-    """Read connection state maintained by the BlueNode monitor."""
-
-    try:
-
-        with ALLSTAR_STATE_FILE.open("r") as file:
-
-            data = json.load(file)
-
-
-
-        return {
-
-            "links": data.get("links", []),
-
-            "connected_since": data.get("connected_since", {})
-
-        }
-
-
-
-    except (OSError, json.JSONDecodeError):
-
-        return {
-
-            "links": [],
-
-            "connected_since": {}
-
-        }
-
-
-
+    return connection_state.load(ALLSTAR_STATE_FILE)
 
 
 def check_skywarn():
