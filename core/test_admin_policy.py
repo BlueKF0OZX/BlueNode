@@ -75,6 +75,15 @@ class PolicyTests(unittest.TestCase):
         self.assertTrue(all(call.args[1] in ('config_error', 'rejected')
                             for call in self.auth.audit.call_args_list))
 
+    def test_skywarn_controls_are_read_only_even_in_local_mode(self):
+        self.write({'enabled': False})
+        for action in ('skywarn-enable', 'skywarn-disable'):
+            code, body = self.request('POST', '/api/control/' + action)
+            self.assertEqual(code, 403)
+            self.assertIn('read-only', body['error'])
+        for effect in self.effects:
+            effect.assert_not_called()
+
     def test_http_logging_never_echoes_untrusted_request_material(self):
         handler = object.__new__(web.NodeSmartHandler)
         with patch('sys.stderr', new_callable=io.StringIO) as output:

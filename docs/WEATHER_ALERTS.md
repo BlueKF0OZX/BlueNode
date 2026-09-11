@@ -1,5 +1,7 @@
 # Current SkywarnPlus Weather Alerts
 
+BlueNode integration is strictly read-only. The former Skywarn On/Off actions are disabled, and new installer sudo rules do not grant access to those helpers. Manage SkywarnPlus directly with its own tools. No polling or dashboard action starts SkywarnPlus.
+
 BlueNode consumes the alerts SkywarnPlus already computes. There is no additional
 weather API, independent filtering engine, weather command, or browser-triggered
 collection. SkywarnPlus enable/disable controls and their authentication remain

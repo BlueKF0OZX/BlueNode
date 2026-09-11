@@ -15,7 +15,7 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 - Cached callsign and registered-location enrichment for active remote nodes
 - Cached layered diagnostics for LAN, gateway, DNS, Internet, and AllStar connectivity
 - Manual connect/disconnect controls
-- Optional DODROPIN and SkywarnPlus controls
+- Optional DODROPIN controls and read-only SkywarnPlus observations
 - Event logging and incident correlation
 - BlueNode Intelligence summaries and recommendations
 - Automatic Asterisk recovery with verification, cooldown, and lockout protection
@@ -95,11 +95,11 @@ authenticated HTTPS and application-level Remote Admin; see the linked guides.
 
 ## Optional integrations
 
-Skywarn controls require an existing SkywarnPlus installation at `/usr/local/bin/SkywarnPlus/`.
+SkywarnPlus observations require an existing installation at `/usr/local/bin/SkywarnPlus/`. BlueNode does not enable, disable, or execute SkywarnPlus.
 Current Weather Alerts use an optional, version-checked observer of SkywarnPlus's
 existing collection cycle. See [Weather Alerts](docs/WEATHER_ALERTS.md) for the
 explicit installation check, freshness rules and update compatibility. Without
-the observer, alert telemetry is unavailable; ordinary Skywarn controls still work.
+the observer, alert telemetry is unavailable. Manage SkywarnPlus directly through its own tools.
 
 Friendly node controls can be configured using entries in friendly_nodes.
 

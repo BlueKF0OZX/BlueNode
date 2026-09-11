@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
 [[ $# -eq 0 ]] || exit 1
-[[ -x /usr/local/bin/SkywarnPlus/SkyControl.py ]] || { echo "SkywarnPlus is not installed" >&2; exit 1; }
-
-/usr/local/bin/SkywarnPlus/SkyControl.py enable true
+echo "BlueNode SkywarnPlus integration is read-only; use SkywarnPlus directly" >&2
+exit 1

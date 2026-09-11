@@ -43,9 +43,7 @@ ACTIONS = {
 
     "dodropin-disconnect": "/usr/local/bin/dodropoff",
 
-    "skywarn-enable": "/usr/local/bin/skywarnon",
 
-    "skywarn-disable": "/usr/local/bin/skywarnoff",
 
 }
 
@@ -431,6 +429,11 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
                                  "error": "Remote Admin configuration error; controls locked"})
             return
         if policy["state"] == "ENABLED" and not self.require_admin(csrf=True):
+            return
+        action = path[len(prefix):].strip("/")
+        if action in ('skywarn-enable', 'skywarn-disable'):
+            ADMIN.audit('skywarn-control', 'read_only_rejected')
+            self.send_json(403, {'ok': False, 'error': 'SkywarnPlus integration is read-only; use SkywarnPlus directly'})
             return
 
         action = path[len(prefix):].strip("/")

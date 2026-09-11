@@ -1083,9 +1083,10 @@
       <div class="controls-grid">
         <button id="btn-dodropin-connect" class="control-button" onclick="runControl('dodropin-connect', this)">DODROPIN Connect</button>
         <button id="btn-dodropin-disconnect" class="control-button" onclick="runControl('dodropin-disconnect', this)">DODROPIN Disconnect</button>
-        <button id="btn-skywarn-on" class="control-button" onclick="runControl('skywarn-enable', this)">Skywarn On</button>
-        <button id="btn-skywarn-off" class="control-button" onclick="runControl('skywarn-disable', this)">Skywarn Off</button>
+        <button id="btn-skywarn-on" class="control-button" disabled aria-describedby="skywarn-control-help" onclick="runControl('skywarn-enable', this)">Skywarn On</button>
+        <button id="btn-skywarn-off" class="control-button" disabled aria-describedby="skywarn-control-help" onclick="runControl('skywarn-disable', this)">Skywarn Off</button>
       </div>
+      <p id="skywarn-control-help">SkywarnPlus integration is read-only. Enable or disable it directly in SkywarnPlus.</p>
 
       <div class="manual-node-control">
 
@@ -1919,11 +1920,9 @@
       if (connectButton) connectButton.disabled = dodropinConnected;
       if (disconnectButton) disconnectButton.disabled = !dodropinConnected;
 
-      const skywarnEnabled = data.skywarn === 'enabled';
-      const skywarnAvailable = ['enabled', 'disabled'].includes(data.skywarn);
 
-      if (skywarnOnButton) skywarnOnButton.disabled = !skywarnAvailable || skywarnEnabled;
-      if (skywarnOffButton) skywarnOffButton.disabled = !skywarnAvailable || !skywarnEnabled;
+      if (skywarnOnButton) skywarnOnButton.disabled = true;
+      if (skywarnOffButton) skywarnOffButton.disabled = true;
     }
 
     let weatherSource = null;

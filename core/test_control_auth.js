@@ -69,7 +69,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     assert.equal(await page.locator('#control-login-cancel').isVisible(), false);
     const controls = [
       ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
-      ['#btn-skywarn-on','skywarn-enable'], ['#btn-skywarn-off','skywarn-disable'],
       ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
       ['button[onclick="runNodeControl(\'node-disconnect\', this)"]','node-disconnect'],
       ['#emergency-enter','emergency-enable'],
@@ -129,7 +128,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     }
     await page.locator('#control-sign-out').click();
     await page.waitForFunction(() => adminCsrfToken === null);
-    await page.locator('#btn-skywarn-on').click();
+    await page.locator('#btn-dodropin-connect').click();
     await page.waitForFunction(() => pendingControl !== null);
     csrfRejected = true;
     const before = executed.length;
@@ -193,7 +192,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     configError = false;
     await page.evaluate(() => loadAdminSession());
     configError = true;
-    await page.locator('#btn-skywarn-on').click();
+    await page.locator('#btn-dodropin-connect').click();
     await page.waitForFunction(() => !controlRequestBusy);
     assert.equal(executed.length, beforeError);
     assert.equal(await page.evaluate(() => pendingControl), null);
@@ -204,6 +203,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'config-error overflow at ' + width);
     }
     assert.deepEqual(errors, []);
-    console.log('PASS control auth UX: nine controls; resume once, expiry, reload, logout, failure, cancellation, CSRF and injection');
+    console.log('PASS control auth UX: seven controls; resume once, expiry, reload, logout, failure, cancellation, CSRF and injection');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

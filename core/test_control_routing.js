@@ -51,7 +51,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       await page.locator('#manual-node-number').fill('12345');
       const controls = [
         ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
-        ['#btn-skywarn-on','skywarn-enable'], ['#btn-skywarn-off','skywarn-disable'],
         ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
         ['button[onclick="runNodeControl(\'node-disconnect\', this)"]','node-disconnect'],
         ['#emergency-enter','emergency-enable'], ['#maintenance-toggle','maintenance-enable']
@@ -71,6 +70,9 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         if (mode === 'signed-out') assert.match(await page.locator(action.startsWith('maintenance-') ? '#automation-action' : '#control-result').innerText(), /cancelled/);
       }
       assert.equal(await page.evaluate(() => window.loginCalls), 0, 'ordinary controls must not invoke login');
+      assert.equal(await page.locator('#btn-skywarn-on').isDisabled(), true);
+      assert.equal(await page.locator('#btn-skywarn-off').isDisabled(), true);
+      assert.match(await page.locator('#skywarn-control-help').innerText(), /read-only/);
       assert.equal(posts.some(request => request.path === '/api/admin/login'), false);
       if (mode !== 'signed-out') {
         await page.locator('button[onclick="toggleEmergencyMode(false, this)"]').click();
