@@ -462,6 +462,10 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
                 return
             enabled = action == "maintenance-enable"
             state = automation.set_maintenance(enabled)
+            if state.get('safety_state_valid') is False:
+                ADMIN.audit('maintenance-mode', 'invalid_safety_state')
+                self.send_json(503, {'ok': False, 'error': state['recovery_safety_message'], 'automation': state})
+                return
             ADMIN.audit("maintenance-mode", "activated" if enabled else "deactivated")
             self.send_json(200, {
                 "ok": True,

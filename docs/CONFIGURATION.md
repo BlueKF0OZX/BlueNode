@@ -153,3 +153,9 @@ Event logs retain a current 4 MiB file and two archives; admin audit logs retain
 Intelligence and session summaries read retained history; totals and incident detail cannot include records that have aged out. The dashboard event response is limited to the latest 500 lines within 128 KiB. Event records are bounded and log-write failures do not stop monitoring. Systemd journal retention remains an operating-system setting.
 
 Remote Admin admits at most 128 simultaneous sessions and keeps rate-limit records for at most 1024 client addresses. Excess requests fail without evicting valid sessions. RX tickets are capped at 256 outstanding entries and expire normally; logout and broker stop revoke them. Authorized journal output is limited to 200 lines of 2048 characters, with sensitive markers and current session/credential material redacted. Treat all operational logs as private.
+
+## Invalid automation safety state
+
+Missing, corrupt, oversized, incomplete, or type-invalid state/automation.json inhibits automatic recovery. Monitoring continues and reports an explicit safety-state error. Neither healthy observations, maintenance controls nor a late recovery result clears the inhibition or overwrites the damaged file. Restore a verified complete version-1 state with its maintenance flag, attempt history, failure count, cooldown, backoff and healthy_since fields; do not delete it to reset protections. No Asterisk observation is changed by this condition.
+
+A completely new installation also starts inhibited until a valid safety state exists. While recovery remains disabled, an operator may explicitly initialize a new state using the installed service account from /opt/nodesmart/core with Python: automation.save_state(automation.default_state()). This is only for a verified new installation with no prior safety history. For an existing installation, restore its verified backup instead. There is no dashboard reset or automatic permissive migration.

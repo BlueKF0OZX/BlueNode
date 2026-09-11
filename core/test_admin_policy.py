@@ -84,6 +84,13 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(self.request('POST', '/api/control/maintenance-enable')[0], 200)
         self.auth.audit.assert_called_with('maintenance-mode', 'activated')
 
+    def test_invalid_automation_state_cannot_be_resumed_by_control(self):
+        self.write({'enabled': False})
+        self.effects[2].return_value = {'safety_state_valid': False,
+                                       'recovery_safety_message': 'Automation safety state invalid'}
+        self.assertEqual(self.request('POST', '/api/control/maintenance-disable')[0], 503)
+        self.auth.audit.assert_called_with('maintenance-mode', 'invalid_safety_state')
+
     def test_skywarn_controls_are_read_only_even_in_local_mode(self):
         self.write({'enabled': False})
         for action in ('skywarn-enable', 'skywarn-disable'):

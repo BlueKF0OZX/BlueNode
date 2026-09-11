@@ -22,6 +22,7 @@ class AutomationTests(unittest.TestCase):
         self.state_file = Path(self.directory.name) / "automation.json"
         self.state_patch = patch.object(automation, "STATE_FILE", self.state_file)
         self.state_patch.start()
+        automation.save_state(automation.default_state())
         self.events = patch.object(automation, "emit")
         self.emit = self.events.start()
 
@@ -29,6 +30,59 @@ class AutomationTests(unittest.TestCase):
         self.events.stop()
         self.state_patch.stop()
         self.directory.cleanup()
+
+    def assert_inhibited(self):
+        original = self.state_file.read_bytes() if self.state_file.exists() else None
+        self.assertFalse(automation.recovery_allowed(stopped(1000), 1000))
+        self.assertIsNone(automation.begin_recovery(1000))
+        for result in (automation.observe_health({'asterisk': 'online'}, 2000),
+                       automation.set_maintenance(False, 2001),
+                       automation.finish_recovery(True, 'late completion', 2002),
+                       automation.cancel_recovery('late cancellation')):
+            self.assertFalse(result['safety_state_valid'])
+            self.assertFalse(result['automation_armed'])
+            self.assertIn('safety state', result['recovery_safety_message'])
+            self.assertIsNone(result['recovery_attempts_today'])
+        current = self.state_file.read_bytes() if self.state_file.exists() else None
+        self.assertEqual(current, original, 'invalid evidence must not be overwritten')
+
+    def test_missing_corrupt_and_oversized_state_inhibits_recovery(self):
+        self.state_file.unlink()
+        self.assert_inhibited()
+        for raw in (b'{broken', b'[]', b'null', b'{}', b'\xff', b'x' * (automation.MAX_STATE_BYTES + 1)):
+            with self.subTest(raw=raw[:16]):
+                self.state_file.write_bytes(raw)
+                self.assert_inhibited()
+
+    def test_missing_or_type_invalid_safety_fields_inhibit(self):
+        valid = automation.default_state()
+        bad = {'version': [True, 2], 'mode': [[], 'bogus'],
+               'maintenance_mode': ['false', 0, None],
+               'recent_recovery_attempts': [None, {}, [True], ['1000'], [-1]],
+               'consecutive_failures': [True, -1, 1.5, '2'],
+               'cooldown_until': [None, False, -1, 1.5, '0', 10 ** 100],
+               'backoff_until': [False, -1, [], 10 ** 100],
+               'healthy_since': [42, 'not a date']}
+        for key, values in bad.items():
+            missing = dict(valid); missing.pop(key)
+            for candidate in [missing, *(dict(valid, **{key: value}) for value in values)]:
+                with self.subTest(key=key, candidate=candidate):
+                    self.state_file.write_text(json.dumps(candidate))
+                    self.assert_inhibited()
+
+    def test_valid_state_preserves_safety_fields_and_unknown_stays_unknown(self):
+        valid = dict(automation.default_state(), maintenance_mode=True,
+                     recent_recovery_attempts=[990, 1001], consecutive_failures=2,
+                     cooldown_until=1100, backoff_until=1200)
+        self.state_file.write_text(json.dumps(valid))
+        loaded = automation.load_state()
+        self.assertTrue(loaded['safety_state_valid'])
+        for key in valid: self.assertEqual(loaded[key], valid[key])
+        health = {'asterisk': 'unknown', 'asterisk_evidence': {'service': {'status': 'unknown'}}}
+        automation.observe_health(health, 1000)
+        self.assertEqual(health['asterisk'], 'unknown')
+        self.assertFalse(automation.recovery_allowed(health, 1000))
+        self.assertEqual(automation.load_state()['recent_recovery_attempts'], [990, 1001])
 
     def test_maintenance_exit_does_not_enable_disabled_recovery(self):
         with patch.object(automation, 'RECOVERY_ENABLED', False):
@@ -86,9 +140,10 @@ class AutomationTests(unittest.TestCase):
         self.assertTrue(automation.load_state()["maintenance_mode"])
         self.state_file.write_text("{broken", encoding="utf-8")
         state = automation.load_state()
-        self.assertEqual(state, automation.default_state())
+        self.assertFalse(state['safety_state_valid'])
+        self.assertTrue(state['maintenance_mode'])
         automation.save_state(state)
-        self.assertEqual(json.loads(self.state_file.read_text())["version"], 1)
+        self.assertEqual(self.state_file.read_text(), '{broken')
 
     def test_connectivity_failure_never_requests_asterisk_recovery(self):
         for domain in ("local_network", "gateway", "dns", "external_internet",

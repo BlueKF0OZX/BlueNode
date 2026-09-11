@@ -52,6 +52,9 @@ DEFAULT_STATE = {
     "connectivity_action": "monitoring_only",
     "recovery_safety_message": None,
 }
+MAX_STATE_BYTES = 256 * 1024
+MAX_EPOCH = 253402214400  # Representable UTC timestamp, before the end of year 9999.
+INVALID_STATE_REASON = 'Automatic recovery inhibited: automation safety state is missing or invalid; restore a verified state file.'
 _THREAD_LOCK = threading.RLock()
 
 
@@ -85,38 +88,79 @@ def default_state():
     return copy.deepcopy(DEFAULT_STATE)
 
 
-def _normalized(data):
+def invalid_state():
     state = default_state()
-    if not isinstance(data, dict):
-        return state
-    for key in state:
-        if key in data:
-            state[key] = data[key]
-    if not isinstance(state["recent_recovery_attempts"], list):
-        state["recent_recovery_attempts"] = []
-    try:
-        state["recent_recovery_attempts"] = [
-            int(item) for item in state["recent_recovery_attempts"]
-        ]
-        state["consecutive_failures"] = max(0, int(state["consecutive_failures"]))
-        state["cooldown_until"] = max(0, int(state["cooldown_until"] or 0))
-        state["backoff_until"] = max(0, int(state["backoff_until"] or 0))
-    except (TypeError, ValueError, OverflowError):
-        return default_state()
-    state["maintenance_mode"] = bool(state["maintenance_mode"])
+    state.update(safety_state_valid=False, mode='attention', maintenance_mode=True,
+                 recovery_safety_message=INVALID_STATE_REASON,
+                 escalation_reason=INVALID_STATE_REASON, last_result=INVALID_STATE_REASON)
+    return state
+
+
+def _normalized(data):
+    # No coercion or missing-field defaults for fields that authorize recovery.
+    required = {'version', 'mode', 'maintenance_mode', 'recent_recovery_attempts',
+                'consecutive_failures', 'cooldown_until', 'backoff_until', 'healthy_since'}
+    if not isinstance(data, dict) or not required.issubset(data):
+        return invalid_state()
+    if data.get('safety_state_valid', True) is not True:
+        return invalid_state()
+    if type(data['version']) is not int or data['version'] != 1:
+        return invalid_state()
+    if data['mode'] not in ('active', 'maintenance', 'recovering', 'recovered', 'attention'):
+        return invalid_state()
+    if type(data['maintenance_mode']) is not bool:
+        return invalid_state()
+    if data['mode'] == 'maintenance' and not data['maintenance_mode']:
+        return invalid_state()
+    for key in ('cooldown_until', 'backoff_until', 'consecutive_failures'):
+        value = data[key]
+        limit = 1000 if key == 'consecutive_failures' else MAX_EPOCH
+        if type(value) is not int or not 0 <= value <= limit:
+            return invalid_state()
+    attempts = data['recent_recovery_attempts']
+    if (not isinstance(attempts, list) or len(attempts) > 4096 or
+            any(type(stamp) is not int or not 0 <= stamp <= MAX_EPOCH for stamp in attempts)):
+        return invalid_state()
+    for key in ('healthy_since', 'last_automation_check'):
+        value = data.get(key)
+        if value is not None:
+            try:
+                if not isinstance(value, str):
+                    return invalid_state()
+                datetime.fromisoformat(value).timestamp()
+            except (ValueError, OverflowError, OSError):
+                return invalid_state()
+    for key, default in DEFAULT_STATE.items():
+        if (key not in required and key not in ('last_verification', 'last_automation_check')
+                and data.get(key) is not None and not isinstance(data[key], str)):
+            return invalid_state()
+    verification = data.get('last_verification')
+    if verification is not None and (not isinstance(verification, dict) or
+            type(verification.get('passed')) is not bool or
+            not isinstance(verification.get('message'), str) or
+            not isinstance(verification.get('timestamp'), str)):
+        return invalid_state()
+    state = default_state()
+    state.update({key: copy.deepcopy(data[key]) for key in state if key in data})
+    state['safety_state_valid'] = True
     return state
 
 
 def load_state():
     try:
-        with STATE_FILE.open(encoding="utf-8") as file:
-            return _normalized(json.load(file))
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return default_state()
+        with STATE_FILE.open('rb') as file:
+            raw = file.read(MAX_STATE_BYTES + 1)
+        if len(raw) > MAX_STATE_BYTES:
+            return invalid_state()
+        return _normalized(json.loads(raw.decode('utf-8')))
+    except (OSError, ValueError, TypeError, RecursionError):
+        return invalid_state()
 
 
 def save_state(state):
     state = _normalized(state)
+    if not state['safety_state_valid']:
+        return state  # Never overwrite corrupt evidence with permissive defaults.
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
@@ -138,7 +182,7 @@ def save_state(state):
 def _prune(state, now):
     state["recent_recovery_attempts"] = [
         stamp for stamp in state["recent_recovery_attempts"]
-        if 0 <= now - stamp < max(86400, ATTEMPT_WINDOW_SECONDS)
+        if now - stamp < max(86400, ATTEMPT_WINDOW_SECONDS)
     ]
 
 
@@ -161,8 +205,8 @@ def public_state(state=None, now=None):
     result.update({
         "recovery_enabled": RECOVERY_ENABLED,
         "automation_armed": (
-            RECOVERY_ENABLED and not state["maintenance_mode"]
-            and float(state.get("backoff_until") or 0) <= now
+            RECOVERY_ENABLED and state['safety_state_valid'] and not state["maintenance_mode"]
+            and state["backoff_until"] <= now and state["cooldown_until"] <= now
         ),
         "repeated_failure_protection": True,
         "recovery_attempts_today": attempts_today,
@@ -170,6 +214,11 @@ def public_state(state=None, now=None):
         "backoff_until_iso": _iso(state["backoff_until"]),
         "operator_attention_required": state["mode"] == "attention",
     })
+    if not state['safety_state_valid']:
+        result.update(maintenance_mode=None, recovery_attempts_today=None,
+                      repeated_failure_protection=False)
+        result.pop('cooldown_until_iso', None)
+        result.pop('backoff_until_iso', None)
     return result
 
 
@@ -177,6 +226,8 @@ def public_state(state=None, now=None):
 def observe_health(health, now=None):
     now = int(time.time() if now is None else now)
     state = load_state()
+    if not state.get('safety_state_valid', True):
+        return public_state(state, now)
     _prune(state, now)
     state["last_automation_check"] = datetime.fromtimestamp(now, timezone.utc).isoformat()
     connectivity = health.get("connectivity") or {}
@@ -223,6 +274,8 @@ def observe_health(health, now=None):
 @locked
 def set_maintenance(enabled, now=None):
     state = load_state()
+    if not state.get('safety_state_valid', True):
+        return public_state(state, now)
     enabled = bool(enabled)
     if state["maintenance_mode"] != enabled:
         state["maintenance_mode"] = enabled
@@ -242,6 +295,8 @@ def recovery_allowed(health, now=None):
     observation_now = time.time() if now is None else now
     now = int(observation_now)
     state = load_state()
+    if not state.get('safety_state_valid', True):
+        return False
     _prune(state, now)
     evidence = health.get("asterisk_evidence", {})
     if (not asterisk_observation.confirmed_stopped(evidence.get("service"), observation_now)
@@ -273,6 +328,8 @@ def recovery_allowed(health, now=None):
 def begin_recovery(now=None):
     now = int(time.time() if now is None else now)
     state = load_state()
+    if not state.get('safety_state_valid', True):
+        return None
     _prune(state, now)
     if state["maintenance_mode"] or state["backoff_until"] > now or state["cooldown_until"] > now:
         return None
@@ -291,6 +348,8 @@ def begin_recovery(now=None):
 def cancel_recovery(message):
     """Release a reserved attempt without claiming a restart or failed verification."""
     state = load_state()
+    if not state.get('safety_state_valid', True):
+        return public_state(state)
     if state["recent_recovery_attempts"]:
         state["recent_recovery_attempts"].pop()
     state["mode"] = "maintenance" if state["maintenance_mode"] else "active"
@@ -304,6 +363,8 @@ def cancel_recovery(message):
 def finish_recovery(verified, message, now=None):
     now = int(time.time() if now is None else now)
     state = load_state()
+    if not state.get('safety_state_valid', True):
+        return public_state(state, now)
     state["last_verification"] = {
         "passed": bool(verified), "message": message,
         "timestamp": datetime.fromtimestamp(now, timezone.utc).isoformat(),
@@ -331,7 +392,7 @@ def finish_recovery(verified, message, now=None):
     else:
         state["consecutive_failures"] += 1
         backoff = min(MAX_BACKOFF_SECONDS,
-                      MIN_COOLDOWN_SECONDS * (2 ** max(0, state["consecutive_failures"] - 1)))
+                      MIN_COOLDOWN_SECONDS * (2 ** min(30, max(0, state["consecutive_failures"] - 1))))
         state["cooldown_until"] = now + backoff
         if state["consecutive_failures"] >= 2 or len(_window_attempts(state, now)) >= MAX_ATTEMPTS:
             state["mode"] = "attention"
