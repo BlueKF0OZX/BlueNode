@@ -2934,10 +2934,12 @@
     async function loadEvents() {
       if (eventsLoading) return;
       eventsLoading = true;
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), 10000);
 
       try {
 
-        const response = await fetch('/logs/events.log?ts=' + Date.now());
+        const response = await fetch('/logs/events.log?ts=' + Date.now(), {signal: controller.signal});
         if (response.status === 404) {
           document.getElementById('events').textContent = 'No event history yet.';
           return;
@@ -3056,7 +3058,7 @@
 
           'Unable to load event history.';
 
-      } finally { eventsLoading = false; }
+      } finally { clearTimeout(deadline); eventsLoading = false; }
 
     }
 

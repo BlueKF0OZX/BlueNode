@@ -210,5 +210,33 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.equal(calls,2,'Refresh guard must reset after failure');
   resolveFetch({json:async()=>{throw new Error('Fixture failure');}});
   await next;
-  console.log('Dashboard presentation and polling guard passed.');
+  const eventStart = html.indexOf('    let eventsLoading');
+  const eventEnd = html.indexOf('    loadStatus();', eventStart);
+  context.AbortController = AbortController;
+  let expire, cleared = 0;
+  context.setTimeout = (callback, delay) => { assert.equal(delay, 10000); expire = callback; return 77; };
+  context.clearTimeout = id => { assert.equal(id, 77); cleared++; };
+  vm.runInContext(html.slice(eventStart, eventEnd), context);
+  for (const phase of ['headers', 'body']) {
+    let requests = 0;
+    context.fetch = async (_url, {signal}) => {
+      requests++;
+      const stalled = () => new Promise((_resolve, reject) => signal.addEventListener('abort',
+        () => reject(new Error('Aborted')), {once:true}));
+      return phase === 'headers' ? stalled() : {ok:true, status:200, text:stalled};
+    };
+    const hung = context.loadEvents();
+    await Promise.resolve();
+    await context.loadEvents();
+    assert.equal(requests, 1, 'Only one event request may be outstanding');
+    expire();
+    await hung;
+    assert.equal(element('events').textContent, 'Unable to load event history.');
+    context.fetch = async () => { requests++; return {status:404}; };
+    await context.loadEvents();
+    assert.equal(requests, 2, 'A timed-out event request must permit the next poll');
+    assert.equal(element('events').textContent, 'No event history yet.');
+  }
+  assert.equal(cleared, 4, 'Timers must be cleared after abort and normal completion');
+  console.log('Dashboard presentation and polling guards/deadlines passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

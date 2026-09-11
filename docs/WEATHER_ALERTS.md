@@ -4,8 +4,7 @@ BlueNode integration is strictly read-only. The former Skywarn On/Off actions ar
 
 BlueNode consumes the alerts SkywarnPlus already computes. There is no additional
 weather API, independent filtering engine, weather command, or browser-triggered
-collection. SkywarnPlus enable/disable controls and their authentication remain
-unchanged.
+collection. BlueNode does not provide SkywarnPlus enable/disable control; manage it directly through SkywarnPlus.
 
 ## Why an optional observer is necessary
 
