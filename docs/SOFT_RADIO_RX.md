@@ -136,3 +136,7 @@ Phase A permits one or more authorized listeners. Audio is not end-to-end
 encrypted inside the host between Asterisk and the loopback broker; it is
 HTTPS/WSS encrypted outside the host. RX availability depends on the installed
 ASL3 chan_websocket and App_Rpt `Pm` behavior. There is deliberately no TX path.
+
+## Future TX safety acceptance tests (not implemented)
+
+Browser TX/PTT remains unsupported. Before any separate TX proposal could be considered, an isolated simulator must prove that a server-owned, monotonic transmit lease expires without client cooperation; a configured maximum continuous TX duration cannot be extended by repeated key requests; disconnect, logout, permission revocation, broker failure, and lost key-up messages release TX; and reconnect never resumes a previous key state. RX permission must never grant TX. Hardware and independent watchdog verification would be required in a separate authorized test environment. The current RX tests reject browser text/PTT requests and binary audio outright.

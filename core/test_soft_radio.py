@@ -82,6 +82,27 @@ class SoftRadioTests(unittest.TestCase):
         self.clock.now += 31
         self.assertFalse(self.radio.consume_ticket(ticket, "session-a"))
 
+    def test_logout_and_stop_revoke_outstanding_tickets(self):
+        ticket = self.radio.issue_ticket('session-a')
+        self.radio.disconnect_session('session-a')
+        self.assertFalse(self.radio.consume_ticket(ticket, 'session-a'))
+        ticket = self.radio.issue_ticket('session-a')
+        self.radio.stop()
+        self.assertFalse(self.radio.consume_ticket(ticket, 'session-a'))
+        self.assertFalse(self.radio.consume_ticket('\u00e9', 'session-a'))
+
+    def test_tx_configuration_and_malformed_frames_are_rejected(self):
+        self.write_config(ptt_enabled=True)
+        self.assertFalse(soft_radio._safe_config()['enabled'])
+        for frame in (bytes([0xc2, 0x80]) + b'abcd', masked_frame(9, b'x' * 126), masked_frame(3)):
+            server, browser = socket.socketpair()
+            try:
+                browser.sendall(frame)
+                with self.assertRaises(ValueError):
+                    soft_radio.read_frame(server, 4096)
+            finally:
+                server.close(); browser.close()
+
     def test_bounded_buffer_drops_oldest_media(self):
         class Stream:
             def __init__(self): self.sent = []
@@ -102,6 +123,21 @@ class SoftRadioTests(unittest.TestCase):
         browser.close(); server.close()
         self.assertEqual(reply[0] & 0x0f, 8)
         self.assertIn(("soft-radio-rx-session", "browser-media-rejected"), self.audit)
+
+    def test_browser_ptt_text_cannot_start_a_command(self):
+        server, browser = socket.socketpair()
+        browser.settimeout(2)
+        thread = threading.Thread(target=self.radio.serve_browser,
+                                  args=(server, 'session', lambda _token: True))
+        thread.start()
+        try:
+            browser.sendall(masked_frame(1, b'{"ptt":true,"duration":999999}'))
+            self.assertEqual(browser.recv(64)[0] & 0x0f, 8)
+            thread.join(2)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(self.commands, [])
+        finally:
+            browser.close(); server.close()
 
     def test_session_expiration_terminates_browser(self):
         server, browser = socket.socketpair()

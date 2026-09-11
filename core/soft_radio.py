@@ -20,6 +20,7 @@ import time
 from collections import deque
 from pathlib import Path
 from urllib.parse import urlsplit
+from remote_admin import _read_security_file
 
 
 CONFIG_FILE = Path(os.environ.get(
@@ -39,7 +40,7 @@ def _safe_config():
         stat = CONFIG_FILE.stat()
         if os.name == "posix" and stat.st_mode & 0o007:
             return disabled
-        raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(_read_security_file(CONFIG_FILE))
         if not isinstance(raw, dict) or raw.get("enabled") is not True:
             return disabled
         allowed = {"enabled", "listen_host", "listen_port", "media_path",
@@ -73,7 +74,7 @@ def _safe_config():
                 "local_node": node, "ticket_seconds": ticket_seconds,
                 "buffer_frames": buffer_frames,
                 "start_channel": raw.get("start_channel") is True}
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+    except (OSError, ValueError, TypeError, RecursionError):
         return disabled
 
 
@@ -87,9 +88,9 @@ def activation_requested():
     try:
         if CONFIG_FILE.is_symlink():
             return False
-        raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(_read_security_file(CONFIG_FILE))
         return isinstance(raw, dict) and raw.get("enabled") is True
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+    except (OSError, ValueError, TypeError, RecursionError):
         return False
 
 
@@ -107,14 +108,14 @@ def read_frame(stream, maximum):
     """Read one RFC 6455 client frame; client masking is mandatory."""
     first, second = _read_exact(stream, 2)
     opcode = first & 0x0F
-    if not first & 0x80 or not second & 0x80:
+    if first & 0x70 or opcode not in (1, 2, 8, 9, 10) or not first & 0x80 or not second & 0x80:
         raise ValueError("fragmented or unmasked WebSocket frame")
     length = second & 0x7F
     if length == 126:
         length = struct.unpack("!H", _read_exact(stream, 2))[0]
     elif length == 127:
         length = struct.unpack("!Q", _read_exact(stream, 8))[0]
-    if length > maximum:
+    if length > maximum or (opcode >= 8 and length > 125):
         raise ValueError("WebSocket frame exceeds limit")
     mask = _read_exact(stream, 4)
     payload = _read_exact(stream, length)
@@ -216,7 +217,7 @@ class SoftRadio:
                 del self.tickets[digest]
 
     def consume_ticket(self, ticket, session_token):
-        if not ticket or not session_token:
+        if not isinstance(ticket, str) or not ticket.isascii() or not 1 <= len(ticket) <= 128 or not session_token:
             return False
         digest = self._ticket_digest(str(ticket))
         with self.lock:
@@ -228,6 +229,7 @@ class SoftRadio:
 
     def disconnect_session(self, session_token):
         with self.lock:
+            self.tickets = {key: value for key, value in self.tickets.items() if value[0] != session_token}
             clients = [client for client in self.clients
                        if hmac.compare_digest(client.session_token,
                                               str(session_token or ""))]
@@ -324,6 +326,7 @@ class SoftRadio:
             server, thread = self.server, self.server_thread
             clients = list(self.clients)
             self.server = self.server_thread = None
+            self.tickets.clear()
         for client in clients:
             try:
                 client.stream.shutdown(socket.SHUT_RDWR)
