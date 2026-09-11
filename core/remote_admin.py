@@ -147,7 +147,7 @@ def validate_new_credentials(username, first, second):
     # It is terminal framing, not an intentional password character.
     first = str(first).removesuffix("\r")
     second = str(second).removesuffix("\r")
-    if not hmac.compare_digest(first, second):
+    if not hmac.compare_digest(first.encode('utf-8'), second.encode('utf-8')):
         raise ValueError("Password confirmation does not match")
     if len(first) < 14:
         raise ValueError("Password must contain at least 14 characters")
@@ -270,11 +270,14 @@ class RemoteAdmin:
             if len(attempts) >= config["max_login_attempts"]:
                 self.audit("login", "rate_limited")
                 return 429, {"ok": False, "error": "Too many authentication attempts"}, None
-        valid_user = hmac.compare_digest(str(username).encode("utf-8"), config["username"].encode("utf-8"))
+            # Reserve before expensive verification so concurrent requests count.
+            attempts.append(now)
+        try:
+            valid_user = hmac.compare_digest(str(username).encode("utf-8"), config["username"].encode("utf-8"))
+        except UnicodeError:
+            valid_user = False
         valid_password = verify_password(str(password), config)
         if not (valid_user and valid_password):
-            with self.lock:
-                self.login_attempts[key].append(now)
             self.audit("login", "rejected")
             return 401, {"ok": False, "error": "Invalid credentials"}, None
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
@@ -297,7 +300,8 @@ class RemoteAdmin:
 
     def csrf_valid(self, token, csrf, config=None):
         session = self.authenticate(token, config)
-        return bool(session and csrf and hmac.compare_digest(session["csrf"], str(csrf)))
+        return bool(session and isinstance(csrf, str) and csrf.isascii() and
+                    hmac.compare_digest(session["csrf"], csrf))
 
     def audit(self, action, outcome):
         record = json.dumps({"timestamp": _utc_now(), "action": str(action)[:64],
@@ -369,6 +373,7 @@ class RemoteAdmin:
             return 400, {"ok": False, "error": "Unexpected parameters"}
         if action == "restart-asterisk":
             if payload.get("confirmation") != "RESTART ASTERISK":
+                self.audit(action, "confirmation_rejected")
                 return 400, {"ok": False, "error": "Explicit confirmation is required"}
             command = ["sudo", "-n", "systemctl", "restart", "asterisk"]
         elif action == "restart-monitor":

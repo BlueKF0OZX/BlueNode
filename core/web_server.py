@@ -71,6 +71,11 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
         super().end_headers()
 
+    def log_message(self, format, *args):
+        # Never echo request URLs, headers, bodies or parser errors to journals.
+        # Administrative outcomes are recorded separately in the audit.
+        return
+
 
 
     ALLOWED_STATIC_PATHS = {

@@ -75,6 +75,13 @@ class PolicyTests(unittest.TestCase):
         self.assertTrue(all(call.args[1] in ('config_error', 'rejected')
                             for call in self.auth.audit.call_args_list))
 
+    def test_http_logging_never_echoes_untrusted_request_material(self):
+        handler = object.__new__(web.NodeSmartHandler)
+        with patch('sys.stderr', new_callable=io.StringIO) as output:
+            handler.log_message('Bad request: %s', 'password=fixture-secret')
+            handler.log_message('"%s" %s %s', '/?ticket=fixture-ticket', 404, 0)
+        self.assertEqual(output.getvalue(), '')
+
     def test_invalid_configuration_matrix_all_routes(self):
         cases = {'empty-object': {}, 'empty-array': [], 'partial': {'enabled': True}}
         for key in ('username', 'password_salt', 'password_hash', 'session_secret'):

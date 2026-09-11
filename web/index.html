@@ -1328,6 +1328,7 @@
   <script>
 
     let adminCsrfToken = null;
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     let softRadioSocket = null;
     let softRadioContext = null;
     let softRadioGain = null;
@@ -2356,7 +2357,7 @@
             intelligence.unresolved_issues || [];
 
           let details =
-            'Level: ' + level +
+            'Level: ' + escapeHtml(level) +
             ' &nbsp;•&nbsp; Attention: ' + attention +
             ' &nbsp;•&nbsp; Recent incidents: ' + incidents +
             '<br>' +
@@ -2366,7 +2367,7 @@
 
           if (unresolved.length) {
             details += '<br>Unresolved: ' +
-              unresolved.map(item => String(item)).join('; ');
+              unresolved.map(escapeHtml).join('; ');
           }
 
           intelligenceDetails.innerHTML = details;
@@ -2499,7 +2500,7 @@
 
                     <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
 
-                      <strong style="color:#e5e7eb;">${component}</strong>
+                      <strong style="color:#e5e7eb;">${escapeHtml(component)}</strong>
 
                       <span style="color:${statusColor};font-size:12px;font-weight:600;">
 
@@ -2513,7 +2514,7 @@
 
                     <div style="margin-top:5px;color:#d1d5db;">
 
-                      ${summary}
+                      ${escapeHtml(summary)}
 
                     </div>
 
@@ -2687,8 +2688,8 @@
               return (
                 '<div class="event-row event-info">' +
                   '<div class="event-content">' +
-                    '<div class="event-name">' + name +
-                    ' (' + node + ')</div>' +
+                    '<div class="event-name">' + escapeHtml(name) +
+                    ' (' + escapeHtml(node) + ')</div>' +
                     '<div class="event-message">' +
                     duration +
                     (ended ? ' — ended ' + ended : '') +
@@ -2725,7 +2726,7 @@
 
         if (healthReason) {
           if (data.health_reasons && data.health_reasons.length) {
-            healthReason.innerHTML = data.health_reasons.join('<br>');
+            healthReason.innerHTML = data.health_reasons.map(escapeHtml).join('<br>');
           } else {
             healthReason.textContent = '';
           }
@@ -2793,7 +2794,7 @@
 
 
 
-            return `<div>${name} (${node})${duration}</div>`;
+            return `<div>${escapeHtml(name)} (${escapeHtml(node)})${duration}</div>`;
 
           }).join('');
 
@@ -3004,10 +3005,10 @@
 
             return `
               <div class="event-row ${eventClass}">
-                <div class="event-time">${displayTime}</div>
+                <div class="event-time">${escapeHtml(displayTime)}</div>
                 <div class="event-content">
-                  <div class="event-name">${label}</div>
-                  <div class="event-message">${message}</div>
+                  <div class="event-name">${escapeHtml(label)}</div>
+                  <div class="event-message">${escapeHtml(message)}</div>
                 </div>
               </div>
             `;

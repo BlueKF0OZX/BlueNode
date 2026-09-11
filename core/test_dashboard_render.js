@@ -52,6 +52,8 @@ function fixture(detailed) {
       let intelligenceIncomplete = false;
       let observedZero = false;
       let connectionUnavailable = false;
+      let injection = false;
+      const hostile = '<img src=x onerror=alert(1)>';
       let releaseIntelligence;
       const intelligenceGate = new Promise(resolve => { releaseIntelligence = resolve; });
       await page.route('**/*', async route=>{
@@ -59,7 +61,7 @@ function fixture(detailed) {
         assert.equal(route.request().method(), 'GET', 'Render checks must never invoke controls');
         if (url.pathname === '/web/') return route.fulfill({contentType:'text/html',body:html});
         if (url.pathname === '/logs/events.log') return route.fulfill({contentType:'text/plain',body:
-          Array.from({length:12}, (_, i) => `${now} | CONNECT.SUCCESS | Example event ${i}: ${'long-detail-'.repeat(20)}`).join('\n')});
+          Array.from({length:12}, (_, i) => `${now} | CONNECT.SUCCESS | Example event ${i}: ${injection ? hostile : 'long-detail-'.repeat(20)}`).join('\n')});
         let body;
         if (attentionUnavailable && ['/state/intelligence.json','/api/emergency-mode'].includes(url.pathname)) return route.fulfill({status:503,body:'Unavailable'});
         if (url.pathname === '/state/system.json' && !missing) body = fixture(detailed);
@@ -74,6 +76,11 @@ function fixture(detailed) {
             completed_connections_today:0,completed_connected_seconds_today:0,recent_sessions:[]};
         }
         if (url.pathname === '/state/system.json' && body && connectionUnavailable) body.radio_activity={telemetry_available:false,stale:true};
+        if (url.pathname === '/state/system.json' && body && injection) {
+          body.friendly_nodes['23456'] = hostile;
+          body.health_reasons = [hostile];
+          body.connection_stats.recent_sessions[0].name = hostile;
+        }
         if (url.pathname === '/state/intelligence.json' && !missing) {
           await intelligenceGate;
           body = {
@@ -82,6 +89,7 @@ function fixture(detailed) {
           recommendation:{message:'Monitor the next diagnostic observation.'},
           incidents:[{component:'internet',resolved:true,summary:'A prior connection interruption was resolved.',started_at:now,duration_seconds:45}]};
           if (intelligenceIncomplete) body = {level:'normal',summary:'A stale reassuring summary'};
+          if (injection) { body.unresolved_issues = [hostile]; body.incidents[0].summary = hostile; }
         }
         if (url.pathname === '/api/admin/session') body = {enabled:true,authenticated:false};
         if (url.pathname === '/events/allstar_state.json' && !missing) body = {links:observedZero?[]:['23456'],connected_since:observedZero?{}:{'23456':now}};
@@ -258,6 +266,12 @@ function fixture(detailed) {
       await checkCardAlignment();
       assert.equal((await geometry()).overflow,false);
       assert.deepEqual(errors,[],`browser errors at ${width}`);
+      missing = false; observedZero = false; connectionUnavailable = false; injection = true;
+      await page.evaluate(async () => { await loadStatus(); await loadEvents(); });
+      for (const selector of ['#events', '#nodes', '#healthreason', '#recent-sessions', '#incident-list', '#intelligence-details']) {
+        assert.equal(await page.locator(selector + ' img').count(), 0, `HTML injection in ${selector}`);
+        assert.ok((await page.locator(selector).textContent()).includes(hostile), `literal text in ${selector}`);
+      }
       checks++;
       await page.close();
     }

@@ -2,6 +2,8 @@ import json
 import os
 import tempfile
 import unittest
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -101,7 +103,35 @@ class RemoteAdminTests(unittest.TestCase):
         self.assertEqual(status, 200); self.assertTrue(token)
         self.assertTrue(self.admin.csrf_valid(token, body["csrf_token"]))
         self.assertFalse(self.admin.csrf_valid(token, "wrong"))
+        self.assertFalse(self.admin.csrf_valid(token, "\u00e9"))
+        self.assertFalse(self.admin.csrf_valid(token, [body['csrf_token']]))
         self.admin.logout(token); self.assertIsNone(self.admin.authenticate(token))
+
+    def test_concurrent_login_attempts_are_reserved_before_hashing(self):
+        self.enable(attempts=1)
+        entered, release = threading.Event(), threading.Event()
+        def slow_verification(*args):
+            entered.set()
+            self.assertTrue(release.wait(5))
+            return False
+        with patch.object(remote_admin, 'verify_password', side_effect=slow_verification), ThreadPoolExecutor(1) as pool:
+            first = pool.submit(self.admin.login, 'operator', 'invalid', 'peer')
+            try:
+                self.assertTrue(entered.wait(5))
+                self.assertEqual(self.admin.login('operator', 'invalid', 'peer')[0], 429)
+            finally:
+                release.set()
+            self.assertEqual(first.result()[0], 401)
+
+    def test_malformed_username_and_audit_do_not_expose_session_material(self):
+        self.enable()
+        self.assertEqual(self.admin.login('\ud800', 'invalid', 'peer')[0], 401)
+        _, body, token = self.admin.login('operator', 'correct horse battery staple', 'peer')
+        public = self.admin.public_state()
+        text = self.audit.read_text() + json.dumps(public)
+        config = json.loads(self.config.read_text())
+        for secret in (token, body['csrf_token'], config['password_hash'], config['password_salt'], config['session_secret']):
+            self.assertNotIn(secret, text)
 
     def test_interactive_credentials_accept_terminal_cr_and_match_confirmation(self):
         username, secret = remote_admin.validate_new_credentials(
