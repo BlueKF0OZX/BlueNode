@@ -54,7 +54,8 @@ class FreshInstallTests(unittest.TestCase):
         config.update(node="23456", callsign="W1AW")
         validator.validate(config)
         for section, value in (("node", "23456\n!id"), ("friendly_nodes", []),
-                               ("web", {"port": 80}), ("recovery", {"asterisk_enabled": "false"})):
+                               ("web", {"port": 80}), ("web", []), ("weather_alerts", []),
+                               ("callsign", "W1AW\nextra"), ("recovery", {"asterisk_enabled": "false"})):
             with self.subTest(section=section), self.assertRaises((ValueError, TypeError)):
                 validator.validate(dict(config, **{section: value}))
 

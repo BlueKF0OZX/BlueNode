@@ -14,9 +14,14 @@ def validate(config):
     if not (node.isascii() and node.isdigit() and 1 <= len(node) <= 10) or node == "12345":
         raise ValueError("set node to your AllStar node number (replace the example)")
     callsign = config.get("callsign")
-    if not isinstance(callsign, str) or not callsign.strip() or callsign == "N0CALL":
+    if (not isinstance(callsign, str) or not callsign.strip() or callsign == "N0CALL"
+            or len(callsign) > 64 or any(ord(c) < 32 or ord(c) == 127 for c in callsign)):
         raise ValueError("set callsign to your station callsign")
     web = config.get("web", {})
+    if not isinstance(web, dict):
+        raise ValueError("web must be an object")
+    if not isinstance(config.get("weather_alerts", {}), dict):
+        raise ValueError("weather_alerts must be an object")
     ipaddress.IPv4Address(web.get("host", "127.0.0.1"))
     port = web.get("port", 8080)
     if type(port) is not int or not 1024 <= port <= 65535:

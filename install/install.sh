@@ -34,8 +34,10 @@ for cmd in /usr/bin/python3 /usr/sbin/asterisk /usr/bin/systemctl /usr/sbin/visu
   [[ -x "${cmd}" ]] || fail "Required command not found: ${cmd}"
 done
 
-for cmd in ip ping getent; do
-  command -v "$cmd" >/dev/null || fail "Required command not found: $cmd (install iproute2, iputils-ping, libc-bin)"
+/usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' || fail "Python 3.9 or newer is required."
+
+for cmd in ip ping getent systemd-analyze; do
+  command -v "$cmd" >/dev/null || fail "Required command not found: $cmd (install iproute2, iputils-ping, libc-bin, systemd)"
 done
 [[ -f "$REPO_ROOT/install/validate-config.py" ]] || fail "Missing config validator"
 
@@ -169,7 +171,7 @@ for directory in events history logs state; do
 done
 
 if [[ ! -e "/usr/local/bin/SkywarnPlus/SkyControl.py" ]]; then
-  echo "WARNING: SkywarnPlus was not detected. Skywarn controls will not work until it is installed."
+  echo "WARNING: SkywarnPlus was not detected. Optional weather observations are unavailable; BlueNode can operate without SkywarnPlus."
 fi
 
 echo "Validating Python files..."
@@ -189,6 +191,6 @@ if /usr/bin/systemctl is-active --quiet nodesmart && /usr/bin/systemctl is-activ
   echo "BlueNode installation complete."
 else
   echo "BlueNode is installed but the service is not running." >&2
-  /usr/bin/systemctl status nodesmart --no-pager || true
+  /usr/bin/systemctl status nodesmart nodesmart-web --no-pager || true
   exit 1
 fi
