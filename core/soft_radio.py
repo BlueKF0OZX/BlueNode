@@ -207,6 +207,9 @@ class SoftRadio:
         with self.lock:
             now = self.clock()
             self._purge_tickets(now)
+            if len(self.tickets) >= 256:
+                self.audit('soft-radio-rx-ticket', 'capacity-limited')
+                return None
             self.tickets[digest] = (str(session_token), now + config["ticket_seconds"])
         self.audit("soft-radio-rx-ticket", "issued")
         return ticket

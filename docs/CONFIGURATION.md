@@ -145,3 +145,11 @@ never requested for a connectivity-only failure.
 The shipped systemd service runs monitor.py, which owns health collection,
 AllStar monitoring, Intelligence updates, and automatic recovery. Do not schedule
 health.py or recovery.py separately when this service is active.
+
+## Runtime retention
+
+Event logs retain a current 4 MiB file and two archives; admin audit logs retain a current 1 MiB file and two archives; connection history retains a current 16 MiB file and two archives. Rotation is performed by BlueNode while appending, with a shared file lock on Linux. Existing oversized current files are reduced to their latest bounded tail on the next append. Archive older history privately before upgrading if long-term retention is required. No live files are trimmed by a repository checkout alone.
+
+Intelligence and session summaries read retained history; totals and incident detail cannot include records that have aged out. The dashboard event response is limited to the latest 500 lines within 128 KiB. Event records are bounded and log-write failures do not stop monitoring. Systemd journal retention remains an operating-system setting.
+
+Remote Admin admits at most 128 simultaneous sessions and keeps rate-limit records for at most 1024 client addresses. Excess requests fail without evicting valid sessions. RX tickets are capped at 256 outstanding entries and expire normally; logout and broker stop revoke them. Authorized journal output is limited to 200 lines of 2048 characters, with sensitive markers and current session/credential material redacted. Treat all operational logs as private.

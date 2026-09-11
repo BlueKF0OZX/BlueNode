@@ -16,6 +16,12 @@
 - Hardened concurrent login throttling, CSRF input handling, and request-log privacy.
 - Revoked unused RX tickets on logout/stop and rejected malformed WebSocket and browser TX input.
 
+### Reliability
+
+- Bounded event/audit/session-history retention and dashboard event responses.
+- Atomic connection-state publication and safe handling of corrupt history and future-dated radio observations.
+- Bounded authentication/ticket memory and redacted authorized journal output.
+
 ### Validation required before release
 
 - Disposable Debian/ASL3 clean install, boot, permissions, upgrade, and rollback.

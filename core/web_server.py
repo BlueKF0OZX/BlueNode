@@ -19,6 +19,7 @@ from config import load_config
 import automation
 import emergency_mode
 import node_controls
+from runtime_io import tail_lines
 from remote_admin import ADMIN, MAX_BODY_BYTES, _safe_config
 from soft_radio import activation_requested
 from soft_radio import PERMISSION as SOFT_RADIO_PERMISSION
@@ -183,6 +184,20 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
             return super().do_GET()
 
 
+
+        if path == '/logs/events.log':
+            log = ROOT / 'logs/events.log'
+            if not log.exists():
+                self.send_error(404, 'Not Found')
+                return
+            body = ('\n'.join(tail_lines(log, maximum=128 * 1024)[-500:]) + '\n').encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return
 
         if path in self.ALLOWED_STATIC_PATHS:
 

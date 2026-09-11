@@ -4,6 +4,7 @@
 
 
 import json
+from runtime_io import tail_lines
 import os
 import tempfile
 
@@ -212,55 +213,53 @@ def load_events():
 
     try:
 
-        with EVENT_LOG.open() as file:
+        for line in tail_lines(EVENT_LOG, backups=2):
 
-            for line in file:
-
-                parts = [part.strip() for part in line.split("|", 2)]
+            parts = [part.strip() for part in line.split("|", 2)]
 
 
 
-                if len(parts) != 3:
+            if len(parts) != 3:
 
-                    continue
-
-
-
-                timestamp, event, message = parts
+                continue
 
 
 
-                try:
-
-                    event_time = datetime.fromisoformat(timestamp)
+            timestamp, event, message = parts
 
 
 
-                    if event_time.tzinfo is None:
+            try:
 
-                        event_time = event_time.replace(tzinfo=local_tz)
-
-
-
-                    event_time = event_time.astimezone(timezone.utc)
+                event_time = datetime.fromisoformat(timestamp)
 
 
 
-                except ValueError:
+                if event_time.tzinfo is None:
 
-                    continue
+                    event_time = event_time.replace(tzinfo=local_tz)
 
 
 
-                events.append({
+                event_time = event_time.astimezone(timezone.utc)
 
-                    "timestamp": event_time,
 
-                    "event": event,
 
-                    "message": message,
+            except ValueError:
 
-                })
+                continue
+
+
+
+            events.append({
+
+                "timestamp": event_time,
+
+                "event": event,
+
+                "message": message,
+
+            })
 
 
 

@@ -82,6 +82,11 @@ class SoftRadioTests(unittest.TestCase):
         self.clock.now += 31
         self.assertFalse(self.radio.consume_ticket(ticket, "session-a"))
 
+    def test_ticket_capacity_fails_closed(self):
+        self.radio.tickets = {str(i): ('session', self.clock.now + 60) for i in range(256)}
+        self.assertIsNone(self.radio.issue_ticket('session'))
+        self.assertEqual(len(self.radio.tickets), 256)
+
     def test_logout_and_stop_revoke_outstanding_tickets(self):
         ticket = self.radio.issue_ticket('session-a')
         self.radio.disconnect_session('session-a')

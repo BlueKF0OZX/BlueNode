@@ -172,6 +172,24 @@ class RemoteAdminTests(unittest.TestCase):
             runner=lambda _command, **_kwargs: Result(1, "", "failed"))
         self.assertEqual(failed.action("restart-monitor", {"action":"restart-monitor"})[0], 500)
 
+    def test_log_output_redacts_sensitive_material_and_bounds_lines(self):
+        self.enable()
+        _, body, token = self.admin.login('operator', 'correct horse battery staple', 'peer')
+        self.admin.runner = lambda *a, **k: Result(0, '\n'.join([
+            'safe fixture', 'ticket=synthetic', token, body['csrf_token'], 'x' * 3000]))
+        code, result = self.admin.logs('bluenode', 20)
+        self.assertEqual(code, 200)
+        self.assertEqual(result['lines'][0], 'safe fixture')
+        self.assertEqual(result['lines'][1:4], ['[redacted sensitive log entry]'] * 3)
+        self.assertEqual(len(result['lines'][4]), 2048)
+
+    def test_session_capacity_refuses_new_sessions_without_revoking_existing(self):
+        self.enable()
+        _, _, token = self.admin.login('operator', 'correct horse battery staple', 'peer')
+        with patch.object(remote_admin, 'MAX_SESSIONS', 1):
+            self.assertEqual(self.admin.login('operator', 'correct horse battery staple', 'peer')[0], 503)
+        self.assertIsNotNone(self.admin.authenticate(token))
+
     def test_constrained_logs_status_and_audit(self):
         status, body = self.admin.logs("asterisk", 20)
         self.assertEqual(status, 200); self.assertEqual(body["source"], "asterisk")

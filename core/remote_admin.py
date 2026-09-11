@@ -11,6 +11,7 @@ import threading
 import time
 import re
 from version import VERSION
+from runtime_io import append_bounded
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,8 @@ AUDIT_FILE = Path(os.environ.get(
 APP_ROOT = Path(os.environ.get("BLUENODE_APP_ROOT", "/opt/nodesmart"))
 MAX_BODY_BYTES = 16384
 MAX_LOG_LINES = 200
+MAX_LOGIN_CLIENTS = 1024
+MAX_SESSIONS = 128
 ALLOWED_LOG_SOURCES = {
     "bluenode": ("nodesmart.service", "nodesmart-web.service"),
     "asterisk": ("asterisk.service",),
@@ -266,6 +269,14 @@ class RemoteAdmin:
         now = self.clock()
         key = str(client_key)[:128]
         with self.lock:
+            for peer, history in list(self.login_attempts.items()):
+                while history and history[0] <= now - config['login_window_seconds']:
+                    history.popleft()
+                if not history:
+                    del self.login_attempts[peer]
+            if key not in self.login_attempts and len(self.login_attempts) >= MAX_LOGIN_CLIENTS:
+                self.audit('login', 'capacity_limited')
+                return 429, {'ok': False, 'error': 'Authentication busy; retry later'}, None
             attempts = self.login_attempts[key]
             while attempts and attempts[0] <= now - config["login_window_seconds"]:
                 attempts.popleft()
@@ -287,6 +298,9 @@ class RemoteAdmin:
         with self.lock:
             self.login_attempts.pop(key, None)
             self._purge()
+            if len(self.sessions) >= MAX_SESSIONS:
+                self.audit('login', 'capacity_limited')
+                return 503, {'ok': False, 'error': 'Session capacity reached; sign out unused sessions'}, None
             self.sessions[token] = {"csrf": csrf, "expires": expires,
                                     "policy": self._session_policy(config),
                                     "expires_at": datetime.fromtimestamp(
@@ -310,8 +324,8 @@ class RemoteAdmin:
                              "outcome": str(outcome)[:64]}, separators=(",", ":"))
         try:
             AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with self.lock, AUDIT_FILE.open("a", encoding="utf-8") as handle:
-                handle.write(record + "\n")
+            with self.lock:
+                append_bounded(AUDIT_FILE, record, maximum=1024 * 1024)
         except OSError:
             pass
 
@@ -363,8 +377,17 @@ class RemoteAdmin:
         self.audit("view-logs-" + source, outcome)
         if result.returncode != 0:
             return 500, {"ok": False, "error": "Unable to retrieve permitted logs"}
-        return 200, {"ok": True, "source": source,
-                     "lines": result.stdout.splitlines()[-count:]}
+        config = _safe_config()
+        sensitive = [config.get(name, '') for name in ('password_hash', 'password_salt', 'session_secret')]
+        with self.lock:
+            sensitive.extend(self.sessions)
+            sensitive.extend(session['csrf'] for session in self.sessions.values())
+        marker = re.compile(r'(?i)(password|passwd|secret|ticket|csrf|authorization|bluenode_admin)[a-z_]*\s*[:=]')
+        lines = []
+        for line in result.stdout.splitlines()[-count:]:
+            hidden = marker.search(line) or any(value and value in line for value in sensitive)
+            lines.append('[redacted sensitive log entry]' if hidden else line[:2048])
+        return 200, {'ok': True, 'source': source, 'lines': lines}
 
     def action(self, action, payload):
         if action not in ALLOWED_ACTIONS:

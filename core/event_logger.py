@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import os
+from runtime_io import append_bounded
 
 
 LOG_FILE = "/opt/nodesmart/logs/events.log"
@@ -10,18 +11,15 @@ def emit(event, message=""):
 
     timestamp = datetime.now().isoformat(timespec="seconds")
 
+    event = str(event).replace("\n", " ").replace("\r", " ")[:128]
+    message = str(message).replace("\n", " ").replace("\r", " ")[:8192]
     line = f"{timestamp} | {event} | {message}\n"
 
 
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-
-    with open(LOG_FILE, "a") as f:
-
-        f.write(line)
-
-
-    print(line.strip())
+    try:
+        append_bounded(LOG_FILE, line)
+    except (OSError, ValueError):
+        print('BlueNode event log write failed', flush=True)
 
 
 

@@ -152,7 +152,7 @@ def load_state():
         with STATE_FILE.open() as file:
             data = json.load(file)
         return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError, TypeError, RecursionError):
         return {}
 
 
@@ -250,7 +250,7 @@ def public_state(now=None):
         stale_after = max(1, int(state.get("stale_after_seconds", STALE_SECONDS)))
     except (TypeError, ValueError):
         stale_after = STALE_SECONDS
-    if age > stale_after:
+    if age < 0 or age > stale_after:
         return {"status": "unavailable", "telemetry_available": False,
                 "local_rx": None, "local_tx": None, "connected_nodes": [],
                 "remote_rx_nodes": [], "last_update": state.get("last_update"),

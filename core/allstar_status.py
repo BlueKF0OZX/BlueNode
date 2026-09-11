@@ -4,6 +4,7 @@ import subprocess
 import json
 
 import os
+from runtime_io import atomic_json, append_bounded, HISTORY_BYTES
 
 
 
@@ -107,7 +108,7 @@ def load_state():
 
 
 
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError, TypeError, AttributeError, RecursionError):
 
         return {
 
@@ -122,27 +123,7 @@ def load_state():
 
 
 def save_state(links, connected_since):
-
-    with open(STATE_FILE, "w") as f:
-
-        json.dump(
-
-            {
-
-                "links": sorted(links),
-
-                "connected_since": connected_since
-
-            },
-
-            f,
-
-            indent=2
-
-        )
-
-
-
+    atomic_json(STATE_FILE, {'links': sorted(links), 'connected_since': connected_since})
 
 
 def format_duration(start_time, end_time):
@@ -243,9 +224,7 @@ def save_connection_history(node, started, ended):
 
 
 
-    with open(CONNECTION_HISTORY_FILE, "a") as file:
-
-        file.write(json.dumps(record) + "\n")
+    append_bounded(CONNECTION_HISTORY_FILE, json.dumps(record), maximum=HISTORY_BYTES)
 
 
 

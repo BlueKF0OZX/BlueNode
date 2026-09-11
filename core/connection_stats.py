@@ -4,6 +4,7 @@
 
 
 import json
+from runtime_io import tail_lines, HISTORY_BYTES
 
 from datetime import datetime, timezone, time
 
@@ -22,45 +23,15 @@ ALLSTAR_STATE_FILE = Path("/opt/nodesmart/events/allstar_state.json")
 
 
 def load_history():
-
     records = []
-
-
-
-    if not HISTORY_FILE.exists():
-
-        return records
-
-
-
-    with HISTORY_FILE.open() as file:
-
-        for line in file:
-
-            line = line.strip()
-
-
-
-            if not line:
-
-                continue
-
-
-
-            try:
-
-                records.append(json.loads(line))
-
-            except json.JSONDecodeError:
-
-                continue
-
-
-
+    for line in tail_lines(HISTORY_FILE, HISTORY_BYTES, backups=2):
+        try:
+            record = json.loads(line)
+            if isinstance(record, dict):
+                records.append(record)
+        except (ValueError, TypeError, RecursionError):
+            continue
     return records
-
-
-
 
 
 def load_active_connections():
@@ -77,7 +48,7 @@ def load_active_connections():
 
 
 
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError, TypeError, AttributeError, RecursionError):
 
         return {}
 
