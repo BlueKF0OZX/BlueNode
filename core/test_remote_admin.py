@@ -176,7 +176,7 @@ class RemoteAdminTests(unittest.TestCase):
         self.enable()
         _, body, token = self.admin.login('operator', 'correct horse battery staple', 'peer')
         self.admin.runner = lambda *a, **k: Result(0, '\n'.join([
-            'safe fixture', 'ticket=synthetic', token, body['csrf_token'], 'x' * 3000]))
+            'safe fixture', '{"ticket":"synthetic"}', token, body['csrf_token'], 'x' * 3000]))
         code, result = self.admin.logs('bluenode', 20)
         self.assertEqual(code, 200)
         self.assertEqual(result['lines'][0], 'safe fixture')

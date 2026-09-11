@@ -31,7 +31,7 @@ Current dashboard with synthetic example observations. See [Testing](docs/TESTIN
 
 ## Requirements
 
-AllStarLink v3 (Debian/systemd), Python 3.9 or newer, Asterisk with `rpt`, systemd, sudo, and a Linux service user. SkywarnPlus is optional.
+AllStarLink v3 (Debian/systemd), Python 3.11 or newer, Asterisk with `rpt`, systemd, sudo, and a Linux service user. SkywarnPlus is optional.
 
 ## Install
 
@@ -102,7 +102,7 @@ existing collection cycle. See [Weather Alerts](docs/WEATHER_ALERTS.md) for the
 explicit installation check, freshness rules and update compatibility. Without
 the observer, alert telemetry is unavailable. Manage SkywarnPlus directly through its own tools.
 
-The example friendly_nodes mapping includes 50241 ? DODROPIN. Existing operator mappings are preserved. Node controls verify fresh App_Rpt state; unavailable observations do not count as successful connections. Manual controls do not depend on the online node directory.
+The example friendly_nodes mapping includes 50241 to DODROPIN. Existing operator mappings are preserved. Node controls verify fresh App_Rpt state; unavailable observations do not count as successful connections. Manual controls do not depend on the online node directory.
 
 ## Project layout
 

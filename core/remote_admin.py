@@ -382,7 +382,7 @@ class RemoteAdmin:
         with self.lock:
             sensitive.extend(self.sessions)
             sensitive.extend(session['csrf'] for session in self.sessions.values())
-        marker = re.compile(r'(?i)(password|passwd|secret|ticket|csrf|authorization|bluenode_admin)[a-z_]*\s*[:=]')
+        marker = re.compile(r'(?i)(password|passwd|secret|ticket|csrf|authorization|bluenode_admin)[a-z_]*[\x22\x27]?\s*[:=]')
         lines = []
         for line in result.stdout.splitlines()[-count:]:
             hidden = marker.search(line) or any(value and value in line for value in sensitive)

@@ -1086,6 +1086,7 @@
         <button id="btn-skywarn-on" class="control-button" disabled aria-describedby="skywarn-control-help" onclick="runControl('skywarn-enable', this)">Skywarn On</button>
         <button id="btn-skywarn-off" class="control-button" disabled aria-describedby="skywarn-control-help" onclick="runControl('skywarn-disable', this)">Skywarn Off</button>
       </div>
+      <p id="dodropin-control-help" style="display:none">DODROPIN mapping is unavailable. Configure friendly_nodes or enter the node number under Manual Node Connection.</p>
       <p id="skywarn-control-help">SkywarnPlus integration is read-only. Enable or disable it directly in SkywarnPlus.</p>
 
       <div class="manual-node-control">
@@ -1921,6 +1922,7 @@
 
       );
 
+      document.getElementById('dodropin-control-help').style.display = dodropinNode ? 'none' : 'block';
       const dodropinConnected =
 
         dodropinNode ? connectedNodes.includes(String(dodropinNode)) : false;

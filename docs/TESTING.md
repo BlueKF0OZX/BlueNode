@@ -9,7 +9,7 @@ $env:NODESMART_CONFIG = Join-Path (Get-Location) 'config/nodesmart.example.json'
 python -m unittest discover -s core -v
 ```
 
-Use an installed Python 3.9+ interpreter. POSIX file-security and terminal tests skip on Windows. The Soft Radio transaction tests use Bash (Git for Windows is supported). test_intelligence.py is a scenario-printing script imported during discovery, not an assertion suite.
+Use an installed Python 3.11+ interpreter. POSIX file-security and terminal tests skip on Windows. The Soft Radio transaction tests use Bash (Git for Windows is supported). test_intelligence.py is a scenario-printing script imported during discovery, not an assertion suite.
 
 ## Dashboard
 

@@ -113,6 +113,24 @@ class WebAdminTests(unittest.TestCase):
         if self.emergency_file.exists(): self.emergency_file.unlink()
         soft_radio.SOFT_RADIO.tickets.clear()
 
+    def test_event_response_is_bounded_and_keeps_latest_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'logs').mkdir()
+            (root / 'logs/events.log').write_text(''.join(f'event {i}\n' for i in range(1000)))
+            with patch.object(web_server, 'ROOT', root):
+                connection = http.client.HTTPConnection('127.0.0.1', self.server.server_port, timeout=3)
+                try:
+                    connection.request('GET', '/logs/events.log')
+                    response = connection.getresponse()
+                    lines = response.read().decode().splitlines()
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.getheader('Cache-Control'), 'no-store')
+                    self.assertEqual(len(lines), 500)
+                    self.assertEqual(lines[-1], 'event 999')
+                finally:
+                    connection.close()
+
     def test_public_version_has_no_authentication_material(self):
         code, _, body = self.request('GET', '/api/version')
         self.assertEqual(code, 200)

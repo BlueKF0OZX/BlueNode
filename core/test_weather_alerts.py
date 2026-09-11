@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import skywarn_snapshot_exporter as exporter
 import weather_alerts as weather
+import health
 
 
 def alert(end='2030-01-01T00:00:00Z', description='Example weather description'):
@@ -17,6 +18,15 @@ def alert(end='2030-01-01T00:00:00Z', description='Example weather description')
 
 
 class WeatherTests(unittest.TestCase):
+    def test_status_config_is_bounded_and_decoding_errors_are_isolated(self):
+        config = self.directory / 'config.yaml'
+        with patch.object(health, 'SKYWARN_CONFIG_FILE', config):
+            for raw in (b'\xff', b'x' * 65537, b'not a status configuration'):
+                config.write_bytes(raw)
+                self.assertEqual(health.check_skywarn(), 'unknown')
+            config.write_bytes(b'SKYWARNPLUS:\n  Enable: true\n')
+            self.assertEqual(health.check_skywarn(), 'enabled')
+
     def test_optional_integration_presence(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder) / 'optional'

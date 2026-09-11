@@ -24,6 +24,7 @@ import asterisk_observation
 
 
 
+SKYWARN_CONFIG_FILE = Path("/usr/local/bin/SkywarnPlus/config.yaml")
 CONFIG = load_config()
 NODE = str(CONFIG["node"])
 CALLSIGN = str(CONFIG["callsign"])
@@ -212,15 +213,19 @@ def check_skywarn():
 
     """Read SkywarnPlus Tailmessage enabled/disabled state."""
 
-    config_file = Path("/usr/local/bin/SkywarnPlus/config.yaml")
+    config_file = SKYWARN_CONFIG_FILE
 
 
 
     try:
 
-        with config_file.open("r") as file:
-
-            lines = file.readlines()
+        if not config_file.is_file():
+            return 'unknown'
+        with config_file.open('rb') as file:
+            raw = file.read(65537)
+        if len(raw) > 65536:
+            return 'unknown'
+        lines = raw.decode('utf-8').splitlines()
 
 
 
@@ -270,7 +275,7 @@ def check_skywarn():
 
 
 
-    except OSError:
+    except (OSError, ValueError):
 
         return "unknown"
 

@@ -34,7 +34,7 @@ for cmd in /usr/bin/python3 /usr/sbin/asterisk /usr/bin/systemctl /usr/sbin/visu
   [[ -x "${cmd}" ]] || fail "Required command not found: ${cmd}"
 done
 
-/usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' || fail "Python 3.9 or newer is required."
+/usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' || fail "Python 3.11 or newer is required."
 
 for cmd in ip ping getent systemd-analyze; do
   command -v "$cmd" >/dev/null || fail "Required command not found: $cmd (install iproute2, iputils-ping, libc-bin, systemd)"
