@@ -49,10 +49,16 @@ class AutomationTests(unittest.TestCase):
     def test_missing_corrupt_and_oversized_state_inhibits_recovery(self):
         self.state_file.unlink()
         self.assert_inhibited()
-        for raw in (b'{broken', b'[]', b'null', b'{}', b'\xff', b'x' * (automation.MAX_STATE_BYTES + 1)):
+        for raw in (b'{broken', b'[]', b'null', b'{}', b'\xff', b'{"maintenance_mode":true,"maintenance_mode":false}', b'x' * (automation.MAX_STATE_BYTES + 1)):
             with self.subTest(raw=raw[:16]):
                 self.state_file.write_bytes(raw)
                 self.assert_inhibited()
+
+    def test_duplicate_safety_fields_in_complete_state_inhibit(self):
+        raw = json.dumps(automation.default_state()).replace('"maintenance_mode": false',
+            '"maintenance_mode": true, "maintenance_mode": false')
+        self.state_file.write_text(raw)
+        self.assert_inhibited()
 
     def test_missing_or_type_invalid_safety_fields_inhibit(self):
         valid = automation.default_state()

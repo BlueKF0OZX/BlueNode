@@ -26,7 +26,7 @@ class ConnectionStateTests(unittest.TestCase):
 
     def test_nested_corruption_and_truncation_never_create_sessions(self):
         valid = {'links': ['50241'], 'connected_since': {'50241': self.started}}
-        cases = ['{', '[]', 'null', '{}', json.dumps({'connected_since': []})]
+        cases = ['{', '[]', 'null', '{}', '{"links":["99999"],"links":[],"connected_since":{}}', json.dumps({'connected_since': []})]
         for key, values in {'links': [None, {}, [None], [['50241']], ['50241', '50241']],
                             'connected_since': [None, [], {'50241': []}, {'50241': 'bad'},
                                                 {'99999': self.started}, {'50241': '2099-01-01'}]}.items():

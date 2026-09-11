@@ -25,13 +25,22 @@ def unavailable():
     return {'links': [], 'connected_since': {}, 'state_available': False}
 
 
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('Duplicate state field')
+        result[key] = value
+    return result
+
+
 def load(path):
     try:
         with Path(path).open('rb') as handle:
             raw = handle.read(MAX_BYTES + 1)
         if len(raw) > MAX_BYTES:
             return unavailable()
-        data = json.loads(raw.decode('utf-8'))
+        data = json.loads(raw.decode('utf-8'), object_pairs_hook=unique_object)
         if not isinstance(data, dict):
             return unavailable()
         links, since = data.get('links'), data.get('connected_since')

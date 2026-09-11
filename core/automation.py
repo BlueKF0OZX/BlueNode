@@ -146,13 +146,22 @@ def _normalized(data):
     return state
 
 
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('Duplicate state field')
+        result[key] = value
+    return result
+
+
 def load_state():
     try:
         with STATE_FILE.open('rb') as file:
             raw = file.read(MAX_STATE_BYTES + 1)
         if len(raw) > MAX_STATE_BYTES:
             return invalid_state()
-        return _normalized(json.loads(raw.decode('utf-8')))
+        return _normalized(json.loads(raw.decode('utf-8'), object_pairs_hook=unique_object))
     except (OSError, ValueError, TypeError, RecursionError):
         return invalid_state()
 

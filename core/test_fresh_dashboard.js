@@ -13,7 +13,7 @@ function element(id) {
   return elements.get(id);
 }
 const requests = [];
-const context = vm.createContext({console, Date, URL, URLSearchParams,
+const context = vm.createContext({console, Date, URL, URLSearchParams, AbortController,
   setInterval(){}, clearInterval(){}, setTimeout, clearTimeout,
   window:{addEventListener(){},location:{protocol:'http:',host:'localhost'}},
   document:{getElementById:element, querySelectorAll(){return [];},
