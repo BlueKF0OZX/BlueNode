@@ -2,7 +2,8 @@
 
 BlueNode is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
 
-**Status:** v0.1.0-alpha — early public testing release.
+**Status:** 0.1.2-alpha.0 - unreleased development snapshot for early testing.
+Linux installation and rollback validation remain release gates; see [Changelog](CHANGELOG.md).
 ## Dashboard
 
 ![BlueNode Dashboard](bluenode-dashboard.jpeg)

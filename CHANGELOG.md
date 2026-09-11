@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased] - 0.1.2-alpha.0
+
+### Changed
+
+- Centered dashboard cards and improved mobile touch targets, diagnostic explanations, and Emergency Mode guidance.
+- Node controls verify resulting App_Rpt state, including already-satisfied and unverified outcomes.
+- SkywarnPlus is strictly read-only; former On/Off controls no longer execute SkywarnPlus.
+- Clarified local-receiver and adjacent-peer limits; Radio Activity stays absent from the dashboard.
+- Improved installation prerequisites, configuration errors, and upgrade/rollback guidance.
+
+### Security
+
+- Escaped observation/history text in dashboard HTML.
+- Hardened concurrent login throttling, CSRF input handling, and request-log privacy.
+- Revoked unused RX tickets on logout/stop and rejected malformed WebSocket and browser TX input.
+
+### Validation required before release
+
+- Disposable Debian/ASL3 clean install, boot, permissions, upgrade, and rollback.
+- Supported App_Rpt link observations, optional weather source compatibility, and HTTPS/proxy behavior.
+- Soft Radio remains parked; no browser TX/PTT functionality is included.
+
+
 ## [0.1.1-alpha] - 2026-08-29
 
 Alpha maintenance and security update.

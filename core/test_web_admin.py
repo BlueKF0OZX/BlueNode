@@ -113,6 +113,12 @@ class WebAdminTests(unittest.TestCase):
         if self.emergency_file.exists(): self.emergency_file.unlink()
         soft_radio.SOFT_RADIO.tickets.clear()
 
+    def test_public_version_has_no_authentication_material(self):
+        code, _, body = self.request('GET', '/api/version')
+        self.assertEqual(code, 200)
+        self.assertEqual(set(body), {'version', 'commit'})
+        self.assertRegex(body['version'], r'^\d+\.\d+\.\d+-alpha\.\d+$')
+
     def test_disabled_and_unauthenticated_access(self):
         self.assertEqual(self.request("GET", "/api/admin/session")[2]["enabled"], False)
         self.enable()

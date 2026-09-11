@@ -91,6 +91,7 @@ function fixture(detailed) {
           if (intelligenceIncomplete) body = {level:'normal',summary:'A stale reassuring summary'};
           if (injection) { body.unresolved_issues = [hostile]; body.incidents[0].summary = hostile; }
         }
+        if (url.pathname === '/api/version') body = {version:'0.1.2-alpha.0',commit:'a'.repeat(40)};
         if (url.pathname === '/api/admin/session') body = {enabled:true,authenticated:false};
         if (url.pathname === '/events/allstar_state.json' && !missing) body = {links:observedZero?[]:['23456'],connected_since:observedZero?{}:{'23456':now}};
         if (url.pathname === '/api/emergency-mode') body = {active:emergency,mode:emergency?'emergency':'normal',elapsed_seconds:65};
@@ -134,6 +135,7 @@ function fixture(detailed) {
         }
       };
       await checkCardAlignment();
+      assert.match(await page.locator('#build-version').innerText(), /0\.1\.2-alpha\.0.*aaaaaaaaaaaa/);
       await page.evaluate(() => loadEvents());
       assert.equal(await page.locator('#events .event-row').count(), 10);
       await page.getByRole('button', {name:'Show More', exact:true}).click();

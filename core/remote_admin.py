@@ -9,6 +9,8 @@ import secrets
 import subprocess
 import threading
 import time
+import re
+from version import VERSION
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -342,7 +344,7 @@ class RemoteAdmin:
     def _version(self):
         result = self._run(["git", "-C", str(APP_ROOT), "rev-parse", "HEAD"], 5)
         commit = result.stdout.strip() if result.returncode == 0 else "unavailable"
-        return {"commit": commit if len(commit) == 40 else "unavailable"}
+        return {"version": VERSION, "commit": commit if re.fullmatch(r"[0-9a-f]{40}", commit) else "unavailable"}
 
     def logs(self, source, lines):
         if source not in ALLOWED_LOG_SOURCES:

@@ -101,6 +101,10 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
         path = self.path.split("?", 1)[0]
 
+        if path == "/api/version":
+            self.send_json(200, ADMIN._version())
+            return
+
         if path == "/api/admin/session":
             self.send_json(200, ADMIN.public_state(self.admin_cookie(), self.admin_policy()))
             return

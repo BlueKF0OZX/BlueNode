@@ -1321,12 +1321,25 @@
     </div>
 
     <div id="error"></div>
+    <div id="build-version" class="sub">BlueNode version unavailable</div>
 
   </div>
 
 
 
   <script>
+
+    async function loadVersion() {
+      try {
+        const response = await fetch('/api/version', {cache:'no-store'});
+        if (!response.ok) return;
+        const state = await response.json();
+        if (typeof state.version !== 'string') return;
+        document.getElementById('build-version').textContent = 'BlueNode ' + state.version +
+          (/^[0-9a-f]{40}$/.test(state.commit) ? ' / ' + state.commit.slice(0, 12) : ' / commit unavailable');
+      } catch (_) { /* Version lookup must not interrupt dashboard startup. */ }
+    }
+    loadVersion();
 
     let adminCsrfToken = null;
     const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
