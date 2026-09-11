@@ -36,6 +36,17 @@ class RadioActivityTests(unittest.TestCase):
     def sample(local_rx=False, local_tx=False, links=None):
         return {"local_rx": local_rx, "local_tx": local_tx, "links": links or []}
 
+    def test_origin_scope_never_identifies_an_ultimate_operator(self):
+        local = radio_activity.classify({'local_rx': True, 'local_tx': False, 'links': []})
+        self.assertEqual(local['tx_origin']['path_scope'], 'local_receiver')
+        self.assertFalse(local['tx_origin']['ultimate_source_known'])
+        with patch.object(radio_activity.node_metadata, 'lookup', return_value={}):
+            remote = radio_activity.classify({'local_rx': False, 'local_tx': True,
+                'links': [{'node': '50241', 'mode': 'T', 'keyed': True}]})
+        self.assertEqual(remote['tx_origin']['path_scope'], 'immediate_peer')
+        self.assertFalse(remote['tx_origin']['ultimate_source_known'])
+        self.assertIn('ultimate transmitter unknown', radio_activity._transition_event(remote, 'START')[1])
+
     def test_parser_and_idle(self):
         parsed = radio_activity.parse_variables(
             "RPT_TXKEYED=0\nRPT_RXKEYED=0\nRPT_ALINKS=1,54321TU\n")

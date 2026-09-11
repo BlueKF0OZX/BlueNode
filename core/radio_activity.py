@@ -101,6 +101,7 @@ def classify(sample):
             "active": True, "source_type": "local_rf",
             "direction": "local_to_network", "confidence": "verified",
             "source_node": NODE, "friendly_name": "",
+            "path_scope": "local_receiver", "ultimate_source_known": False,
         }
     elif len(remote) == 1:
         node = remote[0]
@@ -196,7 +197,7 @@ def _transition_event(state, transition):
         node = state.get("node")
         name = state.get("friendly_name")
         label = f"{name} ({node})" if name else f"Node {node}"
-        return f"RADIO.REMOTE_TX.{transition}", f"{label} audio {transition.lower()}"
+        return f"RADIO.REMOTE_TX.{transition}", f"Adjacent peer {label} audio {transition.lower()}; ultimate transmitter unknown"
     if status == "ambiguous":
         nodes = ", ".join(state.get("remote_rx_nodes", []))
         return f"RADIO.REMOTE_TX.{transition}", f"Multiple keyed links {transition.lower()}: {nodes}"
