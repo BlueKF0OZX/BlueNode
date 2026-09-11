@@ -2,6 +2,7 @@
 import copy
 import subprocess
 import time
+import threading
 import unittest
 from contextlib import ExitStack, nullcontext
 from datetime import datetime, timezone
@@ -61,6 +62,7 @@ class ObservationTests(unittest.TestCase):
             (automation, 'load_state', lambda: copy.deepcopy(self.auto)),
             (automation, 'save_state', save_auto), (automation, 'RECOVERY_ENABLED', True),
             (recovery, 'ASTERISK_RECOVERY_ENABLED', True), (recovery.time, 'sleep', lambda _: None),
+            (recovery, 'VERIFY_TIMEOUT_SECONDS', 1),
             (recovery, 'load_system_state', lambda: self.state),
             (recovery, 'record_recovery_result', lambda *args: self.verified_results.append(args)),
             (recovery, 'load_json', lambda path: self.state if path == recovery.STATE_FILE else {}),
@@ -83,6 +85,9 @@ class ObservationTests(unittest.TestCase):
             if self.after_restart:
                 self.service_results = [service()]
                 self.query = subprocess.CompletedProcess([], 0, 'Asterisk 22.0 fixture', '')
+                # A real monitor publishes a later observation. Cross a Windows
+                # wall-clock tick before constructing the simulated replacement.
+                threading.Event().wait(0.02)
                 self.state = health.build_state()
             return subprocess.CompletedProcess(command, 0, '', '')
         elif command[-1] == 'core show version': value = self.query
@@ -133,6 +138,18 @@ class ObservationTests(unittest.TestCase):
                 state = self.cycle()
                 self.assertEqual(state['asterisk'], 'unknown')
                 self.assert_no_restart()
+
+    def test_responsive_cli_conflicts_with_stopped_service_and_blocks_recovery(self):
+        self.service_results = [service('inactive', 'dead', 0)]
+        self.node = subprocess.CompletedProcess([], 0,
+            'RPT_RXKEYED=1\nRPT_TXKEYED=1\nRPT_ALINKS=1,23456TK\n', '')
+        state = self.cycle()
+        self.assertEqual(state['asterisk'], 'unknown')
+        self.assertEqual(state['asterisk_evidence']['service']['reason'],
+                         'conflicting_service_and_query_evidence')
+        self.assert_no_restart()
+        self.assertTrue(all('restart' not in command and 'rpt cmd' not in command
+                            for command in self.calls))
 
     def test_genuine_stopped_and_failed_can_recover(self):
         for active, sub in [('inactive', 'dead'), ('failed', 'failed')]:
