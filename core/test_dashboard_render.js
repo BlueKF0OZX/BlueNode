@@ -100,6 +100,30 @@ function fixture(detailed) {
         overflow:document.documentElement.scrollWidth>innerWidth,
         heights:[...document.querySelectorAll('#status-grid .card')].slice(0,5).map(e=>e.getBoundingClientRect().height)
       }));
+      const checkCardAlignment = async () => {
+        const cards = await page.locator('#status-grid .card').evaluateAll(elements => elements.map(card => {
+          const bounds = card.getBoundingClientRect();
+          const children = [...card.children].filter(child => child.getBoundingClientRect().height > 0);
+          const first = children[0].getBoundingClientRect();
+          const last = children[children.length - 1].getBoundingClientRect();
+          return {
+            label: children[0].textContent,
+            centered: Math.abs((first.top + last.bottom) / 2 - (bounds.top + bounds.bottom) / 2) < 2,
+            textCentered: children.every(child => getComputedStyle(child).textAlign === 'center'),
+            contained: children.every(child => {
+              const rect = child.getBoundingClientRect();
+              return rect.left >= bounds.left && rect.right <= bounds.right &&
+                child.scrollWidth <= child.clientWidth + 1;
+            })
+          };
+        }));
+        for (const card of cards) {
+          assert.ok(card.centered, `${card.label}: vertically centered at ${width}`);
+          assert.ok(card.textCentered, `${card.label}: horizontally centered text at ${width}`);
+          assert.ok(card.contained, `${card.label}: text fits at ${width}`);
+        }
+      };
+      await checkCardAlignment();
       assert.equal((await geometry()).overflow,false, `overflow at ${width}`);
       assert.equal(await page.locator('#connectivity-disclosure').getAttribute('open'), null);
       const before = (await geometry()).heights;
@@ -201,6 +225,7 @@ function fixture(detailed) {
         await page.evaluate(()=>loadStatus());
         assert.equal(await page.locator('#asterisk').innerText(),item.label);
         assert.match(await page.locator('#asterisk-detail').innerText(),item.detail);
+        await checkCardAlignment();
         assert.equal((await geometry()).overflow,false,`Asterisk evidence overflow at ${width}`);
       }
       asteriskCase = null;
@@ -215,6 +240,7 @@ function fixture(detailed) {
         assert.doesNotMatch(await page.locator('#weather-alerts').textContent(),/No active weather alerts/);
       }
       assert.equal(await page.locator('#status').innerText(),'UNAVAILABLE');
+      await checkCardAlignment();
       assert.equal((await geometry()).overflow,false);
       assert.deepEqual(errors,[],`browser errors at ${width}`);
       checks++;
