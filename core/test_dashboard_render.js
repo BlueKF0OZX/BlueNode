@@ -58,6 +58,8 @@ function fixture(detailed) {
         const url = new URL(route.request().url());
         assert.equal(route.request().method(), 'GET', 'Render checks must never invoke controls');
         if (url.pathname === '/web/') return route.fulfill({contentType:'text/html',body:html});
+        if (url.pathname === '/logs/events.log') return route.fulfill({contentType:'text/plain',body:
+          Array.from({length:12}, (_, i) => `${now} | CONNECT.SUCCESS | Example event ${i}: ${'long-detail-'.repeat(20)}`).join('\n')});
         let body;
         if (attentionUnavailable && ['/state/intelligence.json','/api/emergency-mode'].includes(url.pathname)) return route.fulfill({status:503,body:'Unavailable'});
         if (url.pathname === '/state/system.json' && !missing) body = fixture(detailed);
@@ -124,6 +126,18 @@ function fixture(detailed) {
         }
       };
       await checkCardAlignment();
+      await page.evaluate(() => loadEvents());
+      assert.equal(await page.locator('#events .event-row').count(), 10);
+      await page.getByRole('button', {name:'Show More', exact:true}).click();
+      await page.waitForFunction(() => document.querySelectorAll('#events .event-row').length === 12);
+      assert.equal(await page.locator('#events .event-row').count(), 12);
+      const smallTargets = await page.locator('button:visible, .onboarding-help:visible').evaluateAll(elements =>
+        elements.filter(e => e.getBoundingClientRect().height < 44).map(e => e.textContent.trim()));
+      assert.deepEqual(smallTargets, [], `touch targets at ${width}`);
+      await page.getByRole('button', {name:'Show Less', exact:true}).click();
+      await page.waitForFunction(() => document.querySelectorAll('#events .event-row').length === 10);
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.screenshot({path:path.join(output,`${width}-dashboard.png`),fullPage:true});
       assert.equal((await geometry()).overflow,false, `overflow at ${width}`);
       assert.equal(await page.locator('#connectivity-disclosure').getAttribute('open'), null);
       const before = (await geometry()).heights;
@@ -190,6 +204,7 @@ function fixture(detailed) {
       emergency = true;
       await page.evaluate(()=>loadStatus());
       assert.equal(await page.locator('#emergency-banner').isVisible(),true);
+      assert.match(await page.locator('#emergency-banner').innerText(), /does not change automatic recovery or radio operation/);
       assert.equal((await geometry()).overflow,false,`emergency overflow at ${width}`);
       attentionUnavailable = true;
       await page.evaluate(()=>loadStatus());
