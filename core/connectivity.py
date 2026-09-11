@@ -311,7 +311,7 @@ def diagnostic_layers(checks):
             "IAX module state was unavailable")
 
     links = checks.get("remote_links")
-    if iax is not True:
+    if layers['iax']['status'] != 'ok':
         layers["remote_links"] = _layer("blocked_by_upstream", "Remote links require IAX")
     elif links is None:
         layers["remote_links"] = _layer("unknown", "Remote link state was unavailable")
@@ -334,7 +334,7 @@ def _message(domain, checks):
         "healthy": "LAN, gateway, DNS, Internet, AllStar, Asterisk, and IAX checks are healthy",
         "local_network": "No usable default network interface is available",
         "gateway": "The local interface is available but its default gateway is unreachable",
-        "dns": "The gateway and external Internet are reachable, but DNS resolution failed",
+        "dns": "DNS resolution failed; check the separate direct-IP Internet observation before concluding Internet access is available",
         "external_internet": "The LAN and gateway are reachable, but the external Internet probe failed",
         "allstar_services": "General Internet access works, but the AllStar service endpoint is unreachable",
         "allstar_registration": "AllStar services and Asterisk are available, but App_Rpt is not registered",
@@ -399,7 +399,7 @@ def update(checks=None, now=None):
     elif domain in ("local_network", "gateway"):
         state["operator_action"] = "Check the local interface, cable/Wi-Fi, and router"
     elif domain == "dns":
-        state["operator_action"] = "Check the configured DNS resolver; direct-IP Internet remains available"
+        state["operator_action"] = "Check the configured DNS resolver and the independent direct-IP Internet result"
     elif domain == "external_internet":
         state["operator_action"] = "Check the upstream Internet connection or ISP"
     elif domain in ("allstar_services", "allstar_registration"):

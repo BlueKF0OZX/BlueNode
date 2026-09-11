@@ -126,7 +126,7 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.equal(element('connectivity-summary').textContent, 'DNS failure');
   assert.match(element('connectivity-checks').textContent,/DNS failure.*DNS FAIL.*Internet OK/);
   assert.match(element('connectivity-details').textContent,
-    /DNS resolution failed.*DNS FAIL.*Internet OK.*AllStar services BLOCKED_BY_UPSTREAM.*Action: Check DNS/);
+    /DNS resolution failed.*DNS: FAIL.*Internet: OK.*AllStar services: Waiting for upstream dependency.*Action: Check DNS/);
   assert.equal(element('connectivity-details').style.display,'');
   const automationStart=html.indexOf('    function automationAge');
   const automationEnd=html.indexOf('    let statusLoading',automationStart);

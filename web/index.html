@@ -2003,7 +2003,9 @@
         asterisk: 'Asterisk', iax: 'IAX', remote_links: 'Remote links'
       };
       const layerText = Object.entries(state.layers || {}).map(([name, layer]) =>
-        (layerNames[name] || name) + ' ' + String(layer.status || 'unknown').toUpperCase()
+        (layerNames[name] || name) + ': ' +
+        (layer.status === 'blocked_by_upstream' ? 'Waiting for upstream dependency' : String(layer.status || 'unknown').toUpperCase()) +
+        (layer.evidence ? ' (' + layer.evidence + ')' : '')
       ).join(' \u00b7 ');
       details.textContent = (state.message || 'Failure boundary unavailable') +
         (layerText ? ' | ' + layerText : '') +

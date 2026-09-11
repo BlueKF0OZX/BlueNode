@@ -83,6 +83,25 @@ class ConnectivityTests(unittest.TestCase):
         self.assertEqual(state["layers"]["allstar_registration"]["status"],
                          "ok")
 
+    def test_asterisk_failure_blocks_dependent_layers_despite_cached_success(self):
+        checks = self.healthy()
+        checks['asterisk'] = False
+        layers = connectivity.diagnostic_layers(checks)
+        for name in ('allstar_registration', 'iax', 'remote_links'):
+            self.assertEqual(layers[name]['status'], 'blocked_by_upstream', name)
+        for name in ('local_network', 'gateway', 'dns', 'internet', 'allstar_services'):
+            self.assertEqual(layers[name]['status'], 'ok', name)
+
+    def test_dns_and_internet_failure_do_not_claim_direct_ip_access(self):
+        checks = self.healthy()
+        checks.update(dns=False, internet=False, allstar=False)
+        state = connectivity.update(checks, NOW)
+        self.assertEqual(state['layers']['internet']['status'], 'fail')
+        self.assertEqual(state['layers']['allstar_services']['status'], 'blocked_by_upstream')
+        self.assertEqual(state['layers']['allstar_registration']['status'], 'blocked_by_upstream')
+        self.assertNotIn('Internet are reachable', state['message'])
+        self.assertEqual(state['layers']['asterisk']['status'], 'ok')
+
     def test_registration_failure(self):
         state = self.sustained("allstar")
         self.assertEqual((state["diagnosis"], state["status"]),
