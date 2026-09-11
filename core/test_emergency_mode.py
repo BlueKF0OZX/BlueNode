@@ -50,6 +50,11 @@ class EmergencyModeTests(unittest.TestCase):
         self.state_file.write_text('{"active":true,"mode":"emergency","activated_epoch":"bad"}')
         self.assertEqual(emergency_mode.public_state(now=100)["mode"], "normal")
 
+    def test_out_of_range_or_boolean_epoch_fails_safe(self):
+        for epoch in (10 ** 100, True, -1, 1.5):
+            state = {'active': True, 'mode': 'emergency', 'activated_epoch': epoch}
+            self.assertEqual(emergency_mode.public_state(state, now=100)['mode'], 'normal')
+
     def test_atomic_state_has_no_temporary_residue(self):
         emergency_mode.set_emergency(True, now=1000)
         self.assertEqual(list(self.state_file.parent.glob("*.tmp")), [])

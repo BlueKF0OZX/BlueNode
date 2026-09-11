@@ -30,6 +30,14 @@ class AutomationTests(unittest.TestCase):
         self.state_patch.stop()
         self.directory.cleanup()
 
+    def test_maintenance_exit_does_not_enable_disabled_recovery(self):
+        with patch.object(automation, 'RECOVERY_ENABLED', False):
+            automation.set_maintenance(True, now=1000)
+            state = automation.set_maintenance(False, now=1001)
+            self.assertFalse(state['recovery_enabled'])
+            self.assertFalse(state['automation_armed'])
+            self.assertNotIn('actions resumed', state['last_result'])
+
     def test_isolated_recovery_verifies_and_resumes(self):
         self.assertTrue(automation.recovery_allowed(stopped(1000), 1000))
         self.assertEqual(automation.begin_recovery(1000), 1)

@@ -75,6 +75,13 @@ class PolicyTests(unittest.TestCase):
         self.assertTrue(all(call.args[1] in ('config_error', 'rejected')
                             for call in self.auth.audit.call_args_list))
 
+    def test_maintenance_validates_payload_and_audits_transition(self):
+        self.write({'enabled': False})
+        self.assertEqual(self.request('POST', '/api/control/maintenance-enable', {'extra': True})[0], 400)
+        self.effects[2].assert_not_called()
+        self.assertEqual(self.request('POST', '/api/control/maintenance-enable')[0], 200)
+        self.auth.audit.assert_called_with('maintenance-mode', 'activated')
+
     def test_skywarn_controls_are_read_only_even_in_local_mode(self):
         self.write({'enabled': False})
         for action in ('skywarn-enable', 'skywarn-disable'):

@@ -53,13 +53,16 @@ def _normalized(value):
     state["mode"] = "emergency" if active else "normal"
     if active:
         try:
-            epoch = int(value.get("activated_epoch"))
+            if type(value.get("activated_epoch")) is not int:
+                raise ValueError
+            epoch = value["activated_epoch"]
             if epoch < 0:
                 raise ValueError
-        except (TypeError, ValueError, OverflowError):
+            activated_at = _iso(epoch)
+        except (TypeError, ValueError, OverflowError, OSError):
             return default_state()
         state["activated_epoch"] = epoch
-        state["activated_at"] = _iso(epoch)
+        state["activated_at"] = activated_at
         source = value.get("activation_source")
         state["activation_source"] = source if source in _SOURCES else "local_dashboard"
     transition = value.get("last_transition_at")

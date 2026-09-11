@@ -436,11 +436,13 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
             self.send_json(403, {'ok': False, 'error': 'SkywarnPlus integration is read-only; use SkywarnPlus directly'})
             return
 
-        action = path[len(prefix):].strip("/")
-
         if action in ("maintenance-enable", "maintenance-disable"):
+            if self.read_json() != {}:
+                self.send_json(400, {"ok": False, "error": "Unexpected parameters"})
+                return
             enabled = action == "maintenance-enable"
             state = automation.set_maintenance(enabled)
+            ADMIN.audit("maintenance-mode", "activated" if enabled else "deactivated")
             self.send_json(200, {
                 "ok": True,
                 "action": action,

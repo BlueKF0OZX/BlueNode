@@ -230,7 +230,7 @@ def set_maintenance(enabled, now=None):
         state["last_action"] = "Maintenance mode enabled" if enabled else "Maintenance mode disabled"
         state["last_result"] = (
             "Monitoring continues; automatic actions are suspended" if enabled
-            else "Automatic recovery actions resumed"
+            else "Maintenance ended; configured automatic-recovery policy applies"
         )
         emit("AUTOMATION.MAINTENANCE.ENABLED" if enabled else
              "AUTOMATION.MAINTENANCE.DISABLED", state["last_result"])

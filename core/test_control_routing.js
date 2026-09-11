@@ -44,11 +44,17 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         } else { status = 404; }
         return route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
       });
-      page.on('dialog', dialog => dialog.accept());
+      let allowConfirmation = true;
+      page.on('dialog', dialog => allowConfirmation ? dialog.accept() : dialog.dismiss());
       await page.goto('http://bluenode.test/web/');
       await page.evaluate(() => loadAdminSession());
       await page.evaluate(() => { window.loginCalls = 0; window.adminLogin = () => { window.loginCalls++; }; });
       await page.locator('#manual-node-number').fill('12345');
+      allowConfirmation = false;
+      const cancelledCount = posts.length;
+      await page.locator('#emergency-enter').click();
+      assert.equal(posts.length, cancelledCount, 'cancelled confirmation cannot send a control');
+      allowConfirmation = true;
       const controls = [
         ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
         ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
