@@ -86,6 +86,26 @@ fi
 
 /usr/bin/python3 "$REPO_ROOT/install/validate-config.py" "$INSTALL_ROOT/config/nodesmart.json"
 
+# Only a configuration-only installation may receive new recovery safety state.
+# Never recreate missing state during an upgrade or after a partial installation.
+fresh_install=false
+if [[ ! -e "$SERVICE_FILE" && ! -L "$SERVICE_FILE" &&
+      ! -e "$WEB_SERVICE_FILE" && ! -L "$WEB_SERVICE_FILE" &&
+      ! -e "$SUDOERS_FILE" && ! -L "$SUDOERS_FILE" ]] &&
+   /usr/bin/python3 - "$INSTALL_ROOT" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+sys.exit(0 if not root.is_symlink() and
+         {p.name for p in root.iterdir()} == {'config'} and
+         not (root / 'config').is_symlink() and
+         {p.name for p in (root / 'config').iterdir()} == {'nodesmart.json'}
+         else 1)
+PY
+then
+  fresh_install=true
+fi
+
 echo "Installing restricted sudo permissions..."
 tmp_sudoers="$(mktemp)"
 tmp_service=""
@@ -100,6 +120,19 @@ cleanup() {
 trap cleanup EXIT
 sed "s/NODESMART_USER/${SERVICE_USER}/g" "${REPO_ROOT}/install/nodesmart.sudoers.example" > "${tmp_sudoers}"
 /usr/sbin/visudo -cf "${tmp_sudoers}" >/dev/null || fail "Generated sudoers file failed validation."
+
+# The monitor owns health collection and recovery now. Retire the old writer
+# before replacing code, while retaining its unit files for operator rollback.
+for legacy_unit in nodesmart-health.timer nodesmart-health.service; do
+  legacy_state="$(/usr/bin/systemctl show "$legacy_unit" -p LoadState --value)"
+  if [[ "$legacy_state" != "not-found" ]]; then
+    if [[ "$legacy_unit" == *.timer ]]; then
+      /usr/bin/systemctl disable --now "$legacy_unit"
+    else
+      /usr/bin/systemctl stop "$legacy_unit"
+    fi
+  fi
+done
 
 echo "Preparing BlueNode files and directories..."
 mkdir -p "${INSTALL_ROOT}"
@@ -132,6 +165,22 @@ if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
 fi
 
 mkdir -p "${INSTALL_ROOT}/events" "${INSTALL_ROOT}/history" "${INSTALL_ROOT}/logs" "${INSTALL_ROOT}/state"
+
+if [[ "$fresh_install" == true ]]; then
+  /usr/bin/python3 - "$INSTALL_ROOT" <<'PY'
+import json
+import os
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / 'core'))
+import automation
+with (root / 'state/automation.json').open('x') as file:
+    json.dump(automation.default_state(), file, indent=2)
+    file.flush()
+    os.fsync(file.fileno())
+PY
+fi
 
 echo "Installing helper commands..."
 install -d -o root -g root -m 0755 /usr/local/sbin

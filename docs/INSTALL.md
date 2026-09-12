@@ -61,6 +61,17 @@ New installations default to `web.host: "127.0.0.1"`, port `8080`, and
 keep it disabled while validating your installation. Remote Admin and Soft
 Radio are disabled without their separate configuration.
 
+When completing a new configuration-only installation, the installer creates
+the initial automation safety record before starting services. Reinstalls and
+upgrades never recreate a missing safety record: recovery remains inhibited
+until verified state is restored. This preserves prior cooldown and failure
+history rather than silently clearing it.
+
+Upgrades disable the obsolete `nodesmart-health.timer` and stop its health
+service before replacing application code. The main monitor performs those
+checks now; running both can overwrite automation status. Old unit files are
+retained for rollback, but the timer stays disabled.
+
 For access from another computer on your **trusted LAN**, deliberately set
 `web.host` to the node's LAN IPv4 address. The dashboard includes radio control
 actions and has no authentication by default. Do not bind it to an untrusted

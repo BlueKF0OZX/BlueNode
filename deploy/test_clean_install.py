@@ -90,6 +90,10 @@ hosts: files
         cls.script("usr/bin/systemctl", '''#!/bin/bash
 echo "$*" >> /systemctl.calls
 case "$*" in
+  'show nodesmart-health.timer -p LoadState --value'|'show nodesmart-health.service -p LoadState --value')
+    if [[ -f /etc/systemd/system/$2 ]]; then echo loaded; else echo not-found; fi;;
+  'disable --now nodesmart-health.timer') rm -f /legacy-health-enabled;;
+  'stop nodesmart-health.service') rm -f /legacy-health-running;;
   'daemon-reload'|'enable nodesmart nodesmart-web'|'restart nodesmart nodesmart-web') exit 0;;
   'show asterisk -p MainPID -p ActiveEnterTimestampMonotonic') printf 'MainPID=42\\nActiveEnterTimestampMonotonic=1000\\n'; exit 0;;
   'is-active --quiet asterisk') exit 0;;
@@ -180,7 +184,12 @@ esac
             self.assertTrue(path.is_dir())
             self.assertEqual(path.stat().st_uid, 1234)
             self.assertEqual(path.stat().st_mode & 0o777, 0o750)
-            self.assertEqual(list(path.iterdir()), [])
+            self.assertEqual({p.name for p in path.iterdir()},
+                             {'automation.json'} if directory == 'state' else set())
+        initial_automation = app / 'state/automation.json'
+        self.assertEqual(initial_automation.stat().st_uid, 1234)
+        self.assertEqual(initial_automation.stat().st_mode & 0o777, 0o640)
+        self.assertEqual(json.loads(initial_automation.read_text())['recent_recovery_attempts'], [])
         self.assertEqual((app / "core/monitor.py").stat().st_uid, 0)
         self.assertEqual(config.stat().st_mode & 0o777, 0o640)
         self.assertEqual((self.root / "etc/sudoers.d/nodesmart").stat().st_mode & 0o777, 0o440)
@@ -201,6 +210,8 @@ assert state['skywarn'] == 'unknown'
 assert state['weather_alerts']['status'] == 'unavailable'
 assert state['weather_alerts']['alerts'] == []
 assert state['automation']['automation_armed'] is False
+assert state['automation']['safety_state_valid'] is True
+assert state['automation']['maintenance_mode'] is False
 assert not remote_admin._safe_config()['enabled']
 assert not emergency_mode.public_state()['active']
 assert recovery.load_recovery_state() == {}
@@ -318,6 +329,29 @@ print('SIMULATED PASS installed optional weather: absent/current/stale/partial/d
         marker.write_text('{"preserved": true}')
         self.inside("bash", "/src/install/install.sh")
         self.assertEqual(json.loads(marker.read_text()), {"preserved": True})
+        # An upgrade must preserve history and never reinitialize lost safety state.
+        legacy_timer = self.root / 'etc/systemd/system/nodesmart-health.timer'
+        legacy_service = self.root / 'etc/systemd/system/nodesmart-health.service'
+        legacy_timer.write_text('[Timer]\nOnBootSec=30\n')
+        legacy_service.write_text('[Service]\nType=oneshot\nExecStart=/bin/true\n')
+        (self.root / 'legacy-health-enabled').touch()
+        (self.root / 'legacy-health-running').touch()
+        safety = app / 'state/automation.json'
+        saved_safety = safety.read_bytes()
+        self.inside("bash", "/src/install/install.sh")
+        self.assertFalse((self.root / 'legacy-health-enabled').exists())
+        self.assertFalse((self.root / 'legacy-health-running').exists())
+        self.assertTrue(legacy_timer.exists())
+        self.assertTrue(legacy_service.exists())
+        self.assertEqual(safety.read_bytes(), saved_safety)
+        safety.unlink()
+        self.inside("bash", "/src/install/install.sh")
+        self.assertFalse(safety.exists())
+        invalid = "import sys; sys.path.insert(0,'/opt/nodesmart/core'); import automation; assert not automation.load_state()['safety_state_valid']"
+        self.inside("python3", "-c", invalid, user="1234:1234")
+        safety.write_bytes(saved_safety)
+        os.chown(safety, 1234, 1234)
+        safety.chmod(0o640)
         (self.root / "fail-start").touch()
         failed = self.inside("bash", "/src/install/install.sh", check=False)
         self.assertNotEqual(failed.returncode, 0)
