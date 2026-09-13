@@ -809,6 +809,9 @@
     .connectivity-body p { margin: 10px 0 0; }
     #connectivity-checks { color: #d1dbea; }
     #connectivity-details { color: var(--muted); }
+    body.local-file .wrap > :not(h1):not(.onboarding-help):not(#local-file-notice) { display: none !important; }
+    #local-file-notice { margin-top: 24px; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; line-height: 1.65; }
+    #local-file-notice h2 { margin-top: 0; }
     .support-report { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
     .support-report h3 { margin: 0; font-size: 16px; }
     .support-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
@@ -892,6 +895,12 @@
   <div class="wrap">
 
     <h1>BlueNode</h1>
+    <section id="local-file-notice" hidden aria-labelledby="local-file-title">
+      <h2 id="local-file-title">Open your live BlueNode dashboard</h2>
+      <p>You opened the dashboard file from your computer. Live readings and controls require the BlueNode service running on your node.</p>
+      <p>Open your usual BlueNode web address in the browser, or use your saved dashboard bookmark. This page does not indicate a problem with your node.</p>
+      <p>No monitoring requests or node commands are sent from this local-file view.</p>
+    </section>
     <a class="onboarding-help" href="https://github.com/BlueKF0OZX/BlueNode/blob/main/docs/INSTALL.md#after-installation">Getting Started</a>
 
     <div id="node-identity" class="sub">Loading...</div>
@@ -1426,7 +1435,8 @@
           (/^[0-9a-f]{40}$/.test(state.commit) ? ' / ' + state.commit.slice(0, 12) : ' / commit unavailable');
       } catch (_) { /* Version lookup must not interrupt dashboard startup. */ }
     }
-    loadVersion();
+    const isLocalDashboardFile = window.location?.protocol === 'file:';
+    if (!isLocalDashboardFile) loadVersion();
 
     let adminCsrfToken = null;
     const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -3150,6 +3160,11 @@
 
 
 
+    if (isLocalDashboardFile) {
+      document.body.classList.add('local-file');
+      document.getElementById('local-file-notice').hidden = false;
+      document.querySelectorAll('button, input, select, textarea').forEach(element => { element.disabled = true; });
+    } else {
     loadStatus();
     loadAdminSession();
     loadEvents();
@@ -3165,6 +3180,7 @@
     setInterval(updateLiveConnectedTime, 1000);
     setInterval(updateCurrentSession, 1000);
     setInterval(updateEmergencyTimer, 1000);
+    }
 
   </script>
 

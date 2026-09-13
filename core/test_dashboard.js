@@ -211,7 +211,7 @@ const context = vm.createContext({Date, Number, Object, Error,
   resolveFetch({json:async()=>{throw new Error('Fixture failure');}});
   await next;
   const eventStart = html.indexOf('    let eventsLoading');
-  const eventEnd = html.indexOf('    loadStatus();', eventStart);
+  const eventEnd = html.indexOf('    if (isLocalDashboardFile)', eventStart);
   context.AbortController = AbortController;
   let expire, cleared = 0;
   context.setTimeout = (callback, delay) => { assert.equal(delay, 10000); expire = callback; return 77; };

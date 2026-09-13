@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Opening the dashboard directly from a local file now explains how to reach the live node, without polling unavailable endpoints or showing misleading emergency status.
+
 - Added a previewable troubleshooting report under Smart Connectivity, with allowlisted health/resource/check data and no logs, identities, addresses, or configuration.
 - Improved keyboard focus visibility for dashboard buttons and added a responsive report preview/download area.
 
