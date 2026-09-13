@@ -25,6 +25,14 @@ creating files; it does not run package upgrades itself.
 Use a dedicated, unprivileged service account, with no login shell and no
 membership in `sudo`, `audio`, or radio-device groups:
 
+Before installation, record the existing Asterisk process for comparison afterward:
+
+```bash
+systemctl show asterisk -p MainPID -p ActiveEnterTimestampMonotonic
+```
+
+Then create the service account and start the configuration-only pass:
+
 ```bash
 sudo useradd --system --user-group --home-dir /opt/nodesmart --no-create-home --shell /usr/sbin/nologin bluenode
 sudo NODESMART_USER=bluenode bash ./install/install.sh
@@ -57,7 +65,7 @@ number. On systems hosting multiple nodes, select the one BlueNode will monitor.
 Do not edit Asterisk configuration to match a BlueNode example.
 
 New installations default to `web.host: "127.0.0.1"`, port `8080`, and
-`recovery.asterisk_enabled: false`. Automatic Asterisk restart is opt-in;
+`recovery.asterisk_enabled: false`. Automatic Asterisk recovery is opt-in;
 keep it disabled while validating your installation. Remote Admin and Soft
 Radio are disabled without their separate configuration.
 
@@ -96,7 +104,11 @@ you can use an SSH local forward from your computer:
 ssh -N -L 8080:127.0.0.1:8080 youruser@NODE_IP
 ```
 
-Then open `http://127.0.0.1:8080/web/` on that computer. BlueNode does not change
+Keep that SSH connection open while using the dashboard. Then open
+`http://127.0.0.1:8080/web/` on that computer. Opening `web/index.html` directly
+from a file manager does not connect to the running service.
+
+BlueNode does not change
 host firewall rules, router settings, or public exposure. Any LAN firewall
 policy is an operator decision, outside the installer.
 
@@ -140,9 +152,10 @@ in-memory sessions are cleared by a web-service restart, so sign in again throug
 the configured HTTPS path. Optional weather may be unavailable until the next
 normal collection, especially when its temporary output was cleared at boot.
 Verify both BlueNode services, Asterisk, the configured node and observation
-freshness. These are code-derived expectations: real reboot behavior still
-requires validation on a disposable ASL3 host. Do not reboot an operating radio
-node solely to test onboarding.
+freshness. Reboot persistence was verified in the Debian 12 lab for its tested
+installer baseline; see [validation status](VALIDATION_STATUS.md) for scope and
+remaining hardware limits. Do not reboot an operating radio node solely to
+test onboarding.
 
 ## What installation changes
 

@@ -21,6 +21,7 @@ import monitor
 import recovery
 
 VALID_NODE = 'RPT_RXKEYED=0\nRPT_TXKEYED=0\nRPT_ALINKS=0\n'
+LINK_HEADER = 'NODE PEER RECONNECTS DIRECTION CONNECT TIME CONNECT STATE\n--------------------\n'
 
 
 def service(active='active', sub='running', pid=123, loaded='loaded'):
@@ -39,6 +40,7 @@ class ObservationTests(unittest.TestCase):
         self.service_results = [service()]
         self.query = subprocess.CompletedProcess([], 0, 'Asterisk 22.0 fixture', '')
         self.node = subprocess.CompletedProcess([], 0, VALID_NODE, '')
+        self.link_status = subprocess.CompletedProcess([], 0, LINK_HEADER, '')
         self.calls = []; self.events = []; self.state = {}; self.auto = automation.default_state()
         self.verified_results = []; self.after_restart = True
         self.previous = {'asterisk': 'online', 'status': 'healthy', 'health': {}}
@@ -96,6 +98,7 @@ class ObservationTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0, '', '')
         elif command[-1] == 'core show version': value = self.query
         elif command[-1].startswith('rpt show variables '): value = self.node
+        elif command[-1].startswith('rpt lstats '): value = self.link_status
         else: raise AssertionError('Unexpected external command: ' + repr(command))
         if isinstance(value, Exception): raise value
         return value
@@ -220,11 +223,26 @@ class ObservationTests(unittest.TestCase):
     def test_valid_empty_and_populated_upstream_links(self):
         for link_value, count in [('', '0'), ('0', '0'), ('1,23456TU', '1'), ('2,23456TU,34567RK', '2')]:
             with self.subTest(links=link_value):
+                rows = ('23456 192.0.2.1 0 OUT 00:01:00 ESTABLISHED\n' if int(count) >= 1 else '')
+                if int(count) == 2:
+                    rows += '34567 192.0.2.2 0 IN 00:02:00 ESTABLISHED\n'
+                self.link_status = subprocess.CompletedProcess([], 0, LINK_HEADER + rows, '')
                 self.node = subprocess.CompletedProcess([], 0,
                     'RPT_RXKEYED=0\nRPT_TXKEYED=0\nRPT_ALINKS=' + link_value + '\nRPT_NUMALINKS=' + count + '\n', '')
                 self.assertEqual(observation.node_evidence()['status'], 'available')
         self.node = subprocess.CompletedProcess([], 0, VALID_NODE + 'RPT_NUMALINKS=2\n', '')
         self.assertEqual(observation.node_evidence()['status'], 'unavailable')
+
+    def test_missing_link_transport_evidence_never_requests_restart(self):
+        for result in [subprocess.CompletedProcess([], 1, '', 'Unavailable'),
+                       subprocess.CompletedProcess([], 0, 'Malformed', ''),
+                       subprocess.TimeoutExpired('fixture', 5)]:
+            with self.subTest(result=result):
+                self.link_status = result
+                state = self.cycle()
+                self.assertEqual(state['asterisk'], 'online')
+                self.assertEqual(state['health']['app_rpt'], 'warning')
+                self.assert_no_restart()
 
     def test_wrong_numeric_node_and_stale_post_recovery_state(self):
         self.node = subprocess.CompletedProcess([], 0, 'No such node', '')

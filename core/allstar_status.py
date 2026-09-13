@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from event_logger import emit
 from config import load_config
 import radio_activity
+from rpt_link_status import reconcile
 
 
 
@@ -64,14 +65,21 @@ def get_telemetry():
     )
     if result.returncode != 0:
         return None
-    return radio_activity.parse_variables(result.stdout)
+    sample = radio_activity.parse_variables(result.stdout)
+    if sample is None:
+        return None
+    result = subprocess.run(
+        ["sudo", "-n", "/usr/local/sbin/bluenode-asterisk", "-rx", f"rpt lstats {NODE}"],
+        capture_output=True, text=True, timeout=5,
+    )
+    return reconcile(sample, result.stdout) if result.returncode == 0 else None
 
 
 def get_links(sample=None):
     sample = get_telemetry() if sample is None else sample
     if sample is None:
         return set()
-    return {link["node"] for link in sample["links"]}
+    return {link["node"] for link in sample["links"] if link["mode"] in "TR"}
 
 
 

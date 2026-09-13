@@ -2327,6 +2327,11 @@
 
         if (!response.ok) throw new Error('Monitoring state unavailable');
         const data = await response.json();
+        const observedAt = typeof data?.last_health_check === 'string' ? Date.parse(data.last_health_check) : NaN;
+        const observationAge = Date.now() - observedAt;
+        if (!Number.isFinite(observationAge) || observationAge > 30000 || observationAge < -30000) {
+          throw new Error('Monitoring snapshot is stale or has an invalid timestamp');
+        }
         // Weather/status comes from the fast monitoring snapshot, before auxiliary requests.
         setValue('skywarn', data.skywarn);
         renderWeather(data.weather_alerts);

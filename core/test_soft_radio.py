@@ -147,13 +147,26 @@ class SoftRadioTests(unittest.TestCase):
     def test_session_expiration_terminates_browser(self):
         server, browser = socket.socketpair()
         valid = {"value": True}
+        admitted = threading.Event()
+        def session_valid(_token):
+            result = valid["value"]
+            if result:
+                admitted.set()
+            return result
         thread = threading.Thread(target=self.radio.serve_browser,
-            args=(server, "session", lambda _token: valid["value"]))
+            args=(server, "session", session_valid))
         thread.start()
-        valid["value"] = False
-        thread.join(1)
-        browser.close(); server.close()
-        self.assertFalse(thread.is_alive())
+        try:
+            self.assertTrue(admitted.wait(3), 'Browser was not admitted')
+            valid["value"] = False
+            # Authorization is rechecked once per second; allow scheduling margin.
+            thread.join(3)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(self.radio.clients), 0)
+        finally:
+            valid["value"] = False
+            browser.close(); server.close()
+            thread.join(3)
 
     def test_fixed_origin_command_is_monitor_only_and_outbound_media(self):
         self.radio._start_asterisk_channel(soft_radio._safe_config())

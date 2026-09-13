@@ -7,17 +7,17 @@ assignees: ''
 
 ---
 
-## What would you like NodeSmart to do?
+## What would you like BlueNode to do?
 
 Describe the feature or improvement you would like to see.
 
 ## What problem would this solve?
 
-Explain why this feature would be useful for your AllStarLink node or NodeSmart workflow.
+Explain why this feature would be useful for your AllStarLink node or BlueNode workflow.
 
 ## How would you like it to work?
 
-Describe how you imagine the feature behaving or appearing in NodeSmart.
+Describe how you imagine the feature behaving or appearing in BlueNode.
 
 ## Alternatives considered
 

@@ -115,7 +115,7 @@ echo "$*" >> /tmp/asterisk.calls
 case "$*" in
   '-rx core show version') echo 'Asterisk 22.0 fixture';;
   '-rx rpt show variables '*) printf 'RPT_RXKEYED=0\\nRPT_TXKEYED=0\\nRPT_ALINKS=0\\n';;
-  '-rx rpt lstats '*) echo 'No links';;
+  '-rx rpt lstats '*) printf 'NODE PEER RECONNECTS DIRECTION CONNECT TIME CONNECT STATE\\n--------------------\\n';;
   *) exit 90;;
 esac
 ''')

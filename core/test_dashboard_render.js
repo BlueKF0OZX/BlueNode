@@ -272,6 +272,13 @@ function fixture(detailed) {
         assert.equal((await geometry()).overflow,false,`Asterisk evidence overflow at ${width}`);
       }
       asteriskCase = null;
+      const staleRoute = async route => route.fulfill({contentType:'application/json',
+        body:JSON.stringify({...fixture(false), last_health_check:new Date(Date.now()-60000).toISOString()})});
+      await page.route('**/state/system.json?*', staleRoute);
+      await page.evaluate(() => loadStatus());
+      assert.equal(await page.locator('#status').innerText(), 'UNAVAILABLE');
+      assert.equal(await page.locator('#nodes').innerText(), 'Observation unavailable');
+      await page.unroute('**/state/system.json?*', staleRoute);
       missing = true;
       await page.evaluate(() => prepareSupportReport());
       assert.equal(await page.locator('#support-download').isDisabled(), true);

@@ -1,15 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
-
----
-
----
-name: Bug report
-about: Report a problem with NodeSmart
+about: Report a problem with BlueNode
 title: ''
 labels: bug
 assignees: ''
@@ -17,11 +8,11 @@ assignees: ''
 
 ## What happened?
 
-Describe the problem you encountered.
+Describe the problem and what BlueNode showed.
 
-## What did you expect to happen?
+## What did you expect?
 
-Describe what you expected NodeSmart to do.
+Describe the expected result.
 
 ## Steps to reproduce
 
@@ -31,24 +22,24 @@ Describe what you expected NodeSmart to do.
 
 ## Environment
 
-- NodeSmart version:
-- AllStarLink version:
-- Hardware/platform:
+- BlueNode version or installed commit:
+- Debian version:
+- AllStarLink / Asterisk version:
+- Hardware model:
+- Browser and device, if relevant:
+- Fresh installation or upgrade:
+- Optional integrations configured:
 
-## NodeSmart logs
+## Troubleshooting report
 
-If relevant, include output from:
+If the dashboard is available, open Smart Connectivity, select Preview report,
+then Download report. Review and attach the text file here. If it cannot be
+generated, describe what happened; a report is not required to open an issue.
 
-`journalctl -u nodesmart -n 100 --no-pager`
+## Additional evidence
 
-Paste the relevant output here.
+Include relevant error text or a cropped screenshot if useful. Do not paste
+complete configuration files or unreviewed logs.
 
-## Screenshots
-
-Add screenshots if they help explain the problem.
-
-## Additional information
-
-Anything else that may help diagnose the issue.
-
-**Privacy:** Before posting, remove or obscure callsigns, node numbers, IP addresses, passwords, access tokens, or other information you do not want publicly visible.
+**Privacy:** Remove passwords, tokens, SSH keys, private addresses, callsigns,
+node numbers, and browser/account details you do not want publicly visible.

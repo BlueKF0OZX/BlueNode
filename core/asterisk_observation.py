@@ -5,6 +5,7 @@ import time
 
 from config import load_config
 from radio_activity import parse_variables
+from rpt_link_status import reconcile
 
 NODE = str(load_config().get('node', ''))
 MAX_AGE_SECONDS = 30
@@ -103,6 +104,10 @@ def node_evidence(node=None):
         else:
             reason = 'invalid_or_incomplete_node_response'
         return dict(base, reason=reason)
+    result, error = _run(['sudo', '-n', '/usr/local/sbin/bluenode-asterisk', '-rx', 'rpt lstats ' + node])
+    sample = reconcile(sample, result.stdout) if result is not None and result.returncode == 0 else None
+    if sample is None:
+        return dict(base, reason=error or 'invalid_or_inconsistent_link_status')
     return dict(base, status='available', reason=None, links=sample['links'])
 
 

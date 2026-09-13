@@ -23,14 +23,19 @@
 
 ### Reliability
 
+- Reconcile App_Rpt link variables with transport status so reconnecting peers are not reported as established connections.
+- Reject stale or invalid health timestamps in the dashboard instead of retaining a reassuring old snapshot.
+- Extend observation and installer fixtures for transport status; make session-expiration tests wait for actual admission before revocation.
+
 - Bounded event/audit/session-history retention and dashboard event responses.
 - Atomic connection-state publication and safe handling of corrupt history and future-dated radio observations.
 - Bounded authentication/ticket memory and redacted authorized journal output.
 
 ### Validation required before release
 
-- Disposable Debian/ASL3 clean install, boot, permissions, upgrade, and rollback.
-- Supported App_Rpt link observations, optional weather source compatibility, and HTTPS/proxy behavior.
+- See [validation status](docs/VALIDATION_STATUS.md) for completed Debian/ASL3 installation, reboot, rollback, private-peer, security, and regression checks and their exact scope.
+- Sustained resource/endurance testing is incomplete; the short collection is not a 24-hour pass.
+- Hardware-specific behavior, optional weather source compatibility, and external HTTPS/proxy behavior remain to be verified.
 - Soft Radio remains parked; no browser TX/PTT functionality is included.
 
 

@@ -67,7 +67,7 @@ def classify(sample):
                     "direction": "unknown", "confidence": "unavailable",
                 }}
 
-    connected = [link["node"] for link in sample["links"]]
+    connected = [link["node"] for link in sample["links"] if link["mode"] in "TR"]
     remote = [link["node"] for link in sample["links"]
               if link["keyed"] and link["mode"] != "C"]
     if sample["local_rx"]:
