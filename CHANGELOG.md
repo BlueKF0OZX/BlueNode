@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Added a previewable troubleshooting report under Smart Connectivity, with allowlisted health/resource/check data and no logs, identities, addresses, or configuration.
+- Improved keyboard focus visibility for dashboard buttons and added a responsive report preview/download area.
+
 - Centered dashboard cards and improved mobile touch targets, diagnostic explanations, and Emergency Mode guidance.
 - Node controls verify resulting App_Rpt state, including already-satisfied and unverified outcomes.
 - SkywarnPlus is strictly read-only; former On/Off controls no longer execute SkywarnPlus.

@@ -200,6 +200,16 @@ function fixture(detailed) {
       await page.evaluate(state=>renderWeather(state), fixture(detailed).weather_alerts);
       await page.locator('#connectivity-summary').click();
       assert.equal(await page.locator('#connectivity-disclosure').evaluate(e=>e.open), true);
+      await page.locator('#support-prepare').click();
+      await page.waitForFunction(() => !document.getElementById('support-download').disabled);
+      const report = await page.locator('#support-preview').inputValue();
+      assert.match(report, /BlueNode troubleshooting report/);
+      assert.doesNotMatch(report, /23456|Example linked node|Do not restart Asterisk/);
+      const downloadEvent = page.waitForEvent('download');
+      await page.locator('#support-download').click();
+      const download = await downloadEvent;
+      assert.equal(download.suggestedFilename(), 'bluenode-troubleshooting.txt');
+      assert.equal(fs.readFileSync(await download.path(), 'utf8'), report);
       assert.match(await page.locator('#connectivity-details').innerText(), /Do not restart Asterisk/);
       assert.equal((await geometry()).overflow,false, `expanded overflow at ${width}`);
       assert.deepEqual((await geometry()).heights,before, 'diagnostics must not resize top cards');
@@ -263,6 +273,10 @@ function fixture(detailed) {
       }
       asteriskCase = null;
       missing = true;
+      await page.evaluate(() => prepareSupportReport());
+      assert.equal(await page.locator('#support-download').isDisabled(), true);
+      assert.equal(await page.locator('#support-preview').inputValue(), '');
+      assert.match(await page.locator('#support-status').textContent(), /Could not read/);
       await page.evaluate(()=>loadStatus());
       assert.equal(await page.locator('#connections-today').innerText(), 'Observation unavailable');
       await page.evaluate(()=>{updateLiveConnectedTime();updateCurrentSession();});

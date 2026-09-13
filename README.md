@@ -26,6 +26,7 @@ Current dashboard with synthetic example observations. See [Testing](docs/TESTIN
 - Deliberate persistent Emergency Mode for high-attention operational views
 - Passive Node Behavior and Network Courtesy monitoring with conservative operator-review thresholds
 - Desktop/mobile web dashboard
+- Preview and download a privacy-filtered [troubleshooting report](docs/TROUBLESHOOTING_REPORT.md)
 - systemd startup and installer support
 - Python standard library only
 

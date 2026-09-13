@@ -809,6 +809,11 @@
     .connectivity-body p { margin: 10px 0 0; }
     #connectivity-checks { color: #d1dbea; }
     #connectivity-details { color: var(--muted); }
+    .support-report { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .support-report h3 { margin: 0; font-size: 16px; }
+    .support-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    #support-preview { box-sizing: border-box; width: 100%; min-height: 240px; margin-top: 12px; padding: 12px; background: var(--panel); color: #f3f4f6; border: 1px solid var(--line); border-radius: 8px; font: 13px/1.6 monospace; }
+    .control-button:focus-visible { outline: 3px solid #a9c7ef; outline-offset: 3px; }
     body.emergency-mode .connectivity-panel { order: 1; }
     .controls-panel, .events-panel, .automation-panel, .behavior-panel,
     .remote-admin-panel, .soft-radio-panel { padding: 20px; border-radius: var(--radius); margin-top: 18px; }
@@ -1065,6 +1070,16 @@
       <div class="connectivity-body">
         <p id="connectivity-checks">Waiting for diagnostic observations.</p>
         <p id="connectivity-details" style="display:none"></p>
+        <section class="support-report" aria-labelledby="support-title">
+          <h3 id="support-title">Troubleshooting report</h3>
+          <p>Preview a health snapshot to share when asking for help. Includes check results and resource usage; excludes logs, callsigns, node numbers, network addresses, and configuration.</p>
+          <div class="support-actions">
+            <button id="support-prepare" class="control-button" onclick="prepareSupportReport()">Preview report</button>
+            <button id="support-download" class="control-button" onclick="downloadSupportReport()" disabled>Download report</button>
+          </div>
+          <p id="support-status" role="status" aria-live="polite">No report prepared yet.</p>
+          <textarea id="support-preview" aria-label="Troubleshooting report preview" readonly hidden></textarea>
+        </section>
       </div>
     </details>
 
@@ -1329,6 +1344,77 @@
 
 
   <script>
+    // Explicit field and value allowlists keep arbitrary observation text out of exports.
+    function buildSupportReport(data, now = new Date()) {
+      const state = data && typeof data === 'object' ? data : {};
+      const known = (value, choices) => choices.includes(value) ? value : 'unavailable';
+      const numeric = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
+        ? Math.round(value * 10) / 10 : 'unavailable';
+      const statuses = ['healthy', 'degraded', 'fault', 'online', 'offline', 'normal', 'warning', 'critical', 'unknown', 'active', 'inactive'];
+      const status = value => known(typeof value === 'string' ? value.toLowerCase() : value, statuses);
+      const checked = typeof state.last_health_check === 'string' ? Date.parse(state.last_health_check) : NaN;
+      const age = (now.getTime() - checked) / 1000;
+      const lines = ['BlueNode troubleshooting report', 'Report format: 1',
+        'Prepared: ' + now.toISOString(),
+        'Observation: ' + (Number.isFinite(age) && age >= 0
+          ? new Date(checked).toISOString() + ' (' + Math.floor(age) + ' seconds old)' : 'unavailable or invalid timestamp'),
+        'This is a snapshot of cached observations, not a live diagnostic test.', '',
+        'Overall health: ' + status(state.status), 'Asterisk: ' + status(state.asterisk),
+        'Internet: ' + status(state.internet), 'CPU temperature (C): ' + numeric(state.cpu_temp_c),
+        'Memory used (%): ' + numeric(state.memory_percent), 'Disk used (%): ' + numeric(state.disk_percent),
+        'Uptime (seconds): ' + numeric(state.uptime_seconds), '', 'Connectivity checks:'];
+      for (const key of ['interface', 'gateway', 'dns', 'internet', 'allstar']) {
+        const value = state.connectivity?.checks?.[key];
+        lines.push(key + ': ' + (value === true ? 'pass' : value === false ? 'fail' : 'unavailable'));
+      }
+      lines.push('', 'Privacy: logs, identities, addresses, configuration, and free-text observations are excluded.');
+      return lines.join('\n') + '\n';
+    }
+
+    let supportReportText = '';
+    async function prepareSupportReport() {
+      const button = document.getElementById('support-prepare');
+      const download = document.getElementById('support-download');
+      const preview = document.getElementById('support-preview');
+      const status = document.getElementById('support-status');
+      button.disabled = true;
+      download.disabled = true;
+      supportReportText = '';
+      preview.value = '';
+      preview.hidden = true;
+      status.textContent = 'Preparing report…';
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const response = await fetch('/state/system.json?ts=' + Date.now(), {cache: 'no-store', signal: controller.signal});
+        if (!response.ok) throw new Error('Unavailable');
+        const data = await response.json();
+        if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid snapshot');
+        supportReportText = buildSupportReport(data);
+        preview.value = supportReportText;
+        preview.hidden = false;
+        download.disabled = false;
+        status.textContent = 'Report ready. Review the observation time and preview before sharing.';
+      } catch (_) {
+        status.textContent = 'Could not read monitoring data. Try again when the dashboard is available.';
+      } finally {
+        clearTimeout(timeout);
+        button.disabled = false;
+      }
+    }
+
+    function downloadSupportReport() {
+      if (!supportReportText) return;
+      const url = URL.createObjectURL(new Blob([supportReportText], {type: 'text/plain;charset=utf-8'}));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'bluenode-troubleshooting.txt';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
 
     async function loadVersion() {
       try {
