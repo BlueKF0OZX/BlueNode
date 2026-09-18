@@ -8,7 +8,7 @@ remaining limits before choosing a version to evaluate.
 
 ## QSO page
 
-[Open **On Air**](https://on-air-qso.golddigger-mb.chatgpt.site/) to browse short-lived invitations and find someone to talk with over AllStar.
+[Open **On Air**](https://qso.onair-radio.workers.dev/) to browse short-lived invitations and find someone to talk with over AllStar.
 
 ## Dashboard
 
