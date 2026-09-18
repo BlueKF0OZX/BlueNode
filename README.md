@@ -5,6 +5,11 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 **Status:** 0.1.2-alpha.0 - unreleased development snapshot for early testing.
 See [validation status](docs/VALIDATION_STATUS.md) for completed lab checks and
 remaining limits before choosing a version to evaluate.
+
+## QSO page
+
+[Open **On Air**](https://on-air-qso.golddigger-mb.chatgpt.site/) to browse short-lived invitations and find someone to talk with over AllStar.
+
 ## Dashboard
 
 ![BlueNode Dashboard](bluenode-dashboard.jpeg)
