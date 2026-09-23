@@ -1,6 +1,6 @@
 # Validation status
 
-Review date: 2026-09-13. Status: unreleased alpha candidate for supervised early
+Review date: 2026-09-23. Status: unreleased alpha candidate for supervised early
 evaluation, not a production-certified release. Record the exact installed
 commit when reporting results. No new stable release or tag is implied.
 
@@ -22,6 +22,37 @@ Asterisk/App_Rpt package `2:22.9.0+asl3-3.9.3-1.deb12`. The live checks used a
 working candidate tree containing the link-status fix; installation/reboot
 evidence from the earlier baseline is identified separately above. Results
 do not automatically cover another OS, package version, or future commit.
+
+## September 23 connection/activity follow-up
+
+The draft connection/activity branch was tested on two disposable Debian 12 / ASL3
+VMs with an internal-only peer network, outbound firewall restrictions, no radio
+hardware, and automatic recovery disabled. The initial installed revision was
+`c9e7255`; the pending-transport correction and test-fixture changes accompanying
+this record were then applied and tested.
+
+- Three real connect/disconnect cycles and repeated already-satisfied requests
+  passed through the dashboard control API.
+- With the peer stopped, App_Rpt exposed an outbound CONNECTING transport before
+  adding it to its link variables. The corrected reconciliation retains that
+  transport as pending. Both attempts returned a pending result; the second
+  attempt sent **no duplicate command**, as recorded in the failure diagnostics.
+- After the peer restarted, a connect/disconnect recovery cycle passed.
+- Stopping only the collector for eight seconds left the web service available
+  and produced observation age above the six-second activity expiry threshold.
+  Collection resumed after restart. This checks the live data path; stale display
+  behavior is covered by the dashboard suites using synthetic observations.
+- The local Asterisk process identity remained unchanged across installation,
+  BlueNode restarts, controls, peer outage, and collector interruption. Operator
+  configuration was preserved by installation.
+- All **230 Python tests passed on Linux** as the service user. Windows passed
+  227 with three platform-specific skips. A media-test fixture now uses the test
+  user's ownership and a bounded socket wait; production permission checks are
+  unchanged. The preceding dashboard validation passed all 11 suites, including
+  five display widths; this follow-up changes no dashboard code.
+
+These are short supervised private-peer checks, not live RF acceptance, external
+HTTPS/proxy acceptance, or an endurance run. No production deployment is included.
 
 ## Incomplete or outside this evaluation
 

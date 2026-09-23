@@ -26,6 +26,8 @@
 
 ### Reliability
 
+- Recognize outbound CONNECTING transports before App_Rpt adds them to link variables; preserve pending status and suppress duplicate connect commands during peer outages.
+
 - Mark lost radio observations and collector gaps as interruptions, rather than ordinary transmission ends; do not pair event records across interruptions or restart markers.
 - Reset observed transmission timers after collector gaps or clock reversals, and preserve the last observed activity across idle samples.
 - Wait for an existing pending connection instead of sending a duplicate connect command.
