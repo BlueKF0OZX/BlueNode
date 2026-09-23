@@ -54,6 +54,7 @@ function fixture(detailed) {
       let connectionUnavailable = false;
       let invalidConnectionState = false;
       let injection = false;
+      let eventFixture = null;
       const hostile = '<img src=x onerror=alert(1)>';
       let releaseIntelligence;
       const intelligenceGate = new Promise(resolve => { releaseIntelligence = resolve; });
@@ -61,9 +62,15 @@ function fixture(detailed) {
         const url = new URL(route.request().url());
         assert.equal(route.request().method(), 'GET', 'Render checks must never invoke controls');
         if (url.pathname === '/web/') return route.fulfill({contentType:'text/html',body:html});
-        if (url.pathname === '/logs/events.log') return route.fulfill({contentType:'text/plain',body:
+        if (url.pathname === '/logs/events.log') return route.fulfill({contentType:'text/plain',body:eventFixture ??
           Array.from({length:12}, (_, i) => `${now} | CONNECT.SUCCESS | Example event ${i}: ${injection ? hostile : 'long-detail-'.repeat(20)}`).join('\n')});
         let body;
+        if (url.pathname === '/state/radio_activity.json' && !missing) body = {
+          status:'remote_tx',telemetry_available:true,last_update:new Date().toISOString(),
+          stale_after_seconds:6,last_active_at:new Date().toISOString(),
+          tx_origin:{active:true,source_type:'remote_link',path_scope:'immediate_peer',
+            source_node:'23456',started_at:new Date(Date.now()-17000).toISOString()}
+        };
         if (attentionUnavailable && ['/state/intelligence.json','/api/emergency-mode'].includes(url.pathname)) return route.fulfill({status:503,body:'Unavailable'});
         if (url.pathname === '/state/system.json' && !missing) body = fixture(detailed);
         if (url.pathname === '/state/system.json' && body && asteriskCase) {
@@ -102,6 +109,8 @@ function fixture(detailed) {
       });
       await page.goto('http://bluenode.test/web/');
       await page.waitForFunction(()=>document.getElementById('weather-summary').textContent.includes('1 ACTIVE ALERT TYPE'));
+      await page.waitForFunction(()=>document.getElementById('live-activity-label').textContent.includes('RECEIVING'));
+      assert.match(await page.locator('#live-activity-detail').innerText(), /Via node 23456.*original source unknown/);
       assert.equal(await page.locator('#connections-today').innerText(), 'Waiting for first observation');
       assert.equal(await page.locator('#status').innerText(), 'Loading...', 'weather must render before delayed Intelligence');
       releaseIntelligence();
@@ -152,8 +161,44 @@ function fixture(detailed) {
       const smallTargets = await page.locator('button:visible, .onboarding-help:visible').evaluateAll(elements =>
         elements.filter(e => e.getBoundingClientRect().height < 44).map(e => e.textContent.trim()));
       assert.deepEqual(smallTargets, [], `touch targets at ${width}`);
+      await page.locator('#manual-node-number').fill('23456');
+      await page.locator('#favorite-node-label').fill('Example favorite');
+      await page.getByRole('button',{name:'Save node as favorite',exact:true}).click();
+      assert.match(await page.locator('#saved-node-favorites').innerText(),/Example favorite/);
+      assert.match(await page.locator('#saved-node-recents').innerText(),/34567/);
+      await page.evaluate(()=>loadStatus());
+      assert.equal(await page.locator('#saved-node-favorites button[onclick^="connectSavedNode"]').count(),1);
+      assert.equal((await geometry()).overflow,false,`favorite overflow at ${width}`);
+      await page.locator('.saved-nodes-panel').screenshot({path:path.join(output,`${width}-saved-nodes.png`)});
       await page.getByRole('button', {name:'Show Less', exact:true}).click();
       await page.waitForFunction(() => document.querySelectorAll('#events .event-row').length === 10);
+      eventFixture = [
+        `${new Date(Date.now()-40000).toISOString()} | RADIO.REMOTE_TX.START | Adjacent peer Node 23456 audio start; ultimate transmitter unknown`,
+        `${new Date().toISOString()} | RADIO.REMOTE_TX.END | Adjacent peer Node 23456 audio end; ultimate transmitter unknown`,
+        `${now} | NODE.CONNECTED | Example connection`,
+        `${now} | SYSTEM.WARNING | Example system notice`
+      ].join('\n');
+      await page.evaluate(()=>loadEvents());
+      await page.getByRole('button', {name:'Radio',exact:true}).click();
+      assert.equal(await page.locator('#events .event-row').count(),1);
+      assert.match(await page.locator('#events').innerText(),/40 sec recorded interval/);
+      await page.locator('#events details summary').click();
+      await page.evaluate(()=>loadEvents());
+      assert.equal(await page.locator('#events details').evaluate(e=>e.open),true,'refresh preserves expanded raw records');
+      assert.equal((await geometry()).overflow,false,`raw event overflow at ${width}`);
+      await page.locator('#operational-events-panel').screenshot({path:path.join(output,`${width}-event-history.png`)});
+      await page.locator('#events-raw').check();
+      assert.equal(await page.locator('#events .event-row').count(),2);
+      assert.match(await page.locator('#events pre').first().innerText(),/RADIO.REMOTE_TX.END/);
+      await page.getByRole('button', {name:'Connections',exact:true}).click();
+      assert.equal(await page.locator('#events .event-row').count(),1);
+      assert.match(await page.locator('#events').innerText(),/Example connection/);
+      await page.getByRole('button', {name:'System',exact:true}).click();
+      assert.match(await page.locator('#events').innerText(),/Example system notice/);
+      await page.locator('#events-raw').uncheck();
+      await page.getByRole('button', {name:'All',exact:true}).click();
+      eventFixture = null;
+      await page.evaluate(()=>loadEvents());
       await page.evaluate(() => scrollTo(0, 0));
       await page.screenshot({path:path.join(output,`${width}-dashboard.png`),fullPage:true});
       assert.equal((await geometry()).overflow,false, `overflow at ${width}`);

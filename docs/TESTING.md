@@ -15,6 +15,9 @@ Use an installed Python 3.11+ interpreter. POSIX file-security and terminal test
 
 ```sh
 node core/test_dashboard.js
+node core/test_live_activity.js
+node core/test_event_history.js
+node core/test_saved_nodes.js
 node core/test_fresh_dashboard.js
 node core/test_remote_access.js
 node core/test_dashboard_render.js

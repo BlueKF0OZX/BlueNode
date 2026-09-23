@@ -1,0 +1,60 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
+const elements = {};
+const element = id => elements[id] ||= {textContent:'',innerHTML:'',checked:false,
+  setAttribute(name,value){this[name]=value;},querySelectorAll(){return [];}};
+const context = vm.createContext({Date,document:{getElementById:element},emergencyModeState:{active:false},
+  escapeHtml:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))});
+vm.runInContext(html.slice(html.indexOf('    let eventsExpanded'),html.indexOf('    let eventsLoading')),context);
+const line = (second,event,message) => `2026-09-23T12:00:${String(second).padStart(2,'0')}Z | ${event} | ${message}`;
+const start = line(0,'RADIO.REMOTE_TX.START','Adjacent peer Node 23456 audio start; ultimate transmitter unknown');
+const end = line(40,'RADIO.REMOTE_TX.END','Adjacent peer Node 23456 audio end; ultimate transmitter unknown');
+const records = (lines,raw=false) => context.eventRecords(lines.join('\n'),raw);
+let paired = records([start,end]);
+assert.equal(paired.length,1);
+assert.match(paired[0].message,/Via node 23456.*40 sec recorded interval/);
+assert.equal(paired[0].raw.join('\n'),[start,end].join('\n'));
+assert.equal(records([start,end],true).length,2);
+assert.equal(records([end]).length,1,'rotated-away start remains unmatched');
+assert.equal(records([end,start]).length,2,'out-of-order input is not paired');
+assert.equal(records([start,start,end]).length,2,'duplicate start is not silently lost');
+for(const barrier of [line(20,'RADIO.REMOTE_TX.INTERRUPTED','Observation lost'),
+  line(20,'NODESMART.STARTED','Started'),line(20,'NODE.DISCONNECTED','Link gone'),
+  line(20,'RADIO.REMOTE_TX.START','Multiple keyed links start: 23456, 34567')]) {
+  assert.equal(records([start,barrier,end]).length,3,'never bridge an interruption or ambiguous source');
+}
+assert.equal(records([start,end.replaceAll('23456','34567')]).length,2);
+assert.equal(records([start,end.replace('audio end','audio start')]).length,2);
+assert.equal(records([start,end.replace('12:00:40','bad')]).length,2);
+const local=[line(1,'RADIO.LOCAL_RX.START','Local receiver start'),line(4,'RADIO.LOCAL_RX.END','Local receiver end')];
+assert.match(records(local)[0].message,/Local receiver.*3 sec/);
+const hostile='<img src=x onerror=alert(1)>';
+const input=[start,end,line(41,'NODE.CONNECTED','Example'),line(42,'SYSTEM.WARNING',hostile)].join('\n');
+context.input=input;
+vm.runInContext('eventText = input;',context);
+context.setEventFilter('radio');
+assert.equal(element('events-filter-radio')['aria-pressed'],'true');
+assert.match(element('events').innerHTML,/40 sec recorded interval/);
+assert.doesNotMatch(element('events').innerHTML,/NODE CONNECTED/);
+context.setEventFilter('connections');
+assert.match(element('events').innerHTML,/NODE CONNECTED/);
+context.setEventFilter('system');
+assert.match(element('events').innerHTML,/&lt;img/);
+assert.doesNotMatch(element('events').innerHTML,/<img/);
+context.emergencyModeState.active=true;
+context.setEventFilter('all');
+assert.doesNotMatch(element('events').innerHTML,/RADIO TRANSMISSION/);
+context.setEventFilter('radio');
+assert.match(element('events').innerHTML,/RADIO TRANSMISSION/);
+element('events-raw').checked=true;
+context.renderEvents();
+assert.doesNotMatch(element('events').innerHTML,/recorded interval/);
+assert.match(element('events').innerHTML,/RADIO.REMOTE_TX.START/);
+vm.runInContext("eventHistoryError = 'Unable to load event history.';",context);
+context.setEventFilter('all');
+assert.equal(element('events').textContent,'Unable to load event history.');
+console.log('PASS event pairing, interruptions, filtering, raw records, malformed input, and escaping');
