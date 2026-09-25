@@ -21,7 +21,7 @@ If you have a blank Raspberry Pi, install ASL3 and get your radio working first:
 Copy this entire line into the node's terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.3-alpha.1/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.4-alpha.1/install/bootstrap.sh | sudo bash
 ```
 
 This downloads and runs the installer from the named alpha release. You can
@@ -51,6 +51,11 @@ placeholders with the same values used for SSH.
 
 ## 3. Use the dashboard
 
+**[Meet your dashboard: every section explained](DASHBOARD_GUIDE.md)**
+
+After installation, the welcome page links to the same guide. You can also use
+**Dashboard guide** at the top of the dashboard whenever you need a reminder.
+
 Confirm your callsign/node at the top. Give the first observations time to arrive.
 Use Connect to add a node and Disconnect to leave it. Favorites and Recent Nodes
 save typing. Connection history starts when BlueNode starts observing your node.
@@ -67,7 +72,7 @@ is left alone, with directions to the manual guide.
 For an update to this release, use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.3-alpha.1/install/bootstrap.sh | sudo bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.4-alpha.1/install/bootstrap.sh | sudo bash -s -- --update
 ```
 
 Read the confirmation: an update replaces BlueNode code, including custom edits.

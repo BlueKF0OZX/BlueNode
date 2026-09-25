@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.4-alpha.1] - 2026-09-25
+
+- Added a plain-language guide explaining dashboard cards, controls, statistics, optional features, and the separate preset/Favorites/Recent Nodes lists.
+- Linked the guide from the dashboard, first-visit welcome page, and GitHub getting-started instructions.
+- Bundled the local guide in the Windows installer. The page is read-only and needs no external scripts or network access to read.
+
 ## [0.1.3-alpha.1] - 2026-09-25
 
 - Added a portable Windows x64 setup assistant for existing Debian 12 ASL3 nodes.
