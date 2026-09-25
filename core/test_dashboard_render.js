@@ -42,6 +42,13 @@ function fixture(detailed) {
   try {
     for (const width of [1440,1024,768,390,320]) {
       const page = await browser.newPage({viewport:{width,height:1000}});
+      // This suite advances health fixtures explicitly. Automatic health polling
+      // can race a fixture change; polling behavior has its own regression suite.
+      await page.addInitScript(() => {
+        const schedule = window.setInterval.bind(window);
+        window.setInterval = (callback, delay, ...args) =>
+          callback.name === 'loadStatus' ? 0 : schedule(callback, delay, ...args);
+      });
       const errors = [];
       page.on('pageerror', error=>errors.push(error.message));
       let detailed = true;

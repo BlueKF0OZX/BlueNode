@@ -125,6 +125,9 @@ try {
     Run-Preflight "Target commit committer must be exactly" 1
 
     Write-Host "PASS deployment preflight tests"
+    # Negative cases deliberately leave native exit code 1. Report the suite's
+    # success to callers that propagate LASTEXITCODE (including GitHub Actions).
+    $global:LASTEXITCODE = 0
 }
 finally {
     Remove-Item Env:BLUENODE_SSH_TARGET -ErrorAction SilentlyContinue
