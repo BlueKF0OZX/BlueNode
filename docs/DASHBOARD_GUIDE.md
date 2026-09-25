@@ -21,7 +21,7 @@ Start here after installation, or return whenever a label is unfamiliar. Some op
 
 Favorites are stored in this browser, separately for each local node. Another browser, device, or dashboard address can have a different list. Clearing browser data can remove them. If storage is blocked, the dashboard explains that changes last only for that page.
 
-**Which number gets saved?** The main number beside Connect and Disconnect. The number beside Switch nodes is the node you want to leave; it is not the number saved as a favorite.
+**Which number gets saved?** The main number beside Connect and Disconnect. The automatic-disconnect option does not change which number is saved.
 
 ## Station and health cards
 
@@ -38,9 +38,10 @@ Favorites are stored in this browser, separately for each local node. Another br
 
 ## Connection controls
 
-- **Connect:** adds a link to the number in the main node box. Other links stay connected.
+**Disconnect the current node when I connect to a new one:** an optional checkbox above manual Connect, off by default and remembered in this browser for each local node. With one link, Connect disconnects that node first and then connects to your new number. With no links, it connects normally. With several links, it asks you to enter the number of the node to leave; the other links stay connected. Connecting to the same node does not disconnect it. Favorites and Recent Nodes buttons keep their usual behavior. If disconnect fails, the new connection is not attempted; if the new connection fails after disconnecting, the old link is not restored automatically.
+
+- **Connect:** connects to the number in the main node box. Other links stay connected unless you enable the automatic-disconnect option above.
 - **Disconnect:** leaves the number in the main node box. It does not mean disconnect everything.
-- **Switch nodes:** leaves the number in the Node to leave box, then connects to the number in the main box above. Other links stay connected. Read the result if either step fails.
 - **DODROPIN controls:** shortcuts for that configured destination, where available.
 - **Search AllStar Nodes:** looks up a node, callsign, or location in the directory. A listing does not guarantee the node is online or accepting connections.
 - **Close Results:** hides the directory results; it does not disconnect a node.

@@ -52,7 +52,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       await page.evaluate(() => loadAdminSession());
       await page.evaluate(() => { window.loginCalls = 0; window.adminLogin = () => { window.loginCalls++; }; });
       await page.locator('#manual-node-number').fill('12345');
-      await page.locator('#switch-from-node').fill('54321');
       await page.evaluate(()=>configureSavedNodes('99999',{}));
       await page.locator('#favorite-node-label').fill('Example favorite');
       await page.getByRole('button',{name:'Save node as favorite',exact:true}).click();
@@ -66,7 +65,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
         ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
         ['button[onclick="runNodeControl(\'node-disconnect\', this)"]','node-disconnect'],
-        ['button[onclick="runNodeControl(\'node-switch\', this)"]','node-switch'],
         ['#saved-node-favorites button[onclick^="connectSavedNode"]','node-connect'],
         ['#emergency-enter','emergency-enable'], ['#maintenance-toggle','maintenance-enable']
       ];

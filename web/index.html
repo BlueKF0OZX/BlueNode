@@ -1154,6 +1154,11 @@
       <div class="manual-node-control">
 
         <h3>Manual Node Connection</h3>
+        <label style="display:flex;align-items:center;gap:10px;min-height:44px">
+          <input id="auto-disconnect-current" type="checkbox" onchange="saveAutoDisconnectPreference()" aria-describedby="auto-disconnect-help">
+          Disconnect the current node when I connect to a new one
+        </label>
+        <p id="auto-disconnect-help" class="sub">Applies to the Connect button below. With several links, you will be asked which one to leave.</p>
 
         <div class="manual-node-row">
 
@@ -1197,16 +1202,6 @@
       </div>
 
 
-
-      <div class="manual-node-control">
-        <h3>Switch nodes</h3>
-        <p>Disconnect only the node below, then connect to the number entered above. Other links stay connected.</p>
-        <div class="manual-node-row">
-          <input id="switch-from-node" type="text" inputmode="numeric" maxlength="10"
-                 placeholder="Node to leave" aria-label="Node to disconnect when switching" autocomplete="off">
-          <button class="control-button" onclick="runNodeControl('node-switch', this)">Switch nodes</button>
-        </div>
-      </div>
 
       <div class="favorite-save-row">
         <input id="favorite-node-label" class="admin-field" type="text" maxlength="48" placeholder="Favorite name (optional)" aria-label="Favorite name (optional)">
@@ -1536,6 +1531,11 @@
       }
       if (!ordinaryActions.has(action)) throw new Error('Unsupported control');
       const keys = Object.keys(payload);
+      if (action === 'node-connect' && payload.replace_current === true) {
+        if (keys.length !== 2 || !keys.includes('node') || typeof payload.node !== 'string' ||
+            !/^\d{1,10}$/.test(payload.node)) throw new Error('Invalid node number');
+        return Object.freeze({...payload});
+      }
       if (action === 'node-switch') {
         if (keys.length !== 2 || !keys.includes('node') || !keys.includes('from_node') ||
             ![payload.node, payload.from_node].every(value => typeof value === 'string' && /^\d{1,10}$/.test(value)) ||
@@ -1555,7 +1555,7 @@
         'maintenance-enable':'enable Maintenance Mode', 'maintenance-disable':'disable Maintenance Mode',
         'admin-refresh-diagnostics':'refresh diagnostics', 'admin-restart-monitor':'restart the BlueNode monitor',
         'admin-restart-asterisk':'restart Asterisk'};
-      return action === 'node-connect' ? 'connect to node ' + payload.node :
+      return action === 'node-connect' ? (payload.replace_current ? 'disconnect the current node, then connect to node ' : 'connect to node ') + payload.node :
         action === 'node-switch' ? 'disconnect node ' + payload.from_node + ' and connect to node ' + payload.node :
         action === 'node-disconnect' ? 'disconnect node ' + payload.node : labels[action];
     }
@@ -1835,8 +1835,10 @@
       const resultElement = document.getElementById('control-result');
 
       const node = selectedNode === null ? input.value.trim() : selectedNode;
-      const payload = action === 'node-switch' ?
-        {node, from_node:document.getElementById('switch-from-node').value.trim()} : {node};
+      const payload = {node};
+      if (action === 'node-connect' && selectedNode === null && document.getElementById('auto-disconnect-current').checked) {
+        payload.replace_current = true;
+      }
 
       const originalText = button.textContent;
 
@@ -1864,9 +1866,20 @@
 
       try {
 
-        const response = await requestOrdinaryControl(action, payload);
+        let response = await requestOrdinaryControl(action, payload);
 
-        const result = await response.json();
+        let result = await response.json();
+        if (payload.replace_current && response.status === 409 && result.reason === 'choose_current_node') {
+          const peers = result.connected_nodes;
+          if (!Array.isArray(peers) || !peers.length || !peers.every(validSavedNode)) throw new Error('Current connections could not be verified.');
+          const choice = prompt('Several nodes are connected: ' + peers.join(', ') + '.\nEnter the node number to disconnect before connecting to ' + node + ':');
+          if (choice === null) { resultElement.textContent = 'Connection cancelled. Existing links were left connected.'; return; }
+          const source = choice.trim();
+          if (!peers.includes(source) || source === node) throw new Error('Enter one of the connected node numbers shown. Nothing was disconnected.');
+          if (controlNodeScope !== savedNodeScope) throw new Error('Local node changed. Please try again.');
+          response = await requestOrdinaryControl('node-switch', {node, from_node:source});
+          result = await response.json();
+        }
 
 
 
@@ -2555,11 +2568,25 @@
       renderSavedNodes();
     }
 
+    function saveAutoDisconnectPreference() {
+      if (!savedNodeScope) return;
+      try {
+        localStorage.setItem('bluenode:auto-disconnect:v1:' + savedNodeScope,
+          String(document.getElementById('auto-disconnect-current').checked));
+        document.getElementById('saved-nodes-message').textContent = 'Connection preference saved in this browser.';
+      } catch (_) {
+        document.getElementById('saved-nodes-message').textContent = 'Connection preference changed for this page only; browser storage is unavailable.';
+      }
+    }
+
     function configureSavedNodes(local, names) {
       if (!validSavedNode(local)) return;
       savedNodeNames = names && typeof names === 'object' ? names : {};
       if (savedNodeScope !== local) {
         savedNodeScope = local;
+        const autoDisconnect = document.getElementById('auto-disconnect-current');
+        autoDisconnect.checked = false;
+        try { autoDisconnect.checked = localStorage.getItem('bluenode:auto-disconnect:v1:' + local) === 'true'; } catch (_) {}
         savedNodeData = {favorites:[],recent:[]};
         savedNodeStorageAvailable = true;
         try {
