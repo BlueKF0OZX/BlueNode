@@ -65,6 +65,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
         ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
         ['button[onclick="runNodeControl(\'node-disconnect\', this)"]','node-disconnect'],
+        ['#saved-node-favorites button[onclick^="disconnectSavedNode"]','node-disconnect'],
         ['#saved-node-favorites button[onclick^="connectSavedNode"]','node-connect'],
         ['#emergency-enter','emergency-enable'], ['#maintenance-toggle','maintenance-enable']
       ];

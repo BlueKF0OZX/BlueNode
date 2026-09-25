@@ -15,7 +15,7 @@ Start here after installation, or return whenever a label is unfamiliar. Some op
 **These are different lists. Saving a favorite does not add it to a preset dropdown.**
 
 - **Saved nodes dropdown:** preset shortcuts, if your dashboard has them. Selecting one fills the main node-number box; it does not connect automatically. Presets are supplied by that dashboard's configuration/customization.
-- **Favorites:** numbers you save yourself using Save node as favorite. Find them in the Favorites section above Manual Node Connection. Use Connect next time, or Edit name to change a favorite's label. Renaming does not change its number or radio connections. Remove removes the shortcut, not the radio connection.
+- **Favorites:** numbers you save yourself using Save node as favorite. Find them in the Favorites section above Manual Node Connection. Use Connect next time, Disconnect to leave just that node, or Edit name to change a favorite's label. Disconnect keeps the favorite saved. Renaming does not change its number or radio connections. Remove removes the shortcut, not the radio connection.
 - **Recent Nodes:** shortcuts from verified connections and observed connection history. They are not a list of nodes currently connected. Connect adds a link; Disconnect leaves that particular link.
 - **Favorite name:** an optional label to help you recognize a saved number. Saving the same number again updates its label.
 
