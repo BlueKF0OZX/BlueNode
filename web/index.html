@@ -2623,7 +2623,7 @@
         const label = item.label || (typeof savedNodeNames[item.node] === 'string' ? savedNodeNames[item.node].slice(0,48) : '') || 'Node ' + item.node;
         return `<div class="saved-node-row"><span>${escapeHtml(label)}${label === 'Node ' + item.node ? '' : ' (' + item.node + ')'}</span>
           <button class="control-button" onclick="connectSavedNode('${item.node}', this)" aria-label="Connect node ${item.node}">Connect</button>
-          ${!favorite ? `<button class="control-button" onclick="disconnectSavedNode('${item.node}', this)" aria-label="Disconnect node ${item.node}">Disconnect</button>` : ''}
+          <button class="control-button" onclick="disconnectSavedNode('${item.node}', this)" aria-label="Disconnect node ${item.node}">Disconnect</button>
           ${favorite ? `<button class="control-button" onclick="editFavoriteNode('${item.node}')" aria-label="Edit name for favorite node ${item.node}">Edit name</button><button class="control-button" onclick="removeFavoriteNode('${item.node}')" aria-label="Remove favorite node ${item.node}">Remove</button>` : ''}</div>`;
       };
       for (const [id, markup] of [
@@ -2681,7 +2681,7 @@
 
     async function disconnectSavedNode(node, button) {
       if (!validSavedNode(node) || node === savedNodeScope || !savedNodeScope ||
-          !savedNodeData.recent.some(item=>item.node === node)) return;
+          ![...savedNodeData.favorites,...savedNodeData.recent].some(item=>item.node === node)) return;
       await runNodeControl('node-disconnect', button, node);
       document.getElementById('saved-nodes-message').textContent = document.getElementById('control-result').textContent;
     }
