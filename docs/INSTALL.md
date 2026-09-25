@@ -53,8 +53,9 @@ sudo nano /opt/nodesmart/config/nodesmart.json
 ```
 
 Set `node` to your own AllStar node number and `callsign` to your station
-callsign. The placeholder identity is rejected on the next run. Leave
-`friendly_nodes` as `{}` unless you want optional labels. See
+callsign. The placeholder identity is rejected on the next run. The example
+`friendly_nodes` includes a DODROPIN label; use `{}` if you do not want optional
+labels or add your own mappings. A label does not connect a peer. See
 [Configuration](CONFIGURATION.md) for the remaining settings.
 
 BlueNode does not discover or configure your local node automatically. Use the

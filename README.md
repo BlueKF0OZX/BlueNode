@@ -23,7 +23,9 @@ Current dashboard with synthetic example observations. See [Testing](docs/TESTIN
 - Passive backend local-RF and adjacent-peer telemetry with explicit attribution limits
 - Cached callsign and registered-location enrichment for active remote nodes
 - Cached layered diagnostics for LAN, gateway, DNS, Internet, and AllStar connectivity
-- Manual connect/disconnect controls
+- Verified connect/disconnect and explicit node switching, with failed-phase diagnostics
+- Browser-local favorites and recent nodes, scoped to the monitored node
+- Retained activity summaries and optional prolonged-activity notifications while the page is open
 - Optional DODROPIN controls and read-only SkywarnPlus observations
 - Event logging and incident correlation
 - BlueNode Intelligence summaries and recommendations
@@ -41,6 +43,11 @@ Current dashboard with synthetic example observations. See [Testing](docs/TESTIN
 AllStarLink v3 (Debian/systemd), Python 3.11 or newer, Asterisk with `rpt`, systemd, sudo, and a Linux service user. SkywarnPlus is optional.
 
 ## Install
+
+The public checkout includes shared BlueNode features and example settings.
+An operator's customized dashboard may contain integrations or behavior absent
+from this repository. See [Public builds and local customizations](docs/PUBLIC_BUILDS.md)
+before using another station's screenshot as an installation reference.
 
 Start from the public checkout on a working ASL3 node:
 

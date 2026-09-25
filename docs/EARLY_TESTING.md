@@ -5,6 +5,9 @@ directly and keep automatic recovery disabled during your first evaluation.
 The current development snapshot is still undergoing release validation. Read
 [validation status](VALIDATION_STATUS.md) for what has and has not been checked.
 
+Use the public version you intend to evaluate. A customized operator dashboard
+can differ from it; see [Public builds and local customizations](PUBLIC_BUILDS.md).
+
 ## Before installation
 
 - Record your Debian version, hardware model, ASL3 version, and Asterisk version.
@@ -31,6 +34,8 @@ The current development snapshot is still undergoing release validation. Read
    node for repeated tests.
 5. Try your normal desktop and phone browsers. Note clipped text, controls that
    are hard to use, and any values that stop updating.
+   If Remote Admin is enabled, confirm its sign-in separately from gateway access.
+   Favorites are browser-local, so a newly opened phone may have an empty list.
 6. Leave ordinary monitoring running and note unexpected restarts, connection
    changes, errors, or steadily increasing resource use. There is no need to
    deliberately stop Asterisk or interrupt your network for a first-user test.
