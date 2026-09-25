@@ -1,5 +1,9 @@
 # Installation
 
+**New here? Use [guided setup](GET_STARTED.md)** to detect your node, answer a few
+questions, and get a working dashboard link. The steps below remain available for
+manual configuration and existing/custom installations.
+
 BlueNode targets an existing, working AllStarLink 3 node on Debian 12 with
 Python 3.11 or newer, Asterisk/App_Rpt, and systemd. It does not install or
 configure AllStarLink. Python uses only the standard library; the dashboard's

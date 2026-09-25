@@ -1,2 +1,2 @@
-"""Version of the current unreleased BlueNode alpha snapshot."""
-VERSION = "0.1.2-alpha.0"
+"""Version of the public BlueNode alpha release."""
+VERSION = "0.1.2-alpha.1"

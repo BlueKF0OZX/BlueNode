@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2-alpha.1] - 2026-09-25
+
+- Added a release-pinned download command and guided setup for existing Debian 12 ASL3 nodes.
+- Detects running local nodes, confirms station identity/network access, creates the service account, checks startup, and prints the dashboard link.
+- Leaves existing installations untouched by default; explicit guided updates back up settings/history and restore the prior installation on failure.
+- Added a beginner getting-started guide and troubleshooting steps.
+- Recent nodes now include Disconnect beside Connect, with inline results.
+
 ## [Unreleased] - 0.1.2-alpha.0
 
 ### Changed

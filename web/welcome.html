@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Welcome to BlueNode</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#101a2a;color:#eaf2ff}
+    *{box-sizing:border-box}body{margin:0}main{max-width:780px;margin:auto;padding:48px 24px}
+    .brand{color:#87beff;font-weight:700;letter-spacing:.08em}h1{font-size:clamp(2rem,6vw,3rem);margin:18px 0}p,li{line-height:1.65;color:#c2cfe1}
+    .card{padding:24px;border:1px solid #344960;border-radius:16px;background:#172438;margin:24px 0}
+    .card h2{margin-top:0;font-size:1.2rem}.button{display:inline-block;min-height:48px;padding:14px 24px;border-radius:10px;background:#9acaff;color:#102039;text-decoration:none;font-weight:750}
+    .button[hidden]{display:none}a{color:#9acaff}a:focus-visible{outline:3px solid #fff;outline-offset:5px}li{margin:12px 0}footer{margin-top:30px;font-size:.9rem}
+    #station{font-weight:700;color:#fff}#status{margin-bottom:0}ol{padding-left:24px}
+  </style>
+</head>
+<body><main>
+  <div class="brand">BLUENODE · GET STARTED</div>
+  <h1>Your node, at a glance.</h1>
+  <p>BlueNode runs on your AllStar node. Open the dashboard from your browser whenever you want to check activity or manage a connection.</p>
+  <section class="card" aria-labelledby="station-title">
+    <h2 id="station-title">Your station</h2>
+    <div id="station">Checking your station…</div>
+    <p id="status" role="status">Waiting for a monitoring update.</p>
+  </section>
+  <a class="button" href="/web/">Open dashboard →</a>
+  <section class="card"><h2>Three things to try</h2><ol>
+    <li><strong>Check your callsign and node number.</strong> Make sure they match the station you want to monitor.</li>
+    <li><strong>Find BlueNode Controls.</strong> Enter a remote node and choose Connect. Choose Disconnect when you want to leave it.</li>
+    <li><strong>Save a favorite.</strong> Favorites and Recent Nodes give you shortcuts for the next visit. Bookmark the dashboard in your browser too.</li>
+  </ol></section>
+  <section class="card"><h2>You can leave the extras for later</h2>
+    <p>Weather, Internet remote access, and automatic recovery are optional. Fresh guided installations leave automatic recovery off. BlueNode starts automatically after reboot.</p>
+    <p>Home-network access is for a trusted network. Before making the dashboard available over the Internet, follow the authenticated remote-access guide.</p>
+  </section>
+  <footer>Need help? Use <strong>Troubleshooting Report</strong> in the dashboard, or read the
+    <a href="https://github.com/BlueKF0OZX/BlueNode/blob/main/docs/GET_STARTED.md">getting-started guide</a>.
+    BlueNode is an alpha release for early testing.</footer>
+</main>
+<script>
+  async function checkStation() {
+    const station = document.getElementById('station');
+    const status = document.getElementById('status');
+    if (location.protocol === 'file:') {
+      station.textContent = 'Open BlueNode on your node';
+      status.textContent = 'Use the web link printed by the installer. A downloaded HTML file cannot connect to your radio.';
+      document.querySelector('.button').hidden = true;
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch('/state/system.json', {cache:'no-store', signal:controller.signal});
+      if (!response.ok) throw new Error('No station observation');
+      const state = await response.json();
+      if (!/^[0-9]{1,10}$/.test(String(state.node)) || typeof state.callsign !== 'string') throw new Error('Incomplete station observation');
+      station.textContent = state.callsign + ' · Node ' + state.node;
+      status.textContent = 'Station settings loaded. Open the dashboard for current status and connection controls.';
+    } catch (_) {
+      station.textContent = 'Station data is not available yet';
+      status.textContent = 'Open the dashboard for details. If setup just finished, allow a few seconds for the first update.';
+    } finally { clearTimeout(timer); }
+  }
+  checkStation();
+</script></body></html>

@@ -2,7 +2,7 @@
 
 BlueNode is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
 
-**Status:** 0.1.2-alpha.0 - unreleased development snapshot for early testing.
+**Status:** 0.1.2-alpha.1 — alpha release for early testing.
 See [validation status](docs/VALIDATION_STATUS.md) for completed lab checks and
 remaining limits before choosing a version to evaluate.
 
@@ -43,6 +43,28 @@ Current dashboard with synthetic example observations. See [Testing](docs/TESTIN
 AllStarLink v3 (Debian/systemd), Python 3.11 or newer, Asterisk with `rpt`, systemd, sudo, and a Linux service user. SkywarnPlus is optional.
 
 ## Install
+
+### Start here: guided setup
+
+On an **existing working Debian 12 / ASL3 node**, open your SSH terminal and paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.2-alpha.1/install/bootstrap.sh | sudo bash
+```
+
+The installer detects local nodes, asks for your callsign and dashboard access,
+creates the service account, and prints your dashboard link after checking it.
+No configuration-file editing or second installer run is needed. Existing
+installations are checked and left unchanged unless you explicitly choose an update.
+
+**[Step-by-step setup and help →](docs/GET_STARTED.md)** ·
+[Read the downloader](install/bootstrap.sh) · [Download this release](https://github.com/BlueKF0OZX/BlueNode/releases/tag/v0.1.2-alpha.1)
+
+New installs keep automatic recovery off. Home-network access requires explicit
+confirmation and is for trusted networks only; SSH-only access is the default.
+Setup preserves Asterisk/radio configuration and does not restart Asterisk.
+
+### Manual installation
 
 The public checkout includes shared BlueNode features and example settings.
 An operator's customized dashboard may contain integrations or behavior absent
