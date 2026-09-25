@@ -183,7 +183,8 @@ def verify(config, timeout=25):
 def show_access(config):
     host, port = config['web']['host'], config['web']['port']
     print(f'\nOpen your dashboard: http://{host}:{port}/web/')
-    print(f'First visit? Start here: http://{host}:{port}/web/welcome.html')
+    if (ROOT / 'web/welcome.html').is_file():
+        print(f'First visit? Start here: http://{host}:{port}/web/welcome.html')
     if host == '127.0.0.1':
         print('From another computer, first open an SSH tunnel:')
         print(f'  ssh -N -L {port}:127.0.0.1:{port} YOUR_LOGIN@YOUR_NODE_IP')

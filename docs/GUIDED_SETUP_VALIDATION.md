@@ -34,6 +34,8 @@ The following checks ran against the lab's real systemd and Asterisk/App_Rpt:
 6. Fresh installation created the dedicated service account, enabled both BlueNode
    services, served the dashboard, and obtained a successful local App_Rpt observation.
 7. A second installation attempt refused to overwrite the working installation.
+8. Explicit restoration recovered the saved settings and a healthy dashboard,
+   preserved the pre-restore files in a separate backup, and left Asterisk unchanged.
 
 Asterisk process identity and `/etc/asterisk` file hashes remained unchanged through
 these cases. Retired legacy health units were detected and refused by guided updates;
