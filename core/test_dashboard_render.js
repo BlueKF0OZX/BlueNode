@@ -126,6 +126,8 @@ function fixture(detailed) {
       assert.equal(await page.locator('#completed-connections-today').innerText(), '0');
       assert.match(await page.locator('#dodropin-control-help').innerText(), /mapping is unavailable/);
       assert.equal(await page.locator('.onboarding-help').first().getAttribute('href'), '/web/guide.html');
+      assert.equal(await page.locator('.onboarding-help').first().getAttribute('target'), '_blank');
+      assert.match(await page.locator('.onboarding-help').first().getAttribute('rel'), /noopener/);
       invalidConnectionState = true;
       await page.evaluate(() => loadStatus());
       assert.equal(await page.locator('#active-connections').innerText(), 'Observation unavailable');
