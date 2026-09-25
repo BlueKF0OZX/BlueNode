@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 umask 077
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-VERSION=v0.1.2-alpha.1
+VERSION=v0.1.3-alpha.1
 [[ $# -eq 0 || ( $# -eq 1 && "$1" == --update ) ]] || { echo 'Supported option: --update'; exit 1; }
 [[ $EUID -eq 0 ]] || { echo 'Run this command with sudo.' >&2; exit 1; }
 [[ -r /dev/tty ]] || { echo 'Open an interactive SSH terminal and try again.' >&2; exit 1; }

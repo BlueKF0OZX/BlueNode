@@ -2,7 +2,7 @@
 
 BlueNode is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
 
-**Status:** 0.1.2-alpha.1 — alpha release for early testing.
+**Status:** 0.1.3-alpha.1 — alpha release for early testing.
 See [validation status](docs/VALIDATION_STATUS.md) for completed lab checks and
 remaining limits before choosing a version to evaluate.
 
@@ -44,12 +44,27 @@ AllStarLink v3 (Debian/systemd), Python 3.11 or newer, Asterisk with `rpt`, syst
 
 ## Install
 
-### Start here: guided setup
+### Windows: download, sign in, open your dashboard
+
+**[Download BlueNode Setup for Windows](https://github.com/BlueKF0OZX/BlueNode/releases/download/v0.1.3-alpha.1/BlueNode-Setup.exe)**
+
+Open the app, enter your node's address and Linux login, confirm your station,
+then click **Install BlueNode** and **Open dashboard**. No terminal commands or
+configuration-file editing. The app creates the private connection for you.
+Keep it open while using the dashboard. It also opens existing installations.
+
+Requires Windows x64 and an **existing working Debian 12 / ASL3 node** with SSH
+and sudo access. It does not install ASL3 on a blank Pi. The alpha app is unsigned;
+Windows may show an unknown-publisher warning. No separate .NET installation is needed.
+
+**[Windows walkthrough and help →](docs/WINDOWS_SETUP.md)**
+
+### Linux / Mac / terminal: guided setup
 
 On an **existing working Debian 12 / ASL3 node**, open your SSH terminal and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.2-alpha.1/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.3-alpha.1/install/bootstrap.sh | sudo bash
 ```
 
 The installer detects local nodes, asks for your callsign and dashboard access,
@@ -58,7 +73,7 @@ No configuration-file editing or second installer run is needed. Existing
 installations are checked and left unchanged unless you explicitly choose an update.
 
 **[Step-by-step setup and help →](docs/GET_STARTED.md)** ·
-[Read the downloader](install/bootstrap.sh) · [Download this release](https://github.com/BlueKF0OZX/BlueNode/releases/tag/v0.1.2-alpha.1)
+[Read the downloader](install/bootstrap.sh) · [Download this release](https://github.com/BlueKF0OZX/BlueNode/releases/tag/v0.1.3-alpha.1)
 
 New installs keep automatic recovery off. Home-network access requires explicit
 confirmation and is for trusted networks only; SSH-only access is the default.

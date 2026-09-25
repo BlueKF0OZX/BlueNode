@@ -74,3 +74,10 @@ backups/
 *.tar.gz
 *.tgz
 *.zip
+
+desktop/bin/
+desktop/obj/
+desktop/dist/
+desktop/tests/bin/
+desktop/tests/obj/
+
