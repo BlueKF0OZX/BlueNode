@@ -50,7 +50,7 @@ try {
         ('2.90.' + '110.16')
     )
     $textExtensions = @('.md', '.py', '.js', '.html', '.json', '.ps1', '.sh',
-        '.service', '.example', '.conf', '.template', '.txt', '')
+        '.service', '.example', '.conf', '.template', '.txt', '.cs', '.csproj', '.config', '.manifest', '')
 
     foreach ($relativePath in $files) {
         $normalized = $relativePath.Replace('\', '/')

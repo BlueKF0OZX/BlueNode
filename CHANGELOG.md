@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3-alpha.1] - 2026-09-25
+
+- Added a portable Windows x64 setup assistant for existing Debian 12 ASL3 nodes.
+- Detects the local station, confirms installation, and opens a private dashboard connection automatically.
+- Installs from a bundled release; passwords stay in memory and SSH identities are pinned.
+- Setup jobs continue on the node if the computer disconnects; reconnect to check the result.
+- Existing installations are verified/opened without replacing settings or code.
+- Added Windows setup instructions, integration checks, and a downloadable self-contained app.
+
 ## [0.1.2-alpha.1] - 2026-09-25
 
 - Added a release-pinned download command and guided setup for existing Debian 12 ASL3 nodes.

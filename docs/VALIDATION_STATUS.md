@@ -1,5 +1,12 @@
 # Validation status
 
+Latest release checks (2026-09-25): [Windows setup 0.1.3-alpha.1](WINDOWS_SETUP_VALIDATION.md)
+and [guided setup](GUIDED_SETUP_VALIDATION.md). BlueNode remains an early-testing
+alpha. The dated record below describes the earlier baseline, not the latest
+test counts.
+
+## Earlier baseline
+
 Review date: 2026-09-23. Status: unreleased alpha candidate for supervised early
 evaluation, not a production-certified release. Record the exact installed
 commit when reporting results. No new stable release or tag is implied.

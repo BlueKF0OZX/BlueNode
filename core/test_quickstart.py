@@ -16,6 +16,15 @@ spec.loader.exec_module(setup)
 
 
 class QuickstartTests(unittest.TestCase):
+    def test_backup_refuses_low_disk_space(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'code').write_text('saved application')
+            with patch.object(setup, 'UPDATE_PATHS', [root]), \
+                 patch.object(setup.shutil, 'disk_usage', return_value=type('Usage', (), {'free': 0})()):
+                with self.assertRaisesRegex(ValueError, 'Not enough disk space'):
+                    setup.check_backup_space(root)
+
     def test_includes_templates_and_callsign(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

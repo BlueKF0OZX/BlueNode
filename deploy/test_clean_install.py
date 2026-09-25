@@ -30,7 +30,8 @@ class CleanInstall(unittest.TestCase):
         cls.addClassCleanup(cls.cleanup)
         # The host may mount /tmp noexec/nodev. This mount exists only in our
         # private namespace and does not change the host's /tmp options.
-        run("mount", "-t", "tmpfs", "-o", "size=128m,mode=0755", "tmpfs", str(cls.root))
+        # Leave room for the updater's 64 MiB reserve after copying OS tools.
+        run("mount", "-t", "tmpfs", "-o", "size=256m,mode=0755", "tmpfs", str(cls.root))
         for name in ("tmp", "etc/systemd/system", "etc/sudoers.d", "etc/asterisk",
                      "usr/local/bin", "usr/local/sbin", "run", "dev", "proc", "sys"):
             (cls.root / name).mkdir(parents=True, exist_ok=True)

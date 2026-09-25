@@ -1,0 +1,57 @@
+# Windows setup validation
+
+Release candidate: **0.1.3-alpha.1**, checked 2026-09-25. This is an early-testing
+alpha, not a claim of universal hardware compatibility.
+
+## Completed
+
+- Built the self-contained Windows x64 executable with .NET SDK 8.0.425,
+  runtime 8.0.31, and locked SSH.NET 2026.0.0 dependencies. The packaged executable
+  passed its runtime/embedded-release check. No separate end-user SDK is needed.
+- Rendered and inspected the Windows form; the app provides address/login,
+  detected station, confirmation, progress, and dashboard access.
+- Tested the actual Windows SSH/session code against a checkpointed, isolated
+  Debian 12 ASL3 VM with no radio hardware. Both SSH-key login/passwordless sudo
+  and password login/password-required sudo passed.
+- Rejected an untrusted host identity and an incorrect login password.
+- Detected and opened an older existing installation through an automatic
+  loopback tunnel without replacing its files/settings. Older versions without
+  the welcome page open the dashboard directly.
+- Installed a fresh node, deliberately disconnected the Windows client after
+  starting setup, then reconnected and verified completion, the welcome page,
+  live dashboard, and the expected node identity through the tunnel.
+- Injected a failing installer into a disposable lab source copy. The detached
+  worker reported failure, removed its partial installation/service account,
+  and preserved Asterisk. A subsequent fresh install succeeded.
+- Compared Asterisk PID/start identity and hashes of all `/etc/asterisk` files
+  across the install/failure cases: unchanged. Checked all three services were
+  healthy after successful installation and automatic recovery remained off.
+- Backend regression: 253 tests passed as the installed service user. With an
+  additional low-disk-space guard test, all 254 passed inside the isolated
+  installer fixture. All 12 JavaScript/dashboard suites passed on Windows/Edge.
+- All three namespace-isolated installer/deployment scenarios, Windows deployment
+  tooling tests, and the tracked-source privacy check passed.
+- The isolated Linux installer fixture needed a larger temporary filesystem
+  (256 MiB) so its copied OS tools leave the updater's required 64 MiB reserve.
+  The production reserve was not reduced; its refusal is tested separately.
+
+## Limits
+
+The Windows app supports fresh installation and opening existing installations.
+Updates/restoration use the existing explicit guided CLI flow. It requires an
+already working Debian 12 ASL3 node, SSH, Python, sudo access, and the standard
+installer prerequisites; it does not image a Pi, recover passwords, configure
+ASL3, discover routers, modify firewalls, or expose a dashboard to the Internet.
+Passwords are held only in process memory; connection metadata/fingerprints
+are saved locally. SSH first-use trust still requires operator verification.
+
+The Windows binary is **unsigned** and may trigger Windows reputation warnings.
+Testing used Windows x64 and an amd64 VM. Raspberry Pi hardware, Windows ARM,
+unusual authentication methods, and broad external beta/endurance testing are
+not covered. Loss of the Windows connection was tested; loss of power to the
+node can interrupt installation and requires log review. No production radio
+was modified during these checks.
+
+The regular GitHub checks cover Python, dashboard, and repository/deployment
+regressions. The Windows executable build/integration checks were run locally;
+they are not yet a separate GitHub Actions job. See [build and test commands](../desktop/README.md).

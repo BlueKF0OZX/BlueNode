@@ -4,6 +4,11 @@ BlueNode adds a browser dashboard to an **existing working AllStarLink 3 node**.
 The guided installer supports **Debian 12 ASL3**. It is an early-testing alpha.
 You do not need to edit a configuration file or create a service account.
 
+**Using Windows? [Download the setup app and follow these steps](WINDOWS_SETUP.md).**
+It handles the node connection, installation, and private dashboard access for
+you. The terminal instructions below are an alternative for Linux/Mac users or
+operators who already use SSH.
+
 ## 1. Connect to your node
 
 Use the same SSH terminal and login you use to manage ASL3. Run the command on
@@ -16,7 +21,7 @@ If you have a blank Raspberry Pi, install ASL3 and get your radio working first:
 Copy this entire line into the node's terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.2-alpha.1/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.3-alpha.1/install/bootstrap.sh | sudo bash
 ```
 
 This downloads and runs the installer from the named alpha release. You can
@@ -62,7 +67,7 @@ is left alone, with directions to the manual guide.
 For an update to this release, use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.2-alpha.1/install/bootstrap.sh | sudo bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.3-alpha.1/install/bootstrap.sh | sudo bash -s -- --update
 ```
 
 Read the confirmation: an update replaces BlueNode code, including custom edits.
