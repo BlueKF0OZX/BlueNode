@@ -48,7 +48,7 @@ The clean-install fixture requires Debian namespace/chroot tools and the depende
 
 ## Automated pull request checks
 
-The BlueNode checks workflow runs on pull requests and pushes to main or codex
+The BlueNode checks workflow runs on pull requests and pushes to main or configured feature
 branches. Core regression runs Python 3.11 on Linux using only the public example
 configuration. Dashboard regression runs every core/test_*.js suite with pinned
 Playwright and Chromium; node observations and controls are synthetic. Repository

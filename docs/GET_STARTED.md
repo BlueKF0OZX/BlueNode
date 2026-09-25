@@ -114,3 +114,7 @@ Never post passwords, private backup directories, or unreviewed setup logs.
 
 Advanced configuration: [Installation](INSTALL.md), [Configuration](CONFIGURATION.md),
 [Upgrade and recovery](UPGRADE.md).
+
+## Report a problem
+
+Please report problems during installation, after installation, or while using the dashboard through [GitHub Issues](https://github.com/BlueKF0OZX/BlueNode/issues/new). Include what you tried, what happened, and any error message, plus your BlueNode version and node hardware if known. Issues are public and require a GitHub account; remove passwords and private details from screenshots or troubleshooting reports before posting.

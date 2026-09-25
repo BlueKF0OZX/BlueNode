@@ -3,6 +3,7 @@
 ## [0.1.5-alpha.1] - 2026-09-25
 
 - Bundle the latest dashboard in Windows and terminal installations.
+- Invite installation and dashboard issue reports from the installer and welcome page.
 - Add Edit name and Disconnect to personal favorites; disconnecting keeps the favorite saved.
 - Add a remembered Auto-switch toggle to manual Connect, with clear ON/OFF feedback and a choice of peer when several are linked.
 - Replace the separate Switch nodes form and update the dashboard guide.
