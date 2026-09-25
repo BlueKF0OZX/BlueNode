@@ -71,13 +71,12 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
       ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
       ['button[onclick="runNodeControl(\'node-disconnect\', this)"]','node-disconnect'],
-      ['button[onclick="runNodeControl(\'node-switch\', this)"]','node-switch'],
       ['#emergency-enter','emergency-enable'],
       ['button[onclick="toggleEmergencyMode(false, this)"]','emergency-disable'],
       ['#maintenance-toggle','maintenance-enable']
     ];
     await page.locator('#manual-node-number').fill('12345');
-    await page.locator('#switch-from-node').fill('54321');
+    await page.locator('#auto-disconnect-current').check();
     for (const [selector, action] of controls) {
       authenticated = false; // Includes expiry while the page still believes it is signed in.
       const count = executed.length;
@@ -90,11 +89,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       assert.match(pendingLabel, /This action will run after sign-in/);
       assert.ok(!pendingLabel.includes(action), 'Do not expose internal action identifiers');
       if (action.startsWith('node-')) assert.ok(pendingLabel.includes('12345'));
-      if (action === 'node-switch') {
-        assert.ok(pendingLabel.includes('54321'));
-        await page.locator('#switch-from-node').fill('77777');
-        await page.locator('#manual-node-number').fill('88888');
-      }
       // A second control cannot replace or duplicate the first one.
       await page.evaluate(() => runControl('skywarn-disable', document.createElement('button')));
       await login();
@@ -103,7 +97,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       assert.match(await page.locator('#pending-control-result').textContent(), /Completed:.*Fixture completed/);
       assert.equal(await page.locator('#control-login-cancel').isVisible(), false);
       if (action.startsWith('node-')) assert.deepEqual(executed.at(-1).payload,
-        action === 'node-switch' ? {node:'12345',from_node:'54321'} : {node:'12345'});
+        action === 'node-connect' ? {node:'12345',replace_current:true} : {node:'12345'});
       await page.locator('#manual-node-number').fill('12345');
       await page.evaluate(() => adminLogin(document.createElement('button')));
       assert.equal(executed.length, count + 1, 'another login must not replay consumed action');
@@ -212,6 +206,6 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'config-error overflow at ' + width);
     }
     assert.deepEqual(errors, []);
-    console.log('PASS control auth UX: eight controls; immutable switch targets, resume once, expiry, reload, logout, failure, cancellation, CSRF and injection');
+    console.log('PASS control auth UX: controls; automatic-switch option through sign-in, resume once, expiry, reload, logout, failure, cancellation, CSRF and injection');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

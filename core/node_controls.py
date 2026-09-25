@@ -37,11 +37,36 @@ def perform(action, payload, config):
     if not _LOCK.acquire(blocking=False):
         return 409, {'ok': False, 'error': 'Another node control is being verified; wait before retrying'}
     try:
+        if action == 'node-connect' and isinstance(payload, dict) and 'replace_current' in payload:
+            return connect_replacing_current(payload, config)
         if action == 'node-switch':
             return switch(payload, config)
         return perform_locked(action, payload, config)
     finally:
         _LOCK.release()
+
+
+def connect_replacing_current(payload, config):
+    """Select a single current peer from fresh radio evidence under the control lock."""
+    local = str(config.get('node', ''))
+    if (set(payload) != {'node', 'replace_current'} or payload['replace_current'] is not True
+            or not numeric(local) or not numeric(payload['node']) or payload['node'] == local):
+        return 400, {'ok': False, 'error': 'Enter a valid remote node number and switch option'}
+    observed = asterisk_observation.node_evidence(local)
+    links = observed.get('links')
+    if (observed.get('status') != 'available' or not asterisk_observation.fresh(observed)
+            or not isinstance(links, list) or any(not isinstance(link, dict)
+            or not numeric(link.get('node')) or link.get('mode') not in ('T', 'R', 'C') for link in links)):
+        return 503, {'ok': False, 'error': 'Current connections could not be verified. No switch was attempted.'}
+    peers = {link['node'] for link in links}
+    if payload['node'] in peers:
+        return perform_locked('node-connect', {'node': payload['node']}, config)
+    if len(peers) > 1:
+        return 409, {'ok': False, 'reason': 'choose_current_node', 'connected_nodes': sorted(peers),
+                     'error': 'Several nodes are connected. Choose which node to leave.'}
+    if not peers or peers == {payload['node']}:
+        return perform_locked('node-connect', {'node': payload['node']}, config)
+    return switch({'node': payload['node'], 'from_node': next(iter(peers))}, config)
 
 
 def switch(payload, config):

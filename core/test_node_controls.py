@@ -189,6 +189,54 @@ class SwitchTests(unittest.TestCase):
         self.run.assert_not_called()
 
 
+class AutomaticSwitchTests(unittest.TestCase):
+    setUp = NodeControlTests.setUp
+    samples = SwitchTests.samples
+
+    def automatic(self, **extra):
+        return controls.perform('node-connect', dict(node='50241', replace_current=True, **extra), CONFIG)
+
+    def test_automatic_switch_uses_fresh_peer_and_verified_order(self):
+        self.probe.side_effect = [self.samples(('11111', 'T')), self.samples(('11111', 'T')),
+                                 evidence(), evidence(), evidence('T'), evidence('T')]
+        code, result = self.automatic()
+        self.assertEqual((code, result['phase']), (200, 'complete'))
+        self.assertEqual([call.args[0][-1] for call in self.run.call_args_list],
+                         ['rpt fun 23456 *111111', 'rpt fun 23456 *350241'])
+
+    def test_no_peer_connects_normally(self):
+        self.probe.side_effect = [evidence(), evidence(), evidence('T')]
+        self.assertEqual(self.automatic()[0], 200)
+        self.assertEqual([call.args[0][-1] for call in self.run.call_args_list], ['rpt fun 23456 *350241'])
+
+    def test_same_target_never_disconnects_even_with_other_links(self):
+        self.probe.return_value = self.samples(('50241', 'T'), ('33333', 'T'))
+        self.assertEqual(self.automatic()[1]['outcome'], 'already_satisfied')
+        self.run.assert_not_called()
+
+    def test_several_peers_require_explicit_selection(self):
+        self.probe.return_value = self.samples(('11111', 'T'), ('33333', 'C'))
+        code, result = self.automatic()
+        self.assertEqual((code, result['reason']), (409, 'choose_current_node'))
+        self.assertEqual(result['connected_nodes'], ['11111', '33333'])
+        self.run.assert_not_called()
+
+    def test_stale_missing_or_malformed_evidence_never_disconnects(self):
+        for sample in ({'status':'unavailable'}, dict(evidence(), observed_at=0),
+                       dict(evidence(), links=[{}]), dict(evidence(), links=None)):
+            self.probe.return_value = sample
+            self.assertEqual(self.automatic()[0], 503)
+        self.run.assert_not_called()
+
+    def test_invalid_auto_payload_never_observes(self):
+        for payload in ({'node':'50241','replace_current':False}, {'node':'23456','replace_current':True},
+                        {'node':'bad','replace_current':True}, {'node':'50241','replace_current':'true'},
+                        {'node':'50241','replace_current':True,'extra':1}):
+            self.assertEqual(controls.perform('node-connect', payload, CONFIG)[0], 400)
+        self.probe.assert_not_called()
+        self.run.assert_not_called()
+
+
 class DiagnosticStorageTests(unittest.TestCase):
     def test_writes_structured_record_and_handles_unwritable_storage(self):
         with tempfile.TemporaryDirectory() as folder:
