@@ -908,6 +908,20 @@
     .live-activity[data-state="active"] #live-activity-label { color: #5ee6ae; }
     #live-activity-detail { color: #a8b4c7; font-size: 12px; }
     #live-activity-warning { color: #ffcb70; font-size: 12px; }
+    .auto-switch-card { display:flex; align-items:center; gap:16px; padding:16px; margin:16px 0 8px; border:2px solid #64748b; border-radius:12px; background:#172334; cursor:pointer; }
+    .auto-switch-card:has(input:checked) { border-color:#38bdf8; background:#0c344b; }
+    .auto-switch-card input { appearance:none; -webkit-appearance:none; flex:0 0 54px; width:54px; height:30px; margin:0; border:2px solid #94a3b8; border-radius:20px; background:#475569; cursor:pointer; position:relative; }
+    .auto-switch-card input::before { content:''; position:absolute; width:22px; height:22px; left:2px; top:2px; border-radius:50%; background:#fff; }
+    .auto-switch-card input:checked { background:#0284c7; border-color:#7dd3fc; }
+    .auto-switch-card input:checked::before { left:26px; }
+    .auto-switch-card input:focus-visible { outline:3px solid #facc15; outline-offset:4px; }
+    .auto-switch-copy { display:flex; flex-direction:column; gap:6px; min-width:0; color:#e2e8f0; font-size:14px; line-height:1.5; }
+    .auto-switch-heading { font-size:18px; font-weight:700; color:#fff; }
+    .auto-switch-heading > span { margin-left:8px; padding:3px 8px; border-radius:5px; background:#475569; font-size:12px; vertical-align:middle; }
+    .auto-switch-heading > .auto-switch-on { background:#075985; color:#e0f2fe; }
+    .auto-switch-card .auto-switch-on { display:none; }
+    .auto-switch-card input:checked ~ .auto-switch-copy .auto-switch-on { display:initial; }
+    .auto-switch-card input:checked ~ .auto-switch-copy .auto-switch-off { display:none; }
 </style>
 
 </head>
@@ -1154,11 +1168,15 @@
       <div class="manual-node-control">
 
         <h3>Manual Node Connection</h3>
-        <label style="display:flex;align-items:center;gap:10px;min-height:44px">
-          <input id="auto-disconnect-current" type="checkbox" onchange="saveAutoDisconnectPreference()" aria-describedby="auto-disconnect-help">
-          Disconnect the current node when I connect to a new one
+        <label class="auto-switch-card">
+          <input id="auto-disconnect-current" type="checkbox" role="switch" aria-label="Auto-switch" onchange="saveAutoDisconnectPreference()" aria-describedby="auto-disconnect-help">
+          <span class="auto-switch-copy">
+            <span class="auto-switch-heading">Auto-switch <span class="auto-switch-off">OFF</span><span class="auto-switch-on">ON</span></span>
+            <span class="auto-switch-off">Add a connection and keep existing links.</span>
+            <span class="auto-switch-on">Leave the current node, then connect to the new one.</span>
+          </span>
         </label>
-        <p id="auto-disconnect-help" class="sub">Applies to the Connect button below. With several links, you will be asked which one to leave.</p>
+        <p id="auto-disconnect-help" class="sub">Applies to Connect below. If several nodes are linked, you choose which one to leave.</p>
 
         <div class="manual-node-row">
 
