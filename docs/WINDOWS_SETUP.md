@@ -1,6 +1,6 @@
 # BlueNode in three buttons
 
-**[Download BlueNode Setup for Windows](https://github.com/BlueKF0OZX/BlueNode/releases/download/v0.1.3-alpha.1/BlueNode-Setup.exe)**
+**[Download BlueNode Setup for Windows](https://github.com/BlueKF0OZX/BlueNode/releases/download/v0.1.4-alpha.1/BlueNode-Setup.exe)**
 
 ![BlueNode Setup: enter your node login, confirm the station, and open the dashboard](windows-setup.png)
 

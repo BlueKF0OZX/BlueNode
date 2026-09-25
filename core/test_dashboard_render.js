@@ -125,7 +125,7 @@ function fixture(detailed) {
       assert.equal(await page.locator('#connections-today').innerText(), '4');
       assert.equal(await page.locator('#completed-connections-today').innerText(), '0');
       assert.match(await page.locator('#dodropin-control-help').innerText(), /mapping is unavailable/);
-      assert.equal(await page.locator('.onboarding-help').first().getAttribute('href'), 'https://github.com/BlueKF0OZX/BlueNode/blob/main/docs/INSTALL.md#after-installation');
+      assert.equal(await page.locator('.onboarding-help').first().getAttribute('href'), '/web/guide.html');
       invalidConnectionState = true;
       await page.evaluate(() => loadStatus());
       assert.equal(await page.locator('#active-connections').innerText(), 'Observation unavailable');
