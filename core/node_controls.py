@@ -34,6 +34,50 @@ def numeric(value):
 
 
 def perform(action, payload, config):
+    if not _LOCK.acquire(blocking=False):
+        return 409, {'ok': False, 'error': 'Another node control is being verified; wait before retrying'}
+    try:
+        if action == 'node-switch':
+            return switch(payload, config)
+        return perform_locked(action, payload, config)
+    finally:
+        _LOCK.release()
+
+
+def switch(payload, config):
+    """Called under the control lock; affect only the two explicit targets."""
+    local = str(config.get('node', ''))
+    if (not isinstance(payload, dict) or set(payload) != {'node', 'from_node'}
+            or not numeric(local) or not all(numeric(payload[k]) for k in ('node', 'from_node'))
+            or len({local, payload['node'], payload['from_node']}) != 3):
+        return 400, {'ok': False, 'error': 'Enter two different valid remote node numbers'}
+    target, source = payload['node'], payload['from_node']
+    for phase, action, node in [('disconnecting', 'node-disconnect', source),
+                                 ('connecting', 'node-connect', target)]:
+        code, result = perform_locked(action, {'node': node}, config)
+        if not result.get('ok'):
+            return code, dict(result, phase=phase, from_node=source, node=target,
+                              error=f'Switch stopped while {phase} node {node}: ' + result['error'])
+    final = asterisk_observation.node_evidence(local)
+    links = final.get('links')
+    if (final.get('status') == 'available' and asterisk_observation.fresh(final)
+            and isinstance(links, list)
+            and not any(link['node'] == source for link in links)
+            and any(link['node'] == target and link['mode'] in ('T', 'R') for link in links)):
+        return 200, {'ok': True, 'outcome': 'verified', 'phase': 'complete',
+                     'node': target, 'from_node': source,
+                     'message': f'Switched from node {source} to {target}; verified from App_Rpt state'}
+    incident_id = uuid.uuid4().hex
+    saved = record_failure({'id': incident_id, 'recorded_at': time.time(),
+                            'action': 'node-switch', 'node': target, 'from_node': source,
+                            'reason': 'switch_not_confirmed', 'last': snapshot(final)})
+    return 504, {'ok': False, 'outcome': 'unverified', 'phase': 'verifying',
+                 'node': target, 'from_node': source, 'reason': 'switch_not_confirmed',
+                 'diagnostic_saved': saved, 'diagnostic_id': incident_id if saved else None,
+                 'error': 'Final switch state could not be confirmed. Check current links before retrying'}
+
+
+def perform_locked(action, payload, config):
     if action not in ('node-connect', 'node-disconnect', 'dodropin-connect', 'dodropin-disconnect'):
         return 403, {'ok': False, 'error': 'Action not permitted'}
     manual = action.startswith('node-')
@@ -50,8 +94,6 @@ def perform(action, payload, config):
     local = str(config.get('node', ''))
     if not numeric(target) or not numeric(local) or target == local:
         return 400, {'ok': False, 'error': 'Enter a valid remote AllStar node number'}
-    if not _LOCK.acquire(blocking=False):
-        return 409, {'ok': False, 'error': 'Another node control is being verified; wait before retrying'}
     connect = action.endswith('-connect')
     started = time.monotonic()
     initial = None
@@ -96,49 +138,46 @@ def perform(action, payload, config):
         state = 'connected' if connect else 'disconnected'
         return 200, {'ok': True, 'node': target, 'outcome': outcome,
                      'message': f'Node {target} is {state}; verified from App_Rpt state'}
-    try:
-        before = observed()
-        initial = latest
-        if before is None:
-            return failure(503, 'unavailable', 'App_Rpt state unavailable; no command sent',
-                           'observation_unavailable')
-        if before:
-            return success('already_satisfied')
-        command = f"rpt fun {local} {'*3' if connect else '*1'}{target}"
-        # A pending transport is already attempting this connection. Observe it
-        # under the same lock instead of issuing duplicate DTMF commands.
-        if not (connect and pending()):
-            try:
-                command_sent = True
-                result = subprocess.run(['sudo', '-n', '/usr/local/sbin/bluenode-asterisk', '-rx', command],
-                                        capture_output=True, text=True, timeout=15)
-                command_returncode = result.returncode
-            except subprocess.TimeoutExpired:
-                return failure(504, 'timeout', 'Command timed out; resulting link state is unverified. Check before retrying',
-                               'command_timeout')
-            except OSError:
-                command_sent = False
-                return failure(503, 'failed', 'Unable to execute the permitted node control',
-                               'execution_failed')
-            if result.returncode != 0:
-                return failure(502, 'failed', 'Asterisk rejected the node control; resulting state is unverified',
-                               'command_rejected')
-        deadline = time.monotonic() + VERIFY_SECONDS
-        while True:
-            state = observed()
-            if state is True:
-                return success('verified')
-            if time.monotonic() >= deadline:
-                if state is None:
-                    reason = 'observation_lost'
-                    message = 'App_Rpt state became unavailable; the resulting link state is unknown. Check before retrying'
-                elif connect and pending():
-                    reason = 'connection_pending'
-                    message = 'The connection is still pending in App_Rpt. No duplicate connect command was sent; check before retrying'
-                else:
-                    reason = 'link_not_confirmed'
-                    message = 'The requested link state was not confirmed before the verification deadline. Check before retrying'
-                return failure(504, 'unverified', message, reason)
-            time.sleep(1)
-    finally:
-        _LOCK.release()
+    before = observed()
+    initial = latest
+    if before is None:
+        return failure(503, 'unavailable', 'App_Rpt state unavailable; no command sent',
+                       'observation_unavailable')
+    if before:
+        return success('already_satisfied')
+    command = f"rpt fun {local} {'*3' if connect else '*1'}{target}"
+    # A pending transport is already attempting this connection. Observe it
+    # under the same lock instead of issuing duplicate DTMF commands.
+    if not (connect and pending()):
+        try:
+            command_sent = True
+            result = subprocess.run(['sudo', '-n', '/usr/local/sbin/bluenode-asterisk', '-rx', command],
+                                    capture_output=True, text=True, timeout=15)
+            command_returncode = result.returncode
+        except subprocess.TimeoutExpired:
+            return failure(504, 'timeout', 'Command timed out; resulting link state is unverified. Check before retrying',
+                           'command_timeout')
+        except OSError:
+            command_sent = False
+            return failure(503, 'failed', 'Unable to execute the permitted node control',
+                           'execution_failed')
+        if result.returncode != 0:
+            return failure(502, 'failed', 'Asterisk rejected the node control; resulting state is unverified',
+                           'command_rejected')
+    deadline = time.monotonic() + VERIFY_SECONDS
+    while True:
+        state = observed()
+        if state is True:
+            return success('verified')
+        if time.monotonic() >= deadline:
+            if state is None:
+                reason = 'observation_lost'
+                message = 'App_Rpt state became unavailable; the resulting link state is unknown. Check before retrying'
+            elif connect and pending():
+                reason = 'connection_pending'
+                message = 'The connection is still pending in App_Rpt. No duplicate connect command was sent; check before retrying'
+            else:
+                reason = 'link_not_confirmed'
+                message = 'The requested link state was not confirmed before the verification deadline. Check before retrying'
+            return failure(504, 'unverified', message, reason)
+        time.sleep(1)

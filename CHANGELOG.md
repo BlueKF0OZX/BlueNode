@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Added verified switching between explicit source/destination nodes, preserving unrelated links and reporting the failed phase when verification stops.
+- Added compact mobile controls, retained activity summaries, optional prolonged-activity browser notifications, and measured dashboard request timing.
 - Added browser-local favorites and recent nodes, scoped per local node, with quick-connect through the existing authenticated control flow. Recent nodes come from verified controls and recorded sessions, not activity estimates.
 - Added connection/radio/system event filters, paired radio records with recorded intervals, and expandable original records that remain open across refreshes.
 - Added receiving/idle status, an observed activity timer, last activity, and a five-minute activity warning inside the Connected Nodes card. Activity expires independently when telemetry becomes stale.

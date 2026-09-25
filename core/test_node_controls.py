@@ -126,6 +126,69 @@ class NodeControlTests(unittest.TestCase):
         self.run.assert_not_called()
 
 
+class SwitchTests(unittest.TestCase):
+    setUp = NodeControlTests.setUp
+
+    def samples(self, *nodes):
+        return dict(evidence(), links=[{'node': node, 'mode': mode} for node, mode in nodes])
+
+    def request(self):
+        return controls.perform('node-switch', {'from_node': '11111', 'node': '50241'}, CONFIG)
+
+    def test_switch_serializes_steps_and_preserves_unrelated_links(self):
+        unrelated = ('33333', 'T')
+        self.probe.side_effect = [self.samples(('11111', 'T'), unrelated),
+                                 self.samples(unrelated), self.samples(unrelated),
+                                 self.samples(('50241', 'T'), unrelated),
+                                 self.samples(('50241', 'T'), unrelated)]
+        def execute(*args, **kwargs):
+            self.assertEqual(controls.perform('node-connect', {'node': '44444'}, CONFIG)[0], 409)
+            return subprocess.CompletedProcess([], 0)
+        self.run.side_effect = execute
+        code, result = self.request()
+        self.assertEqual((code, result['phase']), (200, 'complete'))
+        self.assertEqual([call.args[0][-1] for call in self.run.call_args_list],
+                         ['rpt fun 23456 *111111', 'rpt fun 23456 *350241'])
+
+    def test_disconnect_failure_never_connects(self):
+        self.probe.return_value = self.samples(('11111', 'T'))
+        with patch.object(controls, 'VERIFY_SECONDS', 0):
+            code, result = self.request()
+        self.assertEqual((code, result['phase']), (504, 'disconnecting'))
+        self.assertEqual(self.run.call_count, 1)
+        self.assertEqual(self.run.call_args.args[0][-1], 'rpt fun 23456 *111111')
+
+    def test_pending_target_is_not_reissued_after_disconnect(self):
+        self.probe.side_effect = [evidence(), evidence('C'), evidence('T'), evidence('T')]
+        self.assertEqual(self.request()[0], 200)
+        self.run.assert_not_called()
+
+    def test_connect_failure_has_phase_and_no_rollback(self):
+        self.probe.return_value = evidence()
+        with patch.object(controls, 'VERIFY_SECONDS', 0):
+            code, result = self.request()
+        self.assertEqual((code, result['phase']), (504, 'connecting'))
+        self.run.assert_called_once()
+
+    def test_final_state_requires_fresh_source_absence_and_target_presence(self):
+        for final in (self.samples(('11111', 'T'), ('50241', 'T')), evidence(),
+                      dict(evidence('T'), observed_at=0), {'status': 'unavailable'}):
+            self.probe.side_effect = [evidence(), evidence('T'), final]
+            code, result = self.request()
+            self.assertEqual((code, result['phase']), (504, 'verifying'))
+            self.assertEqual(self.record.call_args.args[0]['action'], 'node-switch')
+        self.run.assert_not_called()
+
+    def test_bad_switch_targets_never_observe_or_execute(self):
+        for payload in ({}, {'node': '50241'}, {'node': '50241', 'from_node': '50241'},
+                        {'node': '50241', 'from_node': '23456'},
+                        {'node': '50241', 'from_node': '1;id'},
+                        {'node': 50241, 'from_node': '11111'}):
+            self.assertEqual(controls.perform('node-switch', payload, CONFIG)[0], 400)
+        self.probe.assert_not_called()
+        self.run.assert_not_called()
+
+
 class DiagnosticStorageTests(unittest.TestCase):
     def test_writes_structured_record_and_handles_unwritable_storage(self):
         with tempfile.TemporaryDirectory() as folder:

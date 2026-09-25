@@ -41,12 +41,39 @@ assert.equal(view(corrupt).label,'RECEIVING');
 corrupt.tx_origin.source_node='<img src=x onerror=alert(1)>';
 assert.equal(view(corrupt).state,'unknown');
 (async()=>{
+  let notifications=0, permissionRequests=0;
+  context.Notification=class {
+    static permission='default';
+    static async requestPermission(){ permissionRequests++; return 'granted'; }
+    constructor(){notifications++;}
+  };
+  const prolonged=sample(); prolonged.tx_origin.started_at=stamp(-310);
+  context.fetch=async()=>({ok:true,json:async()=>prolonged});
+  await context.loadLiveActivity();
+  assert.equal(notifications,0,'notifications are off by default');
+  assert.equal(permissionRequests,0,'polling never requests permission');
+  const checkbox=element('activity-notifications'); checkbox.checked=true;
+  await context.toggleActivityNotifications(checkbox);
+  assert.equal(notifications,1);
+  context.renderLiveActivity(); await context.loadLiveActivity();
+  assert.equal(notifications,1,'same interval only notifies once');
+  const staleLong={...prolonged,last_update:stamp(-20)};
+  context.fetch=async()=>({ok:true,json:async()=>staleLong});
+  await context.loadLiveActivity();
+  assert.equal(notifications,1,'stale observations never notify');
+  checkbox.checked=false; await context.toggleActivityNotifications(checkbox);
+  assert.match(element('activity-notification-status').textContent,/Off/);
+  context.Notification.requestPermission=async()=> 'denied';
+  checkbox.checked=true; await context.toggleActivityNotifications(checkbox);
+  assert.equal(checkbox.checked,false);
   context.fetch = async()=>({ok:true,json:async()=>sample()});
   await context.loadLiveActivity();
   assert.match(element('live-activity-label').textContent,/RECEIVING/);
+  assert.match(element('activity-refresh-status').textContent,/ms.*not audio delay/);
   context.fetch = async()=>{throw new Error('offline');};
   await context.loadLiveActivity();
   assert.equal(element('live-activity-label').textContent,'Activity unavailable');
+  assert.match(element('activity-refresh-status').textContent,/unavailable/);
   let release;
   let requests=0;
   context.fetch=()=>{requests++;return new Promise(resolve=>{release=resolve;});};

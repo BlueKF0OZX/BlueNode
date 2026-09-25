@@ -205,7 +205,7 @@
 
     }
 
-    #manual-node-number {
+    #manual-node-number, #switch-from-node {
 
       min-width: 0;
 
@@ -225,7 +225,7 @@
 
     }
 
-    #manual-node-number:focus {
+    #manual-node-number:focus, #switch-from-node:focus {
 
       border-color: #9ca3af;
 
@@ -239,7 +239,7 @@
 
       }
 
-      #manual-node-number {
+      #manual-node-number, #switch-from-node {
 
         grid-column: 1 / -1;
 
@@ -829,13 +829,13 @@
     .control-button:disabled { opacity: 0.55; cursor: not-allowed; }
     .control-button.emergency-enter, .control-button.admin-danger { background: #7f1d1d; border-color: #df7777; color: #fff1f2; }
     .control-button.emergency-enter:hover, .control-button.admin-danger:hover { background: #991b1b; }
-    #manual-node-number:focus-visible, #node-directory-search:focus-visible,
+    #manual-node-number:focus-visible, #switch-from-node:focus-visible, #node-directory-search:focus-visible,
     button:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible,
     [tabindex="0"]:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
     .manual-node-control, .node-directory { margin-top: 20px; padding-top: 16px; }
     .manual-node-control h3, .node-directory h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
     .manual-node-row, .node-search-row { gap: 10px; }
-    #manual-node-number, #node-directory-search, .admin-field { min-width: 0; min-height: 44px; font-size: 16px; line-height: 1.4; border-color: #526078; }
+    #manual-node-number, #switch-from-node, #node-directory-search, .admin-field { min-width: 0; min-height: 44px; font-size: 16px; line-height: 1.4; border-color: #526078; }
     .node-search-row { grid-template-columns: minmax(0, 1fr) auto; }
     .admin-field { flex: 1 1 180px; }
     .admin-row { gap: 10px; margin-top: 14px; }
@@ -870,6 +870,9 @@
       .controls-panel, .events-panel, .automation-panel, .behavior-panel,
       .remote-admin-panel, .soft-radio-panel { padding: 16px; }
       .controls-heading { align-items: stretch; }
+      .controls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .controls-grid .control-button { padding: 8px; overflow-wrap: anywhere; }
+      .saved-nodes-panel, .manual-node-control, .node-directory { margin-top: 14px; padding-top: 12px; }
       .controls-heading .emergency-enter { width: 100%; margin-top: 4px; }
       .admin-row .control-button { flex: 1 1 140px; }
       .event-row { flex-direction: column; gap: 5px; }
@@ -1195,6 +1198,16 @@
 
 
 
+      <div class="manual-node-control">
+        <h3>Switch nodes</h3>
+        <p>Disconnect only the node below, then connect to the number entered above. Other links stay connected.</p>
+        <div class="manual-node-row">
+          <input id="switch-from-node" type="text" inputmode="numeric" maxlength="10"
+                 placeholder="Node to leave" aria-label="Node to disconnect when switching" autocomplete="off">
+          <button class="control-button" onclick="runNodeControl('node-switch', this)">Switch nodes</button>
+        </div>
+      </div>
+
       <div class="favorite-save-row">
         <input id="favorite-node-label" class="admin-field" type="text" maxlength="48" placeholder="Favorite name (optional)" aria-label="Favorite name (optional)">
         <button class="control-button" onclick="saveFavoriteNode()">Save node as favorite</button>
@@ -1381,6 +1394,15 @@
 
       <h2>Recent Events</h2>
 
+      <details class="activity-history">
+        <summary>Observed activity history</summary>
+        <p class="sub">Summaries of retained radio records. Times are observed intervals, not exact audio duration. A peer identifies the incoming link, not the original transmitter. History does not indicate who is active now.</p>
+        <div id="activity-history-summary">Waiting for event history.</div>
+        <p id="activity-refresh-status" class="sub">Activity refresh timing unavailable.</p>
+        <label class="event-raw-toggle"><input id="activity-notifications" type="checkbox" onchange="toggleActivityNotifications(this)"> Notify me about activity over five minutes</label>
+        <p id="activity-notification-status" class="sub">Off. Notifications apply while this page is open.</p>
+      </details>
+
       <div class="event-filters" role="group" aria-label="Filter events">
         <button type="button" class="control-button" id="events-filter-all" aria-pressed="true" onclick="setEventFilter('all')">All</button>
         <button type="button" class="control-button" id="events-filter-connections" aria-pressed="false" onclick="setEventFilter('connections')">Connections</button>
@@ -1502,7 +1524,7 @@
     let adminLoginBusy = false;
     const pendingAdminActions = new Set(['admin-refresh-diagnostics', 'admin-restart-monitor', 'admin-restart-asterisk']);
     const ordinaryActions = new Set(['dodropin-connect', 'dodropin-disconnect',
-      'skywarn-enable', 'skywarn-disable', 'node-connect', 'node-disconnect',
+      'skywarn-enable', 'skywarn-disable', 'node-connect', 'node-disconnect', 'node-switch',
       'emergency-enable', 'emergency-disable', 'maintenance-enable', 'maintenance-disable']);
     function validateControl(action, payload) {
       if (pendingAdminActions.has(action)) {
@@ -1514,6 +1536,12 @@
       }
       if (!ordinaryActions.has(action)) throw new Error('Unsupported control');
       const keys = Object.keys(payload);
+      if (action === 'node-switch') {
+        if (keys.length !== 2 || !keys.includes('node') || !keys.includes('from_node') ||
+            ![payload.node, payload.from_node].every(value => typeof value === 'string' && /^\d{1,10}$/.test(value)) ||
+            payload.node === payload.from_node) throw new Error('Enter two different valid remote node numbers');
+        return Object.freeze({...payload});
+      }
       if (action.startsWith('node-')) {
         if (keys.length !== 1 || keys[0] !== 'node' || typeof payload.node !== 'string' ||
             !/^\d{1,10}$/.test(payload.node)) throw new Error('Invalid node number');
@@ -1528,6 +1556,7 @@
         'admin-refresh-diagnostics':'refresh diagnostics', 'admin-restart-monitor':'restart the BlueNode monitor',
         'admin-restart-asterisk':'restart Asterisk'};
       return action === 'node-connect' ? 'connect to node ' + payload.node :
+        action === 'node-switch' ? 'disconnect node ' + payload.from_node + ' and connect to node ' + payload.node :
         action === 'node-disconnect' ? 'disconnect node ' + payload.node : labels[action];
     }
     function showControlLogin() {
@@ -1806,6 +1835,8 @@
       const resultElement = document.getElementById('control-result');
 
       const node = selectedNode === null ? input.value.trim() : selectedNode;
+      const payload = action === 'node-switch' ?
+        {node, from_node:document.getElementById('switch-from-node').value.trim()} : {node};
 
       const originalText = button.textContent;
 
@@ -1833,7 +1864,7 @@
 
       try {
 
-        const response = await requestOrdinaryControl(action, {node});
+        const response = await requestOrdinaryControl(action, payload);
 
         const result = await response.json();
 
@@ -2372,6 +2403,28 @@
     // Live activity is polled independently of slower health/intelligence calls.
     let activitySource = null;
     let activityLoading = false;
+    let activityRefreshMs = null;
+    let activityNotificationsEnabled = false;
+    let lastActivityNotification = null;
+
+    async function toggleActivityNotifications(input) {
+      activityNotificationsEnabled = false;
+      const status = document.getElementById('activity-notification-status');
+      if (!input.checked) { status.textContent = 'Off. Notifications apply while this page is open.'; return; }
+      if (typeof Notification === 'undefined') {
+        input.checked = false; status.textContent = 'Notifications are unavailable in this browser or connection.'; return;
+      }
+      try {
+        const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+        if (!input.checked) return;
+        activityNotificationsEnabled = permission === 'granted';
+        input.checked = activityNotificationsEnabled;
+        status.textContent = activityNotificationsEnabled ? 'On for this page. One notification per prolonged activity interval.' : 'Permission was not granted. The dashboard warning remains available.';
+        if (activityNotificationsEnabled) renderLiveActivity();
+      } catch (_) {
+        input.checked = false; status.textContent = 'Notifications could not be enabled.';
+      }
+    }
 
     function activityView(source, now = Date.now()) {
       const result = {state:'unknown', label:'Activity unavailable', detail:'', warning:''};
@@ -2424,6 +2477,25 @@
       document.getElementById('live-activity-label').textContent = view.label;
       document.getElementById('live-activity-detail').textContent = view.detail;
       document.getElementById('live-activity-warning').textContent = view.warning;
+      const age = (Date.now() - Date.parse(activitySource?.last_update)) / 1000;
+      document.getElementById('activity-refresh-status').textContent = activityRefreshMs !== null ?
+        'Activity request: ' + Math.round(activityRefreshMs) + ' ms' +
+        (Number.isFinite(age) && age >= 0 ? ' · sample ' + Math.floor(age) + 's old' : '') +
+        '. Browser request timing; not audio delay.' : 'Activity refresh timing unavailable.';
+      if (activityNotificationsEnabled && view.warning) {
+        const origin = activitySource.tx_origin;
+        const key = JSON.stringify([origin.started_at,origin.source_type,origin.source_node,origin.candidate_nodes]);
+        if (key !== lastActivityNotification) {
+          try {
+            new Notification('BlueNode: prolonged activity', {body:'Activity has been observed for over five minutes. Check the dashboard.',tag:'bluenode-prolonged-activity'});
+            lastActivityNotification = key;
+          } catch (_) {
+            activityNotificationsEnabled = false;
+            document.getElementById('activity-notifications').checked = false;
+            document.getElementById('activity-notification-status').textContent = 'Notification delivery failed. The dashboard warning remains available.';
+          }
+        }
+      }
     }
 
     async function loadLiveActivity() {
@@ -2431,12 +2503,15 @@
       activityLoading = true;
       const controller = new AbortController();
       const deadline = setTimeout(() => controller.abort(), 4000);
+      const requestStarted = typeof performance !== 'undefined' ? performance.now() : Date.now();
       try {
         const response = await fetch('/state/radio_activity.json?ts=' + Date.now(), {signal:controller.signal});
         if (!response.ok) throw new Error('Activity unavailable');
         activitySource = await response.json();
+        activityRefreshMs = Math.max(0, (typeof performance !== 'undefined' ? performance.now() : Date.now()) - requestStarted);
       } catch (error) {
         activitySource = null;
+        activityRefreshMs = null;
       } finally {
         clearTimeout(deadline);
         activityLoading = false;
@@ -2535,7 +2610,7 @@
     }
 
     function rememberNodeControl(action, result, controlScope = savedNodeScope) {
-      if (!savedNodeScope || controlScope !== savedNodeScope || !['node-connect','dodropin-connect'].includes(action) || result.ok !== true ||
+      if (!savedNodeScope || controlScope !== savedNodeScope || !['node-connect','dodropin-connect','node-switch'].includes(action) || result.ok !== true ||
           !['verified','already_satisfied'].includes(result.outcome) || !validSavedNode(result.node) || result.node === savedNodeScope) return;
       savedNodeData.recent = [{node:result.node,used_at:Date.now()}, ...savedNodeData.recent.filter(item=>item.node !== result.node)].slice(0,8);
       persistSavedNodes();
@@ -3302,6 +3377,7 @@
           if (peer && peer[3] === transition[2].toLowerCase()) source = 'Via node ' + (peer[1] || peer[2]);
         }
         const time = Date.parse(timestamp);
+        if (source && Number.isFinite(time)) record.source = source;
         if (!rawOnly && source && Number.isFinite(time)) {
           if (transition[2] === 'START') {
             pending = {record, source, time, index:records.length};
@@ -3309,6 +3385,7 @@
             if (pending && pending.source === source && time >= pending.time) {
               records[pending.index] = null;
               record.event = 'RADIO.TRANSMISSION';
+              record.intervalSeconds = (time - pending.time) / 1000;
               record.message = source + ' · ' + Math.round((time - pending.time) / 1000) + ' sec recorded interval' +
                 (transition[1] === 'REMOTE_TX' ? ' · original source unknown' : '');
               record.raw = [...pending.record.raw, line];
@@ -3325,7 +3402,35 @@
       return records.filter(Boolean).reverse();
     }
 
+    function summarizeActivity(records, now = Date.now()) {
+      const sources = new Map();
+      for (const record of records) {
+        const at = Date.parse(record.timestamp);
+        if (!record.source || !Number.isFinite(at) || at > now) continue;
+        const row = sources.get(record.source) || {source:record.source, intervals:0, seconds:0, incomplete:0, last:at};
+        row.last = Math.max(row.last, at);
+        if (Number.isFinite(record.intervalSeconds) && record.intervalSeconds >= 0) {
+          row.intervals++; row.seconds += record.intervalSeconds;
+        } else row.incomplete++;
+        sources.set(record.source, row);
+      }
+      return Array.from(sources.values()).sort((a,b)=>b.last-a.last);
+    }
+
+    function renderActivityHistory() {
+      const element = document.getElementById('activity-history-summary');
+      if (eventHistoryError) { element.textContent = 'Activity history unavailable.'; return; }
+      const rows = summarizeActivity(eventRecords(eventText));
+      if (!rows.length) { element.textContent = 'No attributable radio records in the retained history.'; return; }
+      element.innerHTML = rows.slice(0,20).map(row => `<div class="event-row"><div class="event-content">
+        <strong>${escapeHtml(row.source)}</strong><div class="event-message">${row.intervals} complete intervals · ${Math.round(row.seconds)} sec recorded
+        ${row.incomplete ? ' · ' + row.incomplete + ' unmatched records' : ''}</div>
+        <div class="sub">Last record: ${escapeHtml(new Date(row.last).toLocaleString())}</div></div></div>`).join('') +
+        (rows.length > 20 ? '<p class="sub">Showing the 20 most recently observed sources.</p>' : '');
+    }
+
     function renderEvents() {
+      renderActivityHistory();
       const container = document.getElementById('events');
       if (eventHistoryError) { container.textContent = eventHistoryError; return; }
       const openKeys = new Set(Array.from(container.querySelectorAll('details[open]')).map(item => item.dataset.eventKey));

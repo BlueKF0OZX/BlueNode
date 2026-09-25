@@ -54,7 +54,40 @@ this record were then applied and tested.
 These are short supervised private-peer checks, not live RF acceptance, external
 HTTPS/proxy acceptance, or an endurance run. No production deployment is included.
 
-## Incomplete or outside this evaluation
+## September 25 switching and history follow-up
+
+Explicit node switching holds the web control lock across source disconnection,
+destination connection, and final fresh-state verification. Failed phases stop
+the workflow without retries or rollback. Unrelated links are never targeted.
+The dashboard preserves both targets through sign-in and labels failure phases.
+
+In the isolated ASL3 lab, six alternating switches between private dummy peers
+passed while a third link remained connected. An absent destination produced a
+connecting-phase failure with saved diagnostics; recovery passed. Repeated
+already-satisfied requests and invalid same-node requests behaved as expected.
+The Asterisk process identity was unchanged during the test sequence and install.
+Temporary dummy peers required a lab-only Asterisk restart during preparation;
+this precedes the measured sequence. All 236 Python tests passed on Linux as the
+unprivileged service user. One earlier suite invocation did not complete; the
+subsequent verbose run completed in 9.6 seconds without failures.
+
+Mobile controls use two columns with maintained touch targets. Observed history
+summarizes complete retained intervals and unmatched records per attributable
+source; it is not an active-node directory or an exact audio-duration measurement.
+Notifications are off by default, require browser permission from an explicit
+opt-in, and apply while the page remains open. Stale observations never notify;
+each prolonged interval generates at most one notification per page session.
+Browser request timing is labeled separately from audio latency.
+
+The isolated release tree passed 233 Python tests on Windows with three platform
+skips, and all 11 JavaScript/browser suites, including all five viewport widths.
+Public-tree and whitespace checks passed. Counts differ from the mixed working
+tree because unrelated local work is excluded from this branch.
+
+The radio history and notification checks use synthetic observations. Physical
+RF/audio, external HTTPS, and endurance acceptance remain outstanding.
+
+## Remaining acceptance
 
 - The proposed 24-hour stability run was stopped after eight samples. It is
   **incomplete**, not a pass. Sustained resource trends and loaded-dashboard

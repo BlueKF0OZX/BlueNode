@@ -187,6 +187,11 @@ function fixture(detailed) {
       assert.equal(await page.locator('#events details').evaluate(e=>e.open),true,'refresh preserves expanded raw records');
       assert.equal((await geometry()).overflow,false,`raw event overflow at ${width}`);
       await page.locator('#operational-events-panel').screenshot({path:path.join(output,`${width}-event-history.png`)});
+      await page.locator('.activity-history > summary').click();
+      assert.match(await page.locator('#activity-history-summary').innerText(), /complete intervals/);
+      assert.equal((await geometry()).overflow,false,`activity summary overflow at ${width}`);
+      await page.locator('.activity-history').screenshot({path:path.join(output,`${width}-activity-summary.png`)});
+      await page.locator('.activity-history > summary').click();
       await page.locator('#events-raw').check();
       assert.equal(await page.locator('#events .event-row').count(),2);
       assert.match(await page.locator('#events pre').first().innerText(),/RADIO.REMOTE_TX.END/);
