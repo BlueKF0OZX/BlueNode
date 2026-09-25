@@ -40,6 +40,7 @@ for cmd in ip ping getent systemd-analyze; do
   command -v "$cmd" >/dev/null || fail "Required command not found: $cmd (install iproute2, iputils-ping, libc-bin, systemd)"
 done
 [[ -f "$REPO_ROOT/install/validate-config.py" ]] || fail "Missing config validator"
+[[ -f "$REPO_ROOT/install/quickstart.py" ]] || fail "Missing guided setup helper"
 
 [[ -f "${REPO_ROOT}/config/nodesmart.example.json" ]] || fail "Missing config/nodesmart.example.json"
 [[ -f "${REPO_ROOT}/systemd/nodesmart.service" ]] || fail "Missing systemd/nodesmart.service"
@@ -152,6 +153,7 @@ if [[ "${REPO_ROOT}" != "${INSTALL_ROOT}" ]]; then
   install -m 0755 "${REPO_ROOT}/install/remote-access.sh" "${INSTALL_ROOT}/install/remote-access.sh"
   install -m 0755 "${REPO_ROOT}/install/tailscale-funnel.sh" "${INSTALL_ROOT}/install/tailscale-funnel.sh"
   install -m 0755 "${REPO_ROOT}/install/remote-admin-init.py" "${INSTALL_ROOT}/install/remote-admin-init.py"
+  install -m 0755 "${REPO_ROOT}/install/quickstart.py" "${INSTALL_ROOT}/install/quickstart.py"
   install -m 0755 "${REPO_ROOT}/install/remote-admin.sh" "${INSTALL_ROOT}/install/remote-admin.sh"
   install -m 0755 "${REPO_ROOT}/install/soft-radio-rx.sh" "${INSTALL_ROOT}/install/soft-radio-rx.sh"
   install -m 0755 "${REPO_ROOT}/install/soft-radio-transaction.sh" "${INSTALL_ROOT}/install/soft-radio-transaction.sh"
