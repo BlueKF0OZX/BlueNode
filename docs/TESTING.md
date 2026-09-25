@@ -15,6 +15,9 @@ Use an installed Python 3.11+ interpreter. POSIX file-security and terminal test
 
 ```sh
 node core/test_dashboard.js
+node core/test_live_activity.js
+node core/test_event_history.js
+node core/test_saved_nodes.js
 node core/test_fresh_dashboard.js
 node core/test_remote_access.js
 node core/test_dashboard_render.js
@@ -42,3 +45,16 @@ python3 deploy/test_skywarn_upstream.py /path/to/SkywarnPlus.py
 ```
 
 The clean-install fixture requires Debian namespace/chroot tools and the dependencies in [Installation](INSTALL.md). The source-specific weather check requires the operator-selected upstream source; it isolates its collection function with synthetic requests. Neither check establishes live RF/audio correctness. Do not perform disruptive validation on an operating AllStar node.
+
+## Automated pull request checks
+
+The BlueNode checks workflow runs on pull requests and pushes to main or codex
+branches. Core regression runs Python 3.11 on Linux using only the public example
+configuration. Dashboard regression runs every core/test_*.js suite with pinned
+Playwright and Chromium; node observations and controls are synthetic. Repository
+checks run the public-tree scan and disposable deployment-tool fixtures on Windows.
+The workflow has read-only repository permission and no deployment credentials.
+It does not install BlueNode on an operating node or certify live radio behavior.
+
+The branch-protection check names are Core regression, Dashboard regression,
+and Repository checks. Require them only after their first successful GitHub run.

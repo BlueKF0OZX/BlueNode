@@ -27,6 +27,21 @@ class LinkStatusTests(unittest.TestCase):
         sample = dict(self.sample, links=[])
         self.assertEqual(reconcile(sample, HEADER), sample)
 
+    def test_transport_only_pending_peer_is_not_established_activity(self):
+        sample = dict(self.sample, links=[])
+        result = reconcile(sample, HEADER + '23456 192.0.2.1 0 OUT 00:00:09:842 CONNECTING\n')
+        self.assertEqual(result['links'], [{'node':'23456', 'mode':'C', 'keyed':False}])
+        self.assertEqual(classify(result)['connected_nodes'], [])
+        self.assertEqual(classify(result)['remote_rx_nodes'], [])
+        self.assertIsNone(reconcile(sample, HEADER + '23456 192.0.2.1 0 OUT 00:00:09:842 ESTABLISHED\n'))
+
+    def test_existing_link_and_transport_only_pending_peer(self):
+        result = reconcile(self.sample, HEADER +
+                           '23456 192.0.2.1 0 OUT 00:01:00 ESTABLISHED\n' +
+                           '34567 192.0.2.2 0 OUT 00:00:09:842 CONNECTING\n')
+        self.assertEqual([link['mode'] for link in result['links']], ['T','C'])
+        self.assertEqual(classify(result)['connected_nodes'], ['23456'])
+
     def test_racing_and_invalid_observations_are_unavailable(self):
         valid = '23456 192.0.2.1 0 OUT 00:01:00 ESTABLISHED\n'
         for output in ['', 'Command not found', HEADER, HEADER + valid + valid,

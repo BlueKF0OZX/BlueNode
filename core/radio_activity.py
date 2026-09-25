@@ -211,22 +211,39 @@ def update(sample, now=None):
     current["last_update"] = now.isoformat()
     current["stale_after_seconds"] = STALE_SECONDS
 
+    # A collector gap must not turn two separate observations into one long
+    # transmission. Retain the historical last observation, but reset timers.
+    def age(value):
+        try:
+            return (now - datetime.fromisoformat(value)).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            return -1
+
+    previous_age = age(previous.get('last_update'))
+    continuous = 0 <= previous_age <= STALE_SECONDS
+    last_active = previous.get('last_active_at')
+    if age(last_active) >= 0:
+        current['last_active_at'] = last_active
+    if current['tx_origin']['active']:
+        current['last_active_at'] = now.isoformat()
+
     previous_identity = _identity(previous)
     current_identity = _identity(current)
-    if current_identity == previous_identity and current["status"] not in ("idle", "unavailable"):
+    if continuous and current_identity == previous_identity and current["status"] not in ("idle", "unavailable"):
         current["started_at"] = previous.get("started_at", now.isoformat())
     elif current["status"] not in ("idle", "unavailable"):
         current["started_at"] = now.isoformat()
     if current["tx_origin"]["active"]:
-        if (_origin_identity(current) == _origin_identity(previous)
-                and previous.get("tx_origin", {}).get("started_at")):
+        if (continuous and _origin_identity(current) == _origin_identity(previous)
+                and age(previous.get("tx_origin", {}).get("started_at")) >= 0):
             origin_started = previous["tx_origin"]["started_at"]
         else:
             origin_started = now.isoformat()
         current["tx_origin"]["started_at"] = origin_started
 
-    if previous_identity != current_identity:
-        ended = _transition_event(previous, "END")
+    if previous_identity != current_identity or not continuous:
+        interrupted = not continuous or current['status'] == 'unavailable'
+        ended = _transition_event(previous, "INTERRUPTED" if interrupted else "END")
         started = _transition_event(current, "START")
         if ended:
             emit(*ended)

@@ -18,8 +18,13 @@ def reconcile(sample, output):
                 or fields[5] not in ('ESTABLISHED', 'CONNECTING') or fields[0] in states):
             return None
         states[fields[0]] = fields[5]
-    if set(states) != {link['node'] for link in sample['links']}:
+    variable_nodes = {link['node'] for link in sample['links']}
+    transport_only = set(states) - variable_nodes
+    # App_Rpt omits a not-yet-established outbound transport from RPT_ALINKS.
+    # Retain it as pending, never as an established or keyed connection.
+    if variable_nodes - set(states) or any(states[node] != 'CONNECTING' for node in transport_only):
         return None
     return dict(sample, links=[
         dict(link, mode='C', keyed=False) if states[link['node']] != 'ESTABLISHED' else dict(link)
-        for link in sample['links']])
+        for link in sample['links']] + [
+        {'node': node, 'mode': 'C', 'keyed': False} for node in sorted(transport_only)])

@@ -494,7 +494,7 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
 
 
-        if action in ('node-connect', 'node-disconnect', 'dodropin-connect', 'dodropin-disconnect'):
+        if action in ('node-connect', 'node-disconnect', 'node-switch', 'dodropin-connect', 'dodropin-disconnect'):
             payload = self.read_json()
             status, result = node_controls.perform(action, payload, CONFIG)
             ADMIN.audit(action, result.get('outcome', 'rejected'))

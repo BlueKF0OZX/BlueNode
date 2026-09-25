@@ -205,7 +205,7 @@
 
     }
 
-    #manual-node-number {
+    #manual-node-number, #switch-from-node {
 
       min-width: 0;
 
@@ -225,7 +225,7 @@
 
     }
 
-    #manual-node-number:focus {
+    #manual-node-number:focus, #switch-from-node:focus {
 
       border-color: #9ca3af;
 
@@ -239,7 +239,7 @@
 
       }
 
-      #manual-node-number {
+      #manual-node-number, #switch-from-node {
 
         grid-column: 1 / -1;
 
@@ -829,13 +829,13 @@
     .control-button:disabled { opacity: 0.55; cursor: not-allowed; }
     .control-button.emergency-enter, .control-button.admin-danger { background: #7f1d1d; border-color: #df7777; color: #fff1f2; }
     .control-button.emergency-enter:hover, .control-button.admin-danger:hover { background: #991b1b; }
-    #manual-node-number:focus-visible, #node-directory-search:focus-visible,
+    #manual-node-number:focus-visible, #switch-from-node:focus-visible, #node-directory-search:focus-visible,
     button:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible,
     [tabindex="0"]:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
     .manual-node-control, .node-directory { margin-top: 20px; padding-top: 16px; }
     .manual-node-control h3, .node-directory h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
     .manual-node-row, .node-search-row { gap: 10px; }
-    #manual-node-number, #node-directory-search, .admin-field { min-width: 0; min-height: 44px; font-size: 16px; line-height: 1.4; border-color: #526078; }
+    #manual-node-number, #switch-from-node, #node-directory-search, .admin-field { min-width: 0; min-height: 44px; font-size: 16px; line-height: 1.4; border-color: #526078; }
     .node-search-row { grid-template-columns: minmax(0, 1fr) auto; }
     .admin-field { flex: 1 1 180px; }
     .admin-row { gap: 10px; margin-top: 14px; }
@@ -870,6 +870,9 @@
       .controls-panel, .events-panel, .automation-panel, .behavior-panel,
       .remote-admin-panel, .soft-radio-panel { padding: 16px; }
       .controls-heading { align-items: stretch; }
+      .controls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .controls-grid .control-button { padding: 8px; overflow-wrap: anywhere; }
+      .saved-nodes-panel, .manual-node-control, .node-directory { margin-top: 14px; padding-top: 12px; }
       .controls-heading .emergency-enter { width: 100%; margin-top: 4px; }
       .admin-row .control-button { flex: 1 1 140px; }
       .event-row { flex-direction: column; gap: 5px; }
@@ -884,6 +887,27 @@
       .node-search-row { grid-template-columns: 1fr; }
     }
 
+    .live-activity { margin-top: 10px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+    .event-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .saved-nodes-panel { margin-top: 20px; border-top: 1px solid #526078; padding-top: 16px; }
+    .saved-nodes-panel h3 { font-size: 14px; margin: 0 0 8px; }
+    .saved-node-list h4 { font-size: 13px; margin: 12px 0 8px; color: #a8b4c7; }
+    .saved-node-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .saved-node-row span { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+    .saved-node-row .control-button { padding: 10px 14px; }
+    .favorite-save-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .favorite-save-row input { flex: 1 1 180px; width: auto; }
+    @media (max-width: 480px) { .saved-node-row span { flex-basis: 100%; } }
+    .event-filters .control-button { padding: 10px 14px; }
+    .event-filters [aria-pressed="true"] { background: #1d4ed8; color: #fff; }
+    .event-raw-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; }
+    #events-scope { margin-bottom: 12px; }
+    #events summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: #93c5fd; }
+    #events pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
+    #live-activity-label { color: #a8b4c7; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .live-activity[data-state="active"] #live-activity-label { color: #5ee6ae; }
+    #live-activity-detail { color: #a8b4c7; font-size: 12px; }
+    #live-activity-warning { color: #ffcb70; font-size: 12px; }
 </style>
 
 </head>
@@ -974,6 +998,12 @@
         <div class="label">Connected Nodes</div>
 
         <div id="nodes" class="value">Waiting for first observation</div>
+
+        <div id="live-activity" class="live-activity" data-state="unknown">
+          <div id="live-activity-label" role="status">Activity unavailable</div>
+          <div id="live-activity-detail"></div>
+          <div id="live-activity-warning" role="status"></div>
+        </div>
 
       </div>
 
@@ -1113,6 +1143,14 @@
       <p id="dodropin-control-help" style="display:none">DODROPIN mapping is unavailable. Configure friendly_nodes or enter the node number under Manual Node Connection.</p>
       <p id="skywarn-control-help">SkywarnPlus integration is read-only. Enable or disable it directly in SkywarnPlus.</p>
 
+      <div class="saved-nodes-panel">
+        <h3>Favorites &amp; Recent Nodes</h3>
+        <p id="saved-nodes-help" class="sub">Saved in this browser, separately for each local node.</p>
+        <div id="saved-node-favorites" class="saved-node-list">Waiting for node identity.</div>
+        <div id="saved-node-recents" class="saved-node-list"></div>
+        <div id="saved-nodes-message" role="status" class="sub"></div>
+      </div>
+
       <div class="manual-node-control">
 
         <h3>Manual Node Connection</h3>
@@ -1159,6 +1197,21 @@
       </div>
 
 
+
+      <div class="manual-node-control">
+        <h3>Switch nodes</h3>
+        <p>Disconnect only the node below, then connect to the number entered above. Other links stay connected.</p>
+        <div class="manual-node-row">
+          <input id="switch-from-node" type="text" inputmode="numeric" maxlength="10"
+                 placeholder="Node to leave" aria-label="Node to disconnect when switching" autocomplete="off">
+          <button class="control-button" onclick="runNodeControl('node-switch', this)">Switch nodes</button>
+        </div>
+      </div>
+
+      <div class="favorite-save-row">
+        <input id="favorite-node-label" class="admin-field" type="text" maxlength="48" placeholder="Favorite name (optional)" aria-label="Favorite name (optional)">
+        <button class="control-button" onclick="saveFavoriteNode()">Save node as favorite</button>
+      </div>
 
       <div class="node-directory">
 
@@ -1341,6 +1394,24 @@
 
       <h2>Recent Events</h2>
 
+      <details class="activity-history">
+        <summary>Observed activity history</summary>
+        <p class="sub">Summaries of retained radio records. Times are observed intervals, not exact audio duration. A peer identifies the incoming link, not the original transmitter. History does not indicate who is active now.</p>
+        <div id="activity-history-summary">Waiting for event history.</div>
+        <p id="activity-refresh-status" class="sub">Activity refresh timing unavailable.</p>
+        <label class="event-raw-toggle"><input id="activity-notifications" type="checkbox" onchange="toggleActivityNotifications(this)"> Notify me about activity over five minutes</label>
+        <p id="activity-notification-status" class="sub">Off. Notifications apply while this page is open.</p>
+      </details>
+
+      <div class="event-filters" role="group" aria-label="Filter events">
+        <button type="button" class="control-button" id="events-filter-all" aria-pressed="true" onclick="setEventFilter('all')">All</button>
+        <button type="button" class="control-button" id="events-filter-connections" aria-pressed="false" onclick="setEventFilter('connections')">Connections</button>
+        <button type="button" class="control-button" id="events-filter-radio" aria-pressed="false" onclick="setEventFilter('radio')">Radio</button>
+        <button type="button" class="control-button" id="events-filter-system" aria-pressed="false" onclick="setEventFilter('system')">System</button>
+      </div>
+      <label class="event-raw-toggle"><input id="events-raw" type="checkbox" onchange="renderEvents()"> Show individual raw events</label>
+      <div id="events-scope" class="sub"></div>
+
       <div id="events">Loading events...</div>
 
     </div>
@@ -1453,7 +1524,7 @@
     let adminLoginBusy = false;
     const pendingAdminActions = new Set(['admin-refresh-diagnostics', 'admin-restart-monitor', 'admin-restart-asterisk']);
     const ordinaryActions = new Set(['dodropin-connect', 'dodropin-disconnect',
-      'skywarn-enable', 'skywarn-disable', 'node-connect', 'node-disconnect',
+      'skywarn-enable', 'skywarn-disable', 'node-connect', 'node-disconnect', 'node-switch',
       'emergency-enable', 'emergency-disable', 'maintenance-enable', 'maintenance-disable']);
     function validateControl(action, payload) {
       if (pendingAdminActions.has(action)) {
@@ -1465,6 +1536,12 @@
       }
       if (!ordinaryActions.has(action)) throw new Error('Unsupported control');
       const keys = Object.keys(payload);
+      if (action === 'node-switch') {
+        if (keys.length !== 2 || !keys.includes('node') || !keys.includes('from_node') ||
+            ![payload.node, payload.from_node].every(value => typeof value === 'string' && /^\d{1,10}$/.test(value)) ||
+            payload.node === payload.from_node) throw new Error('Enter two different valid remote node numbers');
+        return Object.freeze({...payload});
+      }
       if (action.startsWith('node-')) {
         if (keys.length !== 1 || keys[0] !== 'node' || typeof payload.node !== 'string' ||
             !/^\d{1,10}$/.test(payload.node)) throw new Error('Invalid node number');
@@ -1479,6 +1556,7 @@
         'admin-refresh-diagnostics':'refresh diagnostics', 'admin-restart-monitor':'restart the BlueNode monitor',
         'admin-restart-asterisk':'restart Asterisk'};
       return action === 'node-connect' ? 'connect to node ' + payload.node :
+        action === 'node-switch' ? 'disconnect node ' + payload.from_node + ' and connect to node ' + payload.node :
         action === 'node-disconnect' ? 'disconnect node ' + payload.node : labels[action];
     }
     function showControlLogin() {
@@ -1720,6 +1798,7 @@
     });
 
     async function runControl(action, button) {
+      const controlNodeScope = savedNodeScope;
       const resultElement = document.getElementById('control-result');
       const originalText = button.textContent;
 
@@ -1737,6 +1816,7 @@
         }
 
         resultElement.textContent = 'Command completed successfully.';
+        rememberNodeControl(action, result, controlNodeScope);
 
         setTimeout(loadStatus, 1000);
       } catch (error) {
@@ -1747,13 +1827,16 @@
       }
     }
 
-    async function runNodeControl(action, button) {
+    async function runNodeControl(action, button, selectedNode = null) {
+      const controlNodeScope = savedNodeScope;
 
       const input = document.getElementById('manual-node-number');
 
       const resultElement = document.getElementById('control-result');
 
-      const node = input.value.trim();
+      const node = selectedNode === null ? input.value.trim() : selectedNode;
+      const payload = action === 'node-switch' ?
+        {node, from_node:document.getElementById('switch-from-node').value.trim()} : {node};
 
       const originalText = button.textContent;
 
@@ -1781,7 +1864,7 @@
 
       try {
 
-        const response = await requestOrdinaryControl(action, {node});
+        const response = await requestOrdinaryControl(action, payload);
 
         const result = await response.json();
 
@@ -1796,6 +1879,7 @@
 
 
         resultElement.textContent = result.message;
+        rememberNodeControl(action, result, controlNodeScope);
 
         setTimeout(loadStatus, 1000);
 
@@ -2316,6 +2400,239 @@
       }
     }
 
+    // Live activity is polled independently of slower health/intelligence calls.
+    let activitySource = null;
+    let activityLoading = false;
+    let activityRefreshMs = null;
+    let activityNotificationsEnabled = false;
+    let lastActivityNotification = null;
+
+    async function toggleActivityNotifications(input) {
+      activityNotificationsEnabled = false;
+      const status = document.getElementById('activity-notification-status');
+      if (!input.checked) { status.textContent = 'Off. Notifications apply while this page is open.'; return; }
+      if (typeof Notification === 'undefined') {
+        input.checked = false; status.textContent = 'Notifications are unavailable in this browser or connection.'; return;
+      }
+      try {
+        const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+        if (!input.checked) return;
+        activityNotificationsEnabled = permission === 'granted';
+        input.checked = activityNotificationsEnabled;
+        status.textContent = activityNotificationsEnabled ? 'On for this page. One notification per prolonged activity interval.' : 'Permission was not granted. The dashboard warning remains available.';
+        if (activityNotificationsEnabled) renderLiveActivity();
+      } catch (_) {
+        input.checked = false; status.textContent = 'Notifications could not be enabled.';
+      }
+    }
+
+    function activityView(source, now = Date.now()) {
+      const result = {state:'unknown', label:'Activity unavailable', detail:'', warning:''};
+      const stamp = value => typeof value === 'string' ? Date.parse(value) : NaN;
+      const age = now - stamp(source?.last_update);
+      const limit = Math.min(30, Math.max(1, Number(source?.stale_after_seconds) || 6)) * 1000;
+      const lastAge = now - stamp(source?.last_active_at);
+      const elapsed = seconds => {
+        const whole = Math.max(0, Math.floor(seconds));
+        return Math.floor(whole / 60).toString().padStart(2, '0') + ':' + (whole % 60).toString().padStart(2, '0');
+      };
+      if (Number.isFinite(lastAge) && lastAge >= 0) {
+        const seconds = Math.floor(lastAge / 1000);
+        result.detail = 'Last activity observed ' + (seconds < 60 ? seconds + 's' :
+          seconds < 3600 ? Math.floor(seconds / 60) + 'm' : Math.floor(seconds / 3600) + 'h') + ' ago';
+      }
+      if (!source || source.telemetry_available !== true || source.stale === true ||
+          !Number.isFinite(age) || age < 0 || age > limit) return result;
+      const origin = source.tx_origin;
+      if (source.status === 'idle' && origin?.active === false && origin?.source_type === 'none') {
+        result.state = 'idle'; result.label = 'IDLE';
+        if (!result.detail) result.detail = 'No activity observed yet';
+        return result;
+      }
+      if (origin?.active !== true) return result;
+      let label;
+      if (origin.source_type === 'remote_link' && origin.path_scope === 'immediate_peer' &&
+          /^[0-9]{1,10}$/.test(origin.source_node)) {
+        label = 'RECEIVING';
+        result.detail = 'Via node ' + origin.source_node + ' · original source unknown';
+      } else if (origin.source_type === 'local_rf') {
+        label = 'LOCAL RECEIVER ACTIVE'; result.detail = 'Audio from the local receiver';
+      } else if (origin.source_type === 'ambiguous') {
+        label = 'MULTIPLE SOURCES ACTIVE'; result.detail = 'Audio source cannot be isolated';
+      } else if (origin.source_type === 'internal_or_unknown') {
+        label = 'NODE TRANSMITTING'; result.detail = 'Source unknown or generated by the node';
+      } else return result;
+      const start = stamp(origin.started_at);
+      const duration = (now - start) / 1000;
+      const validDuration = Number.isFinite(duration) && duration >= 0 && start <= stamp(source.last_update);
+      result.state = 'active';
+      result.label = label + (validDuration ? ' · ' + elapsed(duration) : '');
+      if (validDuration && duration >= 300) result.warning = 'Activity over 5 minutes — check the link';
+      return result;
+    }
+
+    function renderLiveActivity() {
+      const view = activityView(activitySource);
+      document.getElementById('live-activity').dataset.state = view.state;
+      document.getElementById('live-activity-label').textContent = view.label;
+      document.getElementById('live-activity-detail').textContent = view.detail;
+      document.getElementById('live-activity-warning').textContent = view.warning;
+      const age = (Date.now() - Date.parse(activitySource?.last_update)) / 1000;
+      document.getElementById('activity-refresh-status').textContent = activityRefreshMs !== null ?
+        'Activity request: ' + Math.round(activityRefreshMs) + ' ms' +
+        (Number.isFinite(age) && age >= 0 ? ' · sample ' + Math.floor(age) + 's old' : '') +
+        '. Browser request timing; not audio delay.' : 'Activity refresh timing unavailable.';
+      if (activityNotificationsEnabled && view.warning) {
+        const origin = activitySource.tx_origin;
+        const key = JSON.stringify([origin.started_at,origin.source_type,origin.source_node,origin.candidate_nodes]);
+        if (key !== lastActivityNotification) {
+          try {
+            new Notification('BlueNode: prolonged activity', {body:'Activity has been observed for over five minutes. Check the dashboard.',tag:'bluenode-prolonged-activity'});
+            lastActivityNotification = key;
+          } catch (_) {
+            activityNotificationsEnabled = false;
+            document.getElementById('activity-notifications').checked = false;
+            document.getElementById('activity-notification-status').textContent = 'Notification delivery failed. The dashboard warning remains available.';
+          }
+        }
+      }
+    }
+
+    async function loadLiveActivity() {
+      if (activityLoading) return;
+      activityLoading = true;
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), 4000);
+      const requestStarted = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      try {
+        const response = await fetch('/state/radio_activity.json?ts=' + Date.now(), {signal:controller.signal});
+        if (!response.ok) throw new Error('Activity unavailable');
+        activitySource = await response.json();
+        activityRefreshMs = Math.max(0, (typeof performance !== 'undefined' ? performance.now() : Date.now()) - requestStarted);
+      } catch (error) {
+        activitySource = null;
+        activityRefreshMs = null;
+      } finally {
+        clearTimeout(deadline);
+        activityLoading = false;
+        renderLiveActivity();
+      }
+    }
+
+    // Browser-local preferences are scoped to the observed local node identity.
+    let savedNodeScope = null;
+    let savedNodeData = {favorites:[], recent:[]};
+    let savedNodeNames = {};
+    let savedNodeStorageAvailable = true;
+    const validSavedNode = value => typeof value === 'string' && /^[0-9]{1,10}$/.test(value);
+
+    function cleanSavedNodes(value, local, now = Date.now()) {
+      const favorites = [], recent = [];
+      if (value && typeof value === 'object') {
+        for (const item of Array.isArray(value.favorites) ? value.favorites.slice(0, 100) : []) {
+          if (validSavedNode(item?.node) && item.node !== local && !favorites.some(entry => entry.node === item.node)) {
+            favorites.push({node:item.node, label:typeof item.label === 'string' ? item.label.trim().slice(0,48) : ''});
+          }
+        }
+        for (const item of Array.isArray(value.recent) ? value.recent.slice(0, 100) : []) {
+          if (validSavedNode(item?.node) && item.node !== local && Number.isFinite(item.used_at) && item.used_at >= 0 && item.used_at <= now) {
+            const old = recent.find(entry => entry.node === item.node);
+            if (old) old.used_at = Math.max(old.used_at, item.used_at);
+            else recent.push({node:item.node,used_at:item.used_at});
+          }
+        }
+      }
+      return {favorites:favorites.slice(0,20),recent:recent.sort((a,b)=>b.used_at-a.used_at).slice(0,8)};
+    }
+
+    function persistSavedNodes() {
+      if (!savedNodeScope) return;
+      try {
+        localStorage.setItem('bluenode:nodes:v1:' + savedNodeScope, JSON.stringify(savedNodeData));
+        savedNodeStorageAvailable = true;
+      }
+      catch (_) { savedNodeStorageAvailable = false; }
+      renderSavedNodes();
+    }
+
+    function configureSavedNodes(local, names) {
+      if (!validSavedNode(local)) return;
+      savedNodeNames = names && typeof names === 'object' ? names : {};
+      if (savedNodeScope !== local) {
+        savedNodeScope = local;
+        savedNodeData = {favorites:[],recent:[]};
+        savedNodeStorageAvailable = true;
+        try {
+          const raw = localStorage.getItem('bluenode:nodes:v1:' + local);
+          if (raw && raw.length <= 32768) savedNodeData = cleanSavedNodes(JSON.parse(raw), local);
+        } catch (_) { savedNodeStorageAvailable = false; }
+      }
+      renderSavedNodes();
+    }
+
+    function renderSavedNodes() {
+      document.getElementById('saved-nodes-help').textContent = savedNodeStorageAvailable
+        ? 'Saved in this browser, separately for each local node. Connect adds a link; it does not disconnect other nodes.'
+        : 'Browser storage unavailable; changes last for this page only. Connect adds a link.';
+      const row = (item, favorite) => {
+        const label = item.label || (typeof savedNodeNames[item.node] === 'string' ? savedNodeNames[item.node].slice(0,48) : '') || 'Node ' + item.node;
+        return `<div class="saved-node-row"><span>${escapeHtml(label)}${label === 'Node ' + item.node ? '' : ' (' + item.node + ')'}</span>
+          <button class="control-button" onclick="connectSavedNode('${item.node}', this)" aria-label="Connect node ${item.node}">Connect</button>
+          ${favorite ? `<button class="control-button" onclick="removeFavoriteNode('${item.node}')" aria-label="Remove favorite node ${item.node}">Remove</button>` : ''}</div>`;
+      };
+      for (const [id, markup] of [
+        ['saved-node-favorites', '<h4>Favorites</h4>' + (savedNodeData.favorites.map(item=>row(item,true)).join('') || '<p class="sub">Enter a node below to save your first favorite.</p>')],
+        ['saved-node-recents', '<h4>Recent</h4>' + (savedNodeData.recent.map(item=>row(item,false)).join('') || '<p class="sub">Verified connections will appear here.</p>')]
+      ]) {
+        const element = document.getElementById(id);
+        if (element.dataset.markup !== markup) { element.innerHTML = markup; element.dataset.markup = markup; }
+      }
+    }
+
+    function saveFavoriteNode() {
+      const node = document.getElementById('manual-node-number').value.trim();
+      const output = document.getElementById('saved-nodes-message');
+      if (!savedNodeScope) { output.textContent = 'Wait for the local node identity before saving favorites.'; return; }
+      if (!validSavedNode(node) || node === savedNodeScope) { output.textContent = 'Enter a valid remote node number.'; return; }
+      const label = document.getElementById('favorite-node-label').value.trim().slice(0,48);
+      const old = savedNodeData.favorites.find(item=>item.node === node);
+      if (old) old.label = label;
+      else if (savedNodeData.favorites.length < 20) savedNodeData.favorites.push({node,label});
+      else { output.textContent = 'Favorites is full. Remove a node before adding another.'; return; }
+      persistSavedNodes();
+      output.textContent = 'Favorite saved' + (savedNodeStorageAvailable ? '.' : ' for this page only.');
+    }
+
+    function removeFavoriteNode(node) {
+      savedNodeData.favorites = savedNodeData.favorites.filter(item=>item.node !== node);
+      persistSavedNodes();
+      document.getElementById('saved-nodes-message').textContent = 'Favorite removed.';
+    }
+
+    function rememberNodeControl(action, result, controlScope = savedNodeScope) {
+      if (!savedNodeScope || controlScope !== savedNodeScope || !['node-connect','dodropin-connect','node-switch'].includes(action) || result.ok !== true ||
+          !['verified','already_satisfied'].includes(result.outcome) || !validSavedNode(result.node) || result.node === savedNodeScope) return;
+      savedNodeData.recent = [{node:result.node,used_at:Date.now()}, ...savedNodeData.recent.filter(item=>item.node !== result.node)].slice(0,8);
+      persistSavedNodes();
+    }
+
+    function connectSavedNode(node, button) {
+      if (!validSavedNode(node) || node === savedNodeScope || !savedNodeScope ||
+          ![...savedNodeData.favorites,...savedNodeData.recent].some(item=>item.node === node)) return;
+      return runNodeControl('node-connect', button, node);
+    }
+
+    function observeRecentNodes(sessions) {
+      if (!savedNodeScope || !Array.isArray(sessions)) return;
+      const recent = sessions.slice(0,50).map(session=>({node:String(session?.node || ''),
+        used_at:typeof session?.disconnected_at === 'string' ? Date.parse(session.disconnected_at) : NaN}));
+      const cleaned = cleanSavedNodes({favorites:savedNodeData.favorites, recent:[...savedNodeData.recent,...recent]},savedNodeScope);
+      if (JSON.stringify(cleaned.recent) !== JSON.stringify(savedNodeData.recent)) {
+        savedNodeData = cleaned;
+        persistSavedNodes();
+      }
+    }
+
     let statusLoading = false;
     async function loadStatus() {
       if (statusLoading) return;
@@ -2333,6 +2650,7 @@
           throw new Error('Monitoring snapshot is stale or has an invalid timestamp');
         }
         // Weather/status comes from the fast monitoring snapshot, before auxiliary requests.
+        configureSavedNodes(String(data.node || ''), data.friendly_nodes);
         setValue('skywarn', data.skywarn);
         renderWeather(data.weather_alerts);
 
@@ -2681,6 +2999,7 @@
         }
 
         const connectionStats = data.connection_stats || {};
+        if (connectionStats.state_available !== false) observeRecentNodes(connectionStats.recent_sessions);
         connectionsObserved = connectionStats.state_available !== false && allstarObserved && data.radio_activity?.telemetry_available === true && data.radio_activity?.stale === false &&
           Array.isArray(data.connected_nodes) && ['connections_today','connected_seconds_today','active_connections',
             'completed_connections_today','completed_connected_seconds_today'].every(k => Number.isFinite(connectionStats[k]) && connectionStats[k] >= 0) &&
@@ -3025,10 +3344,131 @@
 
 
     let eventsExpanded = false;
+    let eventFilter = 'all';
+    let eventText = '';
+    let eventHistoryError = '';
+
+    function setEventFilter(filter) {
+      if (!['all', 'connections', 'radio', 'system'].includes(filter)) return;
+      eventFilter = filter;
+      eventsExpanded = false;
+      for (const name of ['all', 'connections', 'radio', 'system']) {
+        document.getElementById('events-filter-' + name).setAttribute('aria-pressed', String(name === filter));
+      }
+      renderEvents();
+    }
+
+    function eventRecords(text, rawOnly = false) {
+      const records = [];
+      let pending = null;
+      for (const line of text.split('\n').filter(line => line.trim())) {
+        const parts = line.replace(/\r$/, '').split(' | ');
+        const timestamp = parts[0] || '';
+        const event = parts[1] || '';
+        const message = parts.slice(2).join(' | ');
+        const category = /^RADIO\./.test(event) ? 'radio' :
+          /^(?:NODE\.(?:CONNECTED|DISCONNECTED)|CONNECT\.|DISCONNECT\.|CONTROL\.(?:NODE|DODROPIN)\.)/.test(event) ? 'connections' : 'system';
+        const record = {timestamp, event, message, category, raw:[line], key:timestamp + '|' + event + '|' + message};
+        const transition = /^RADIO\.(LOCAL_RX|REMOTE_TX)\.(START|END)$/.exec(event);
+        let source = null;
+        if (transition?.[1] === 'LOCAL_RX' && message === 'Local receiver ' + transition[2].toLowerCase()) source = 'Local receiver';
+        if (transition?.[1] === 'REMOTE_TX') {
+          const peer = /^Adjacent peer (?:Node ([0-9]{1,10})|.+ \(([0-9]{1,10})\)) audio (start|end); ultimate transmitter unknown$/.exec(message);
+          if (peer && peer[3] === transition[2].toLowerCase()) source = 'Via node ' + (peer[1] || peer[2]);
+        }
+        const time = Date.parse(timestamp);
+        if (source && Number.isFinite(time)) record.source = source;
+        if (!rawOnly && source && Number.isFinite(time)) {
+          if (transition[2] === 'START') {
+            pending = {record, source, time, index:records.length};
+          } else {
+            if (pending && pending.source === source && time >= pending.time) {
+              records[pending.index] = null;
+              record.event = 'RADIO.TRANSMISSION';
+              record.intervalSeconds = (time - pending.time) / 1000;
+              record.message = source + ' · ' + Math.round((time - pending.time) / 1000) + ' sec recorded interval' +
+                (transition[1] === 'REMOTE_TX' ? ' · original source unknown' : '');
+              record.raw = [...pending.record.raw, line];
+              record.key = pending.record.key + '|' + timestamp;
+            }
+            pending = null;
+          }
+        } else if (category === 'radio' || /STARTED|STOPPED|RESTART|DISCONNECT/.test(event)) {
+          // Never bridge collector interruptions, restarts, or ambiguous sources.
+          pending = null;
+        }
+        records.push(record);
+      }
+      return records.filter(Boolean).reverse();
+    }
+
+    function summarizeActivity(records, now = Date.now()) {
+      const sources = new Map();
+      for (const record of records) {
+        const at = Date.parse(record.timestamp);
+        if (!record.source || !Number.isFinite(at) || at > now) continue;
+        const row = sources.get(record.source) || {source:record.source, intervals:0, seconds:0, incomplete:0, last:at};
+        row.last = Math.max(row.last, at);
+        if (Number.isFinite(record.intervalSeconds) && record.intervalSeconds >= 0) {
+          row.intervals++; row.seconds += record.intervalSeconds;
+        } else row.incomplete++;
+        sources.set(record.source, row);
+      }
+      return Array.from(sources.values()).sort((a,b)=>b.last-a.last);
+    }
+
+    function renderActivityHistory() {
+      const element = document.getElementById('activity-history-summary');
+      if (eventHistoryError) { element.textContent = 'Activity history unavailable.'; return; }
+      const rows = summarizeActivity(eventRecords(eventText));
+      if (!rows.length) { element.textContent = 'No attributable radio records in the retained history.'; return; }
+      element.innerHTML = rows.slice(0,20).map(row => `<div class="event-row"><div class="event-content">
+        <strong>${escapeHtml(row.source)}</strong><div class="event-message">${row.intervals} complete intervals · ${Math.round(row.seconds)} sec recorded
+        ${row.incomplete ? ' · ' + row.incomplete + ' unmatched records' : ''}</div>
+        <div class="sub">Last record: ${escapeHtml(new Date(row.last).toLocaleString())}</div></div></div>`).join('') +
+        (rows.length > 20 ? '<p class="sub">Showing the 20 most recently observed sources.</p>' : '');
+    }
+
+    function renderEvents() {
+      renderActivityHistory();
+      const container = document.getElementById('events');
+      if (eventHistoryError) { container.textContent = eventHistoryError; return; }
+      const openKeys = new Set(Array.from(container.querySelectorAll('details[open]')).map(item => item.dataset.eventKey));
+      const emergencyPattern = /EMERGENCY|ASTERISK|CONNECT|DISCONNECT|INTERNET|DNS|GATEWAY|ALLSTAR|SKYWARN|INCIDENT|RECOVERY|AUTOMATION|CONTROL/i;
+      const rawOnly = document.getElementById('events-raw').checked;
+      const records = eventRecords(eventText, rawOnly);
+      const filtered = records.filter(record =>
+        (eventFilter === 'all' || record.category === eventFilter) &&
+        (!emergencyModeState.active || eventFilter !== 'all' || emergencyPattern.test(record.event)));
+      document.getElementById('events-scope').textContent = emergencyModeState.active && eventFilter === 'all'
+        ? 'Emergency view: operational events. Select Radio for radio history.' : '';
+      const shown = eventsExpanded ? filtered : filtered.slice(0, 10);
+      if (!shown.length) {
+        container.textContent = eventText.trim() ? 'No events match this filter.' : 'No event history yet.';
+        return;
+      }
+      container.innerHTML = shown.map(record => {
+        let eventClass = 'event-info';
+        if (/\.(FAILED|FAULT|CRITICAL|OFFLINE)/.test(record.event)) eventClass = 'event-critical';
+        else if (/\.(DEGRADED|WARNING|CANCELLED|INTERRUPTED)/.test(record.event)) eventClass = 'event-warning';
+        else if (/\.(SUCCESS|HEALTHY|NORMAL|ONLINE|ENABLED)/.test(record.event)) eventClass = 'event-success';
+        const time = new Date(record.timestamp);
+        const displayTime = Number.isNaN(time.getTime()) ? record.timestamp : time.toLocaleString([], {
+          month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        const rawText = `<pre>${escapeHtml(record.raw.join('\n'))}</pre>`;
+        const raw = rawOnly ? rawText : `<details data-event-key="${escapeHtml(record.key)}" ${openKeys.has(record.key) ? 'open' : ''}>
+          <summary>View raw ${record.raw.length > 1 ? 'records' : 'record'}</summary>${rawText}</details>`;
+        return `<div class="event-row ${eventClass}"><div class="event-time">${escapeHtml(displayTime)}</div>
+          <div class="event-content"><div class="event-name">${escapeHtml(record.event.replaceAll('.', ' ').replaceAll('_', ' '))}</div>
+          <div class="event-message">${escapeHtml(record.message)}</div>${raw}</div></div>`;
+      }).join('');
+      if (filtered.length > 10) container.innerHTML += `<div style="text-align:center; margin-top:16px;">
+        <button type="button" class="control-button" onclick="toggleEvents()">${eventsExpanded ? 'Show Less' : 'Show More'}</button></div>`;
+    }
 
     function toggleEvents() {
       eventsExpanded = !eventsExpanded;
-      loadEvents();
+      renderEvents();
     }
 
     let eventsLoading = false;
@@ -3042,119 +3482,21 @@
 
         const response = await fetch('/logs/events.log?ts=' + Date.now(), {signal: controller.signal});
         if (response.status === 404) {
+          eventText = '';
+          eventHistoryError = '';
           document.getElementById('events').textContent = 'No event history yet.';
           return;
         }
         if (!response.ok) throw new Error('Event history unavailable');
 
-        const text = await response.text();
-
-
-
-        const allLines = text
-          .trim()
-          .split('\n')
-          .filter(Boolean)
-          .reverse();
-
-        const emergencyPattern = /EMERGENCY|ASTERISK|CONNECT|DISCONNECT|INTERNET|DNS|GATEWAY|ALLSTAR|SKYWARN|INCIDENT|RECOVERY|AUTOMATION|CONTROL/i;
-        const operationalLines = emergencyModeState.active
-          ? allLines.filter(line => emergencyPattern.test(line))
-          : allLines;
-        const lines = eventsExpanded
-          ? operationalLines
-          : operationalLines.slice(0, 10);
-
-
-
-        const container = document.getElementById('events');
-
-
-
-        if (!lines.length) {
-
-          container.textContent = 'No recent events.';
-
-          return;
-
-        }
-
-
-
-        container.innerHTML = lines
-          .map(line => {
-            const parts = line.split(' | ');
-            const timestamp = parts[0] || '';
-            const event = parts[1] || '';
-            const message = parts.slice(2).join(' | ');
-
-            let eventClass = 'event-info';
-
-            if (
-              event.includes('.FAILED') ||
-              event.includes('.FAULT') ||
-              event.includes('.CRITICAL') ||
-              event.includes('.OFFLINE')
-            ) {
-              eventClass = 'event-critical';
-            } else if (
-              event.includes('.DEGRADED') ||
-              event.includes('.WARNING') ||
-              event.includes('.CANCELLED')
-            ) {
-              eventClass = 'event-warning';
-            } else if (
-              event.includes('.SUCCESS') ||
-              event.includes('.HEALTHY') ||
-              event.includes('.NORMAL') ||
-              event.includes('.ONLINE') ||
-              event.includes('.ENABLED')
-            ) {
-              eventClass = 'event-success';
-            }
-
-            let displayTime = timestamp;
-            const parsedTime = new Date(timestamp);
-
-            if (!Number.isNaN(parsedTime.getTime())) {
-              displayTime = parsedTime.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-              });
-            }
-
-            const label = event
-              .replaceAll('.', ' ')
-              .replaceAll('_', ' ');
-
-            return `
-              <div class="event-row ${eventClass}">
-                <div class="event-time">${escapeHtml(displayTime)}</div>
-                <div class="event-content">
-                  <div class="event-name">${escapeHtml(label)}</div>
-                  <div class="event-message">${escapeHtml(message)}</div>
-                </div>
-              </div>
-            `;
-          })
-          .join('');
-
-        if (operationalLines.length > 10) {
-          container.innerHTML += `
-            <div style="text-align:center; margin-top:16px;">
-              <button type="button" class="control-button" onclick="toggleEvents()"
-                style="padding:10px 18px; border:0; border-radius:8px; cursor:pointer;">
-                ${eventsExpanded ? 'Show Less' : 'Show More'}
-              </button>
-            </div>
-          `;
-        }
-
-
+        eventText = await response.text();
+        eventHistoryError = '';
+        renderEvents();
 
       } catch (err) {
 
+        eventText = '';
+        eventHistoryError = 'Unable to load event history.';
         document.getElementById('events').textContent =
 
           'Unable to load event history.';
@@ -3171,12 +3513,15 @@
       document.querySelectorAll('button, input, select, textarea').forEach(element => { element.disabled = true; });
     } else {
     loadStatus();
+    loadLiveActivity();
     loadAdminSession();
     loadEvents();
 
 
 
     setInterval(loadStatus, 2000);
+    setInterval(loadLiveActivity, 2000);
+    setInterval(renderLiveActivity, 1000);
     // Expire local presentation even if an unrelated HTTP request stalls a refresh.
     setInterval(() => renderWeather(weatherSource), 2000);
 

@@ -1,0 +1,61 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const html = fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
+const elements = {};
+const element = id => elements[id] ||= {textContent:'',innerHTML:'',value:'',dataset:{}};
+const storage = new Map();
+const commands = [];
+const context = vm.createContext({Date,document:{getElementById:element},
+  localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},
+  runNodeControl:(...args)=>commands.push(args),
+  escapeHtml:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))});
+vm.runInContext(html.slice(html.indexOf('    // Browser-local preferences'),html.indexOf('    let statusLoading')),context);
+const data = () => JSON.parse(storage.get('bluenode:nodes:v1:12345'));
+context.configureSavedNodes('12345',{});
+element('manual-node-number').value='23456';
+element('favorite-node-label').value='<img src=x onerror=alert(1)>';
+context.saveFavoriteNode();
+assert.equal(data().favorites.length,1);
+assert.match(element('saved-node-favorites').innerHTML,/&lt;img/);
+assert.doesNotMatch(element('saved-node-favorites').innerHTML,/<img/);
+element('favorite-node-label').value='Example';
+context.saveFavoriteNode();
+assert.equal(data().favorites.length,1,'saving again updates, not duplicates');
+assert.equal(data().favorites[0].label,'Example');
+context.connectSavedNode('23456',{});
+assert.equal(commands[0][0],'node-connect');
+assert.equal(commands[0][2],'23456','saved target is passed explicitly');
+for (const value of ['12345','evil','99999']) context.connectSavedNode(value,{});
+assert.equal(commands.length,1);
+context.rememberNodeControl('node-connect',{ok:false,outcome:'unverified',node:'23456'});
+assert.equal(data().recent.length,0);
+context.rememberNodeControl('node-connect',{ok:true,outcome:'verified',node:'23456'},'99999');
+assert.equal(data().recent.length,0,'a response from a different local-node scope is not recorded');
+context.rememberNodeControl('node-disconnect',{ok:true,outcome:'verified',node:'23456'});
+assert.equal(data().recent.length,0);
+context.rememberNodeControl('node-connect',{ok:true,outcome:'verified',node:'23456'});
+assert.equal(data().recent[0].node,'23456');
+context.observeRecentNodes([{node:'34567',disconnected_at:new Date(Date.now()-10000).toISOString()},
+  {node:'45678',disconnected_at:'bad'},{node:'56789',disconnected_at:new Date(Date.now()+60000).toISOString()}]);
+assert.equal(data().recent.length,2);
+assert.equal(data().recent[0].node,'23456');
+context.configureSavedNodes('54321',{});
+assert.doesNotMatch(element('saved-node-favorites').innerHTML,/Example/);
+context.configureSavedNodes('12345',{});
+assert.match(element('saved-node-favorites').innerHTML,/Example/);
+context.removeFavoriteNode('23456');
+assert.equal(data().favorites.length,0);
+const clean=context.cleanSavedNodes({favorites:[null,{node:'12345'}, {node:'23456',label:'x'.repeat(80)},{node:'23456'}, {node:'<script>'}],
+  recent:Array.from({length:20},(_,i)=>({node:String(60000+i),used_at:i}))},'12345',100);
+assert.equal(clean.favorites.length,1);
+assert.equal(clean.favorites[0].label.length,48);
+assert.equal(clean.recent.length,8);
+assert.equal(clean.recent[0].used_at,19);
+context.localStorage.setItem=()=>{throw new Error('blocked');};
+context.saveFavoriteNode();
+assert.match(element('saved-nodes-message').textContent,/page only/);
+assert.match(element('saved-node-favorites').innerHTML,/Example/);
+console.log('PASS saved-node scope, persistence, validation, recents, escaping, and unavailable storage');

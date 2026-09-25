@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Added verified switching between explicit source/destination nodes, preserving unrelated links and reporting the failed phase when verification stops.
+- Added compact mobile controls, retained activity summaries, optional prolonged-activity browser notifications, and measured dashboard request timing.
+- Added browser-local favorites and recent nodes, scoped per local node, with quick-connect through the existing authenticated control flow. Recent nodes come from verified controls and recorded sessions, not activity estimates.
+- Added connection/radio/system event filters, paired radio records with recorded intervals, and expandable original records that remain open across refreshes.
+- Added receiving/idle status, an observed activity timer, last activity, and a five-minute activity warning inside the Connected Nodes card. Activity expires independently when telemetry becomes stale.
 - Opening the dashboard directly from a local file now explains how to reach the live node, without polling unavailable endpoints or showing misleading emergency status.
 
 - Added a previewable troubleshooting report under Smart Connectivity, with allowlisted health/resource/check data and no logs, identities, addresses, or configuration.
@@ -12,7 +17,7 @@
 - Centered dashboard cards and improved mobile touch targets, diagnostic explanations, and Emergency Mode guidance.
 - Node controls verify resulting App_Rpt state, including already-satisfied and unverified outcomes.
 - SkywarnPlus is strictly read-only; former On/Off controls no longer execute SkywarnPlus.
-- Clarified local-receiver and adjacent-peer limits; Radio Activity stays absent from the dashboard.
+- Clarified local-receiver and adjacent-peer limits; activity is integrated into Connected Nodes rather than a separate dashboard panel.
 - Improved installation prerequisites, configuration errors, and upgrade/rollback guidance.
 
 ### Security
@@ -23,6 +28,12 @@
 
 ### Reliability
 
+- Recognize outbound CONNECTING transports before App_Rpt adds them to link variables; preserve pending status and suppress duplicate connect commands during peer outages.
+
+- Mark lost radio observations and collector gaps as interruptions, rather than ordinary transmission ends; do not pair event records across interruptions or restart markers.
+- Reset observed transmission timers after collector gaps or clock reversals, and preserve the last observed activity across idle samples.
+- Wait for an existing pending connection instead of sending a duplicate connect command.
+- Preserve bounded, structured link-control failure snapshots and distinguish pending links, lost observation, command rejection, and verification deadlines.
 - Reconcile App_Rpt link variables with transport status so reconnecting peers are not reported as established connections.
 - Reject stale or invalid health timestamps in the dashboard instead of retaining a reassuring old snapshot.
 - Extend observation and installer fixtures for transport status; make session-expiration tests wait for actual admission before revocation.

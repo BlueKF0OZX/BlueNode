@@ -161,6 +161,47 @@ class RadioActivityTests(unittest.TestCase):
         self.state_file.write_text("not json")
         self.assertEqual(radio_activity.public_state(NOW)["status"], "unavailable")
 
+    def test_last_activity_survives_idle_and_unavailable_samples(self):
+        radio_activity.update(self.sample(local_rx=True), NOW)
+        last = NOW + timedelta(seconds=2)
+        radio_activity.update(self.sample(local_rx=True), last)
+        for sample in (self.sample(), None):
+            state = radio_activity.update(sample, NOW + timedelta(seconds=4))
+            self.assertEqual(state['last_active_at'], last.isoformat())
+
+    def test_collector_gap_resets_transmission_timer(self):
+        active = self.sample(local_rx=True)
+        radio_activity.update(active, NOW)
+        later = NOW + timedelta(seconds=radio_activity.STALE_SECONDS + 1)
+        state = radio_activity.update(active, later)
+        self.assertEqual(state['started_at'], later.isoformat())
+        self.assertEqual(state['tx_origin']['started_at'], later.isoformat())
+
+    def test_clock_reversal_drops_future_history_and_resets_timer(self):
+        radio_activity.update(self.sample(local_rx=True), NOW + timedelta(seconds=10))
+        state = radio_activity.update(self.sample(local_rx=True), NOW)
+        self.assertEqual(state['tx_origin']['started_at'], NOW.isoformat())
+        self.assertEqual(state['last_active_at'], NOW.isoformat())
+        state['last_active_at'] = 'not a timestamp'
+        radio_activity.save_state(state)
+        state = radio_activity.update(self.sample(), NOW + timedelta(seconds=2))
+        self.assertNotIn('last_active_at', state)
+
+    def test_observation_loss_is_interruption_not_normal_end(self):
+        with patch.object(radio_activity, 'emit') as emit:
+            radio_activity.update(self.sample(local_rx=True), NOW)
+            radio_activity.update(None, NOW + timedelta(seconds=2))
+        self.assertEqual([call.args[0] for call in emit.call_args_list],
+                         ['RADIO.LOCAL_RX.START', 'RADIO.LOCAL_RX.INTERRUPTED'])
+
+    def test_gap_between_active_samples_emits_interruption_and_new_start(self):
+        with patch.object(radio_activity, 'emit') as emit:
+            radio_activity.update(self.sample(local_rx=True), NOW)
+            radio_activity.update(self.sample(local_rx=True),
+                                  NOW + timedelta(seconds=radio_activity.STALE_SECONDS + 1))
+        self.assertEqual([call.args[0] for call in emit.call_args_list],
+                         ['RADIO.LOCAL_RX.START', 'RADIO.LOCAL_RX.INTERRUPTED', 'RADIO.LOCAL_RX.START'])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,6 +31,8 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
             if (protectedRequest) assert.equal(request.headers()['x-csrf-token'], 'fixture-csrf');
             if (url.pathname.startsWith('/api/control/emergency-')) emergency = url.pathname.endsWith('-enable');
             body = {ok:true,message:'Fixture accepted',emergency_mode:{active:emergency,mode:emergency?'emergency':'normal'},automation:{mode:'maintenance'}};
+            if (url.pathname === '/api/control/node-connect') Object.assign(body,
+              {outcome:'verified',node:JSON.parse(request.postData()).node});
           }
         } else if (url.pathname === '/api/admin/session') {
           body = {enabled:mode !== 'local',authenticated,csrf_token:authenticated?'fixture-csrf':null};
@@ -50,6 +52,11 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       await page.evaluate(() => loadAdminSession());
       await page.evaluate(() => { window.loginCalls = 0; window.adminLogin = () => { window.loginCalls++; }; });
       await page.locator('#manual-node-number').fill('12345');
+      await page.locator('#switch-from-node').fill('54321');
+      await page.evaluate(()=>configureSavedNodes('99999',{}));
+      await page.locator('#favorite-node-label').fill('Example favorite');
+      await page.getByRole('button',{name:'Save node as favorite',exact:true}).click();
+      assert.equal(posts.length,0,'saving a favorite must never send a radio control');
       allowConfirmation = false;
       const cancelledCount = posts.length;
       await page.locator('#emergency-enter').click();
@@ -59,6 +66,8 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         ['#btn-dodropin-connect','dodropin-connect'], ['#btn-dodropin-disconnect','dodropin-disconnect'],
         ['button[onclick="runNodeControl(\'node-connect\', this)"]','node-connect'],
         ['button[onclick="runNodeControl(\'node-disconnect\', this)"]','node-disconnect'],
+        ['button[onclick="runNodeControl(\'node-switch\', this)"]','node-switch'],
+        ['#saved-node-favorites button[onclick^="connectSavedNode"]','node-connect'],
         ['#emergency-enter','emergency-enable'], ['#maintenance-toggle','maintenance-enable']
       ];
       for (const [selector, action] of controls) {
@@ -72,13 +81,16 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         await page.waitForFunction(selector => !document.querySelector(selector).disabled, selector);
         assert.equal(posts.length, before + 1);
         assert.equal(posts.at(-1).path, '/api/control/' + action);
-        if (action.startsWith('node-')) assert.deepEqual(JSON.parse(posts.at(-1).body), {node:'12345'});
+        if (action.startsWith('node-')) assert.deepEqual(JSON.parse(posts.at(-1).body),
+          action === 'node-switch' ? {node:'12345',from_node:'54321'} : {node:'12345'});
         if (mode === 'signed-out') assert.match(await page.locator(action.startsWith('maintenance-') ? '#automation-action' : '#control-result').innerText(), /cancelled/);
       }
       assert.equal(await page.evaluate(() => window.loginCalls), 0, 'ordinary controls must not invoke login');
       assert.equal(await page.locator('#btn-skywarn-on').isDisabled(), true);
       assert.equal(await page.locator('#btn-skywarn-off').isDisabled(), true);
       assert.match(await page.locator('#skywarn-control-help').innerText(), /read-only/);
+      assert.equal(await page.locator('#saved-node-recents button[onclick^="connectSavedNode"]').count(),mode === 'signed-out' ? 0 : 1,
+        'only a verified connection enters recents');
       assert.equal(posts.some(request => request.path === '/api/admin/login'), false);
       if (mode !== 'signed-out') {
         await page.locator('button[onclick="toggleEmergencyMode(false, this)"]').click();
@@ -98,6 +110,11 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       await page.waitForFunction(()=>!controlRequestBusy);
       assert.equal(posts.at(-1).path, '/api/admin/action');
       assert.match(await page.locator('#admin-result').innerText(), authenticated ? /Fixture accepted/ : /cancelled/);
+      const beforeReload = posts.length;
+      await page.reload();
+      await page.evaluate(()=>configureSavedNodes('99999',{}));
+      assert.match(await page.locator('#saved-node-favorites').innerText(),/Example favorite/);
+      assert.equal(posts.length,beforeReload,'restoring favorites must not reconnect automatically');
       await page.close();
       console.log('PASS control routing: ' + mode);
     }

@@ -29,7 +29,7 @@ class WebAdminTests(unittest.TestCase):
         config = json.loads(self.config.read_text())
         config['session_seconds'] = 2592000
         self.config.write_text(json.dumps(config))
-        actions = ['node-connect', 'node-disconnect', 'dodropin-connect', 'dodropin-disconnect',
+        actions = ['node-connect', 'node-disconnect', 'node-switch', 'dodropin-connect', 'dodropin-disconnect',
                    'skywarn-enable', 'skywarn-disable', 'emergency-enable', 'emergency-disable',
                    'maintenance-enable', 'maintenance-disable']
         for action in actions:

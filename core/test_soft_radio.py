@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import soft_radio
+import remote_admin
 
 
 class Clock:
@@ -38,6 +39,8 @@ class SoftRadioTests(unittest.TestCase):
         self.config = Path(self.temp.name) / "soft-radio.json"
         self.patch = patch.object(soft_radio, "CONFIG_FILE", self.config)
         self.patch.start()
+        self.owner_patch = patch.object(remote_admin, 'CONFIG_OWNER_UID', getattr(os, 'geteuid', lambda: 0)())
+        self.owner_patch.start()
         self.clock = Clock()
         self.audit = []
         self.commands = []
@@ -48,6 +51,7 @@ class SoftRadioTests(unittest.TestCase):
     def tearDown(self):
         self.radio.stop()
         self.patch.stop()
+        self.owner_patch.stop()
         self.temp.cleanup()
 
     def runner(self, command, **_kwargs):
@@ -182,10 +186,14 @@ class SoftRadioTests(unittest.TestCase):
 
     def test_asterisk_media_is_received_without_upstream_media(self):
         server, asterisk = socket.socketpair()
+        asterisk.settimeout(2)
         received = []
         self.radio.broadcast = received.append
         thread = threading.Thread(target=self.radio._handle_asterisk,
                                   args=(server, ("127.0.0.1", 1234)))
+        self.addCleanup(thread.join, 2)
+        self.addCleanup(server.close)
+        self.addCleanup(asterisk.close)
         thread.start()
         credential = base64.b64encode(
             b"fixture_user:fixture-value-not-secret-12345").decode()

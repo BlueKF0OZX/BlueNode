@@ -1,6 +1,6 @@
 # Validation status
 
-Review date: 2026-09-13. Status: unreleased alpha candidate for supervised early
+Review date: 2026-09-23. Status: unreleased alpha candidate for supervised early
 evaluation, not a production-certified release. Record the exact installed
 commit when reporting results. No new stable release or tag is implied.
 
@@ -23,7 +23,71 @@ working candidate tree containing the link-status fix; installation/reboot
 evidence from the earlier baseline is identified separately above. Results
 do not automatically cover another OS, package version, or future commit.
 
-## Incomplete or outside this evaluation
+## September 23 connection/activity follow-up
+
+The draft connection/activity branch was tested on two disposable Debian 12 / ASL3
+VMs with an internal-only peer network, outbound firewall restrictions, no radio
+hardware, and automatic recovery disabled. The initial installed revision was
+`c9e7255`; the pending-transport correction and test-fixture changes accompanying
+this record were then applied and tested.
+
+- Three real connect/disconnect cycles and repeated already-satisfied requests
+  passed through the dashboard control API.
+- With the peer stopped, App_Rpt exposed an outbound CONNECTING transport before
+  adding it to its link variables. The corrected reconciliation retains that
+  transport as pending. Both attempts returned a pending result; the second
+  attempt sent **no duplicate command**, as recorded in the failure diagnostics.
+- After the peer restarted, a connect/disconnect recovery cycle passed.
+- Stopping only the collector for eight seconds left the web service available
+  and produced observation age above the six-second activity expiry threshold.
+  Collection resumed after restart. This checks the live data path; stale display
+  behavior is covered by the dashboard suites using synthetic observations.
+- The local Asterisk process identity remained unchanged across installation,
+  BlueNode restarts, controls, peer outage, and collector interruption. Operator
+  configuration was preserved by installation.
+- All **230 Python tests passed on Linux** as the service user. Windows passed
+  227 with three platform-specific skips. A media-test fixture now uses the test
+  user's ownership and a bounded socket wait; production permission checks are
+  unchanged. The preceding dashboard validation passed all 11 suites, including
+  five display widths; this follow-up changes no dashboard code.
+
+These are short supervised private-peer checks, not live RF acceptance, external
+HTTPS/proxy acceptance, or an endurance run. No production deployment is included.
+
+## September 25 switching and history follow-up
+
+Explicit node switching holds the web control lock across source disconnection,
+destination connection, and final fresh-state verification. Failed phases stop
+the workflow without retries or rollback. Unrelated links are never targeted.
+The dashboard preserves both targets through sign-in and labels failure phases.
+
+In the isolated ASL3 lab, six alternating switches between private dummy peers
+passed while a third link remained connected. An absent destination produced a
+connecting-phase failure with saved diagnostics; recovery passed. Repeated
+already-satisfied requests and invalid same-node requests behaved as expected.
+The Asterisk process identity was unchanged during the test sequence and install.
+Temporary dummy peers required a lab-only Asterisk restart during preparation;
+this precedes the measured sequence. All 236 Python tests passed on Linux as the
+unprivileged service user. One earlier suite invocation did not complete; the
+subsequent verbose run completed in 9.6 seconds without failures.
+
+Mobile controls use two columns with maintained touch targets. Observed history
+summarizes complete retained intervals and unmatched records per attributable
+source; it is not an active-node directory or an exact audio-duration measurement.
+Notifications are off by default, require browser permission from an explicit
+opt-in, and apply while the page remains open. Stale observations never notify;
+each prolonged interval generates at most one notification per page session.
+Browser request timing is labeled separately from audio latency.
+
+The isolated release tree passed 233 Python tests on Windows with three platform
+skips, and all 11 JavaScript/browser suites, including all five viewport widths.
+Public-tree and whitespace checks passed. Counts differ from the mixed working
+tree because unrelated local work is excluded from this branch.
+
+The radio history and notification checks use synthetic observations. Physical
+RF/audio, external HTTPS, and endurance acceptance remain outstanding.
+
+## Remaining acceptance
 
 - The proposed 24-hour stability run was stopped after eight samples. It is
   **incomplete**, not a pass. Sustained resource trends and loaded-dashboard
