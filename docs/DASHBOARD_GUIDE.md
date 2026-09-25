@@ -38,7 +38,7 @@ Favorites are stored in this browser, separately for each local node. Another br
 
 ## Connection controls
 
-**Disconnect the current node when I connect to a new one:** an optional checkbox above manual Connect, off by default and remembered in this browser for each local node. With one link, Connect disconnects that node first and then connects to your new number. With no links, it connects normally. With several links, it asks you to enter the number of the node to leave; the other links stay connected. Connecting to the same node does not disconnect it. Favorites and Recent Nodes buttons keep their usual behavior. If disconnect fails, the new connection is not attempted; if the new connection fails after disconnecting, the old link is not restored automatically.
+**Auto-switch:** an optional ON/OFF toggle above manual Connect, off by default and remembered in this browser for each local node. With one link, Connect disconnects that node first and then connects to your new number. With no links, it connects normally. With several links, it asks you to enter the number of the node to leave; the other links stay connected. Connecting to the same node does not disconnect it. Favorites and Recent Nodes buttons keep their usual behavior. If disconnect fails, the new connection is not attempted; if the new connection fails after disconnecting, the old link is not restored automatically.
 
 - **Connect:** connects to the number in the main node box. Other links stay connected unless you enable the automatic-disconnect option above.
 - **Disconnect:** leaves the number in the main node box. It does not mean disconnect everything.
