@@ -21,7 +21,7 @@ If you have a blank Raspberry Pi, install ASL3 and get your radio working first:
 Copy this entire line into the node's terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.4-alpha.1/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.5-alpha.1/install/bootstrap.sh | sudo bash
 ```
 
 This downloads and runs the installer from the named alpha release. You can
@@ -72,7 +72,7 @@ is left alone, with directions to the manual guide.
 For an update to this release, use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.4-alpha.1/install/bootstrap.sh | sudo bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.5-alpha.1/install/bootstrap.sh | sudo bash -s -- --update
 ```
 
 Read the confirmation: an update replaces BlueNode code, including custom edits.
@@ -114,3 +114,7 @@ Never post passwords, private backup directories, or unreviewed setup logs.
 
 Advanced configuration: [Installation](INSTALL.md), [Configuration](CONFIGURATION.md),
 [Upgrade and recovery](UPGRADE.md).
+
+## Report a problem
+
+Please report problems during installation, after installation, or while using the dashboard through [GitHub Issues](https://github.com/BlueKF0OZX/BlueNode/issues/new). Include what you tried, what happened, and any error message, plus your BlueNode version and node hardware if known. Issues are public and require a GitHub account; remove passwords and private details from screenshots or troubleshooting reports before posting.

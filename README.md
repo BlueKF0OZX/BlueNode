@@ -2,7 +2,7 @@
 
 BlueNode is an open-source monitoring, control, intelligence, and automatic-recovery dashboard for AllStarLink v3 nodes.
 
-**Status:** 0.1.4-alpha.1 — alpha release for early testing.
+**Status:** 0.1.5-alpha.1 — alpha release for early testing.
 See [validation status](docs/VALIDATION_STATUS.md) for completed lab checks and
 remaining limits before choosing a version to evaluate.
 
@@ -48,7 +48,7 @@ AllStarLink v3 (Debian/systemd), Python 3.11 or newer, Asterisk with `rpt`, syst
 
 ### Windows: download, sign in, open your dashboard
 
-**[Download BlueNode Setup for Windows](https://github.com/BlueKF0OZX/BlueNode/releases/download/v0.1.4-alpha.1/BlueNode-Setup.exe)**
+**[Download BlueNode Setup for Windows](https://github.com/BlueKF0OZX/BlueNode/releases/download/v0.1.5-alpha.1/BlueNode-Setup.exe)**
 
 Open the app, enter your node's address and Linux login, confirm your station,
 then click **Install BlueNode** and **Open dashboard**. No terminal commands or
@@ -66,7 +66,7 @@ Windows may show an unknown-publisher warning. No separate .NET installation is 
 On an **existing working Debian 12 / ASL3 node**, open your SSH terminal and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.4-alpha.1/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/BlueKF0OZX/BlueNode/v0.1.5-alpha.1/install/bootstrap.sh | sudo bash
 ```
 
 The installer detects local nodes, asks for your callsign and dashboard access,
@@ -75,7 +75,7 @@ No configuration-file editing or second installer run is needed. Existing
 installations are checked and left unchanged unless you explicitly choose an update.
 
 **[Step-by-step setup and help →](docs/GET_STARTED.md)** ·
-[Read the downloader](install/bootstrap.sh) · [Download this release](https://github.com/BlueKF0OZX/BlueNode/releases/tag/v0.1.4-alpha.1)
+[Read the downloader](install/bootstrap.sh) · [Download this release](https://github.com/BlueKF0OZX/BlueNode/releases/tag/v0.1.5-alpha.1)
 
 New installs keep automatic recovery off. Home-network access requires explicit
 confirmation and is for trusted networks only; SSH-only access is the default.

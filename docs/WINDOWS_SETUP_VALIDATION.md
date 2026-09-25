@@ -3,6 +3,16 @@
 Release candidate: **0.1.3-alpha.1**, checked 2026-09-25. This is an early-testing
 alpha, not a claim of universal hardware compatibility.
 
+## 0.1.5-alpha.1 package refresh
+
+The 0.1.5-alpha.1 Windows executable passed a new self-contained build and
+runtime/embedded-package check. Every bundled file was compared byte-for-byte
+with the release source, including the new Favorites controls, Auto-switch,
+and dashboard guide. The tracked-source privacy check passed. The installer now also displays a feedback note and GitHub issue link. The installation
+engine and Windows connection/install logic are unchanged from the integration validation below;
+the full VM installation exercise was not repeated for this dashboard refresh.
+The same hardware and external-testing limits still apply.
+
 ## Completed
 
 - Built the self-contained Windows x64 executable with .NET SDK 8.0.425,

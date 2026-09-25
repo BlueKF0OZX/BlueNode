@@ -54,6 +54,9 @@ internal sealed class SetupWindow : Form
         var title = new Label { Text = "Your radio. One simple dashboard.", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 0, 0, 12) };
         title.Font = new Font("Segoe UI", 20, FontStyle.Bold); page.Controls.Add(title);
         page.Controls.Add(Note("BlueNode Setup  •  Windows  •  Early-testing alpha", 8));
+        page.Controls.Add(Note("Please report any problems during installation, after installation, or while using the dashboard.", 4));
+        var reportIssue = new LinkLabel { Text = "Report a problem on GitHub", AutoSize = true, Margin = new Padding(0, 0, 0, 12) };
+        reportIssue.LinkClicked += (_, _) => Launch("https://github.com/BlueKF0OZX/BlueNode/issues/new"); page.Controls.Add(reportIssue);
         page.Controls.Add(Note("Start with a working AllStarLink 3 node on Debian 12. This app adds BlueNode to it.\nYour computer and node need to be able to reach each other.", 18));
         AddRow(credentials, "Node address", host);
         AddRow(credentials, "Linux username", user);
