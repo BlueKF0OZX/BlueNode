@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5-alpha.1] - 2026-09-25
+
+- Bundle the latest dashboard in Windows and terminal installations.
+- Add Edit name and Disconnect to personal favorites; disconnecting keeps the favorite saved.
+- Add a remembered Auto-switch toggle to manual Connect, with clear ON/OFF feedback and a choice of peer when several are linked.
+- Replace the separate Switch nodes form and update the dashboard guide.
+- Open the dashboard guide in a separate tab.
+
 ## [0.1.4-alpha.1] - 2026-09-25
 
 - Added a plain-language guide explaining dashboard cards, controls, statistics, optional features, and the separate preset/Favorites/Recent Nodes lists.
