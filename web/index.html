@@ -2579,7 +2579,7 @@
         return `<div class="saved-node-row"><span>${escapeHtml(label)}${label === 'Node ' + item.node ? '' : ' (' + item.node + ')'}</span>
           <button class="control-button" onclick="connectSavedNode('${item.node}', this)" aria-label="Connect node ${item.node}">Connect</button>
           ${!favorite ? `<button class="control-button" onclick="disconnectSavedNode('${item.node}', this)" aria-label="Disconnect node ${item.node}">Disconnect</button>` : ''}
-          ${favorite ? `<button class="control-button" onclick="removeFavoriteNode('${item.node}')" aria-label="Remove favorite node ${item.node}">Remove</button>` : ''}</div>`;
+          ${favorite ? `<button class="control-button" onclick="editFavoriteNode('${item.node}')" aria-label="Edit name for favorite node ${item.node}">Edit name</button><button class="control-button" onclick="removeFavoriteNode('${item.node}')" aria-label="Remove favorite node ${item.node}">Remove</button>` : ''}</div>`;
       };
       for (const [id, markup] of [
         ['saved-node-favorites', '<h4>Favorites</h4>' + (savedNodeData.favorites.map(item=>row(item,true)).join('') || '<p class="sub">Enter a node below to save your first favorite.</p>')],
@@ -2602,6 +2602,17 @@
       else { output.textContent = 'Favorites is full. Remove a node before adding another.'; return; }
       persistSavedNodes();
       output.textContent = 'Favorite saved' + (savedNodeStorageAvailable ? '.' : ' for this page only.');
+    }
+
+    function editFavoriteNode(node) {
+      if (!savedNodeScope || !validSavedNode(node)) return;
+      const favorite = savedNodeData.favorites.find(item => item.node === node);
+      if (!favorite) return;
+      const name = prompt('Name for favorite node ' + node + ' (optional, up to 48 characters):', favorite.label);
+      if (name === null) return;
+      favorite.label = name.trim().slice(0,48);
+      persistSavedNodes();
+      document.getElementById('saved-nodes-message').textContent = 'Favorite name updated' + (savedNodeStorageAvailable ? '.' : ' for this page only.');
     }
 
     function removeFavoriteNode(node) {
