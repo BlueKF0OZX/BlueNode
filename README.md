@@ -26,7 +26,7 @@ Current dashboard with synthetic example observations. See [Testing](docs/TESTIN
 - Cached callsign and registered-location enrichment for active remote nodes
 - Cached layered diagnostics for LAN, gateway, DNS, Internet, and AllStar connectivity
 - Verified connect/disconnect and explicit node switching, with failed-phase diagnostics
-- Browser-local favorites and recent nodes, scoped to the monitored node
+- Favorites shared across phone and PC through the monitored node; browser-local recent nodes
 - Retained activity summaries and optional prolonged-activity notifications while the page is open
 - Optional DODROPIN controls and read-only SkywarnPlus observations
 - Event logging and incident correlation

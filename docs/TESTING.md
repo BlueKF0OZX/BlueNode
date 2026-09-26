@@ -18,6 +18,7 @@ node core/test_dashboard.js
 node core/test_live_activity.js
 node core/test_event_history.js
 node core/test_saved_nodes.js
+node core/test_shared_favorites_browser.js
 node core/test_fresh_dashboard.js
 node core/test_remote_access.js
 node core/test_dashboard_render.js
@@ -25,7 +26,19 @@ node core/test_control_auth.js
 node core/test_control_routing.js
 ```
 
-The last three need Playwright resolvable by Node and Chromium. BLUENODE_BROWSER_PATH can select an installed compatible browser. Rendering checks use 320, 390, 768, 1024, and 1440px and write screenshots to a temporary directory (or BLUENODE_RENDER_OUTPUT). No request reaches an actual node.
+The browser suites, including shared favorites and the last three listed above,
+need Playwright resolvable by Node and Chromium. BLUENODE_BROWSER_PATH can select
+an installed compatible browser. Rendering checks use 320, 390, 768, 1024, and
+1440px and write screenshots to a temporary directory (or BLUENODE_RENDER_OUTPUT).
+No request reaches an actual node.
+
+The shared-favorites browser suite starts the real Python HTTP/favorites service
+on loopback with temporary storage and uses separate phone/PC browser contexts.
+It verifies migration, save/rename/remove synchronization, automatic refresh,
+reload persistence, and touch targets. Set `BLUENODE_TEST_PYTHON` if Python is not
+on PATH (`python` on Windows, `python3` elsewhere). Other requests are fixtures;
+the suite never reaches an operating node. Backend tests cover concurrent edits,
+corrupt state, capacity, storage failure, authentication, CSRF, and origins.
 
 ## Repository and deployment fixtures
 

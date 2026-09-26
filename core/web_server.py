@@ -19,6 +19,7 @@ from config import load_config
 import automation
 import emergency_mode
 import node_controls
+import favorites
 from runtime_io import tail_lines
 from remote_admin import ADMIN, MAX_BODY_BYTES, _safe_config
 from soft_radio import activation_requested
@@ -104,6 +105,12 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/version":
             self.send_json(200, ADMIN._version())
+            return
+
+        if path == "/api/favorites":
+            if self.require_favorites_access():
+                status, result = favorites.read(ROOT, str(CONFIG.get('node', '')))
+                self.send_json(status, result)
             return
 
         if path == "/api/admin/session":
@@ -340,6 +347,24 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
             return None
 
+    def require_favorites_access(self, write=False):
+        policy = self.admin_policy()
+        if policy['state'] == 'CONFIG_ERROR':
+            self.send_json(503, {'ok': False, 'error': 'Remote Admin configuration error; favorites locked.'})
+            return False
+        if policy['state'] == 'ENABLED' and not self.require_admin(csrf=write):
+            return False
+        if write:
+            origin = self.headers.get('Origin')
+            parts = urlsplit(origin or '')
+            if (self.headers.get('Content-Type', '').split(';')[0].strip().lower() != 'application/json'
+                    or self.headers.get('Sec-Fetch-Site') == 'cross-site'
+                    or (origin is not None and (parts.scheme not in ('http', 'https')
+                        or parts.netloc.lower() != self.headers.get('Host', '').lower()))):
+                self.send_json(403, {'ok': False, 'error': 'Same-origin JSON request required.'})
+                return False
+        return True
+
     def send_admin_cookie(self, token, clear=False):
         config = self.admin_policy()
         parts = [f"bluenode_admin={'' if clear else token}", "Path=/", "HttpOnly",
@@ -354,6 +379,11 @@ class NodeSmartHandler(SimpleHTTPRequestHandler):
         self.__dict__.pop("_admin_policy", None)
 
         path = self.path.split("?", 1)[0]
+        if path == '/api/favorites':
+            if self.require_favorites_access(write=True):
+                status, result = favorites.update(ROOT, str(CONFIG.get('node', '')), self.read_json())
+                self.send_json(status, result)
+            return
         if path == "/api/admin/login":
             payload = self.read_json()
             if not isinstance(payload, dict) or set(payload) - {"username", "password"}:

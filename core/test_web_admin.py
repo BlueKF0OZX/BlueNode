@@ -24,6 +24,27 @@ class Result:
 
 
 class WebAdminTests(unittest.TestCase):
+    def test_shared_favorites_auth_csrf_origin_and_private_storage(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(web_server, 'ROOT', Path(directory)), patch.dict(web_server.CONFIG, {'node':'12345'}):
+            payload = {'local_node':'12345','revision':0,'operation':'save','item':{'node':'23456','label':'Example'}}
+            self.assertEqual(self.request('GET','/api/favorites')[0],200)
+            self.assertEqual(self.request('POST','/api/favorites',payload,{'Origin':'https://foreign.example'})[0],403)
+            self.assertEqual(self.request('POST','/api/favorites',payload,{'Sec-Fetch-Site':'cross-site'})[0],403)
+            self.enable()
+            self.assertEqual(self.request('GET','/api/favorites')[0],401)
+            self.assertEqual(self.request('POST','/api/favorites',payload)[0],401)
+            _, headers, login = self.request('POST','/api/admin/login',{'username':'operator',PASSWORD_KEY:'correct horse battery staple'})
+            cookie = {'Cookie':headers['Set-Cookie'].split(';',1)[0]}
+            self.assertEqual(self.request('POST','/api/favorites',payload,cookie)[0],403)
+            authorized = {**cookie,'X-CSRF-Token':login['csrf_token']}
+            with patch.object(web_server.node_controls,'perform') as control:
+                self.assertEqual(self.request('POST','/api/favorites',payload,authorized)[0],200)
+                self.assertEqual(self.request('GET','/api/favorites',headers=cookie)[2]['favorites'],[payload['item']])
+                control.assert_not_called()
+            self.config.write_text('{')
+            self.assertEqual(self.request('GET','/api/favorites',headers=cookie)[0],503)
+            self.assertEqual(self.request('POST','/api/favorites',payload,authorized)[0],503)
+
     def test_persistent_cookie_rotation_and_all_control_auth_guards(self):
         self.enable()
         config = json.loads(self.config.read_text())
