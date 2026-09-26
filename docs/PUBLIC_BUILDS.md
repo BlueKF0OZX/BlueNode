@@ -20,8 +20,10 @@ every installed file matches it.
 
 Shared monitoring, diagnostics, verified node controls, activity history, saved
 nodes, and responsive controls are included. Replace the example identity with
-your own. Favorites are stored in that browser, per monitored node, and do not
-automatically follow you to another phone or computer.
+your own. From 0.1.6-alpha.1, favorites and their names are stored on the monitored
+node and shared by its phone/PC dashboards. Import older browser favorites using
+the dashboard's explicit import button. Recent Nodes and Auto-switch remain
+browser preferences. Earlier releases used browser-only favorites.
 
 Weather observations need their documented optional integration. A customized
 station may show regional weather, an operating schedule, additional controls,

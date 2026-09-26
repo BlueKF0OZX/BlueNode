@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## [0.1.6-alpha.1] - 2026-09-26
 
 - Store favorites and their names on the node so phone and PC dashboards share the same list.
 - Import existing browser favorites explicitly, preserving names already saved on the node.
 - Reject conflicting edits from stale browsers, preserve data on storage errors, and protect shared favorites with the existing Remote Admin sign-in policy.
+- Show the favorites sign-in action for protected gateways that return an authentication-required HTTP 403 response.
 - Add contributor/security guidance, private vulnerability reporting, and a pull-request checklist.
 
 ## [0.1.5-alpha.1] - 2026-09-25

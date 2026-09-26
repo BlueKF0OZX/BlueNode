@@ -7,6 +7,7 @@ const html = fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 const source = html.slice(html.indexOf('    // Browser-local preferences'),html.indexOf('    let statusLoading'));
 let shared = {ok:true,local_node:'12345',revision:0,favorites:[]};
 let failure = 0;
+let authRequired = false;
 const writes = [], commands = [];
 function device() {
   const elements = {}, storage = new Map();
@@ -29,7 +30,7 @@ function device() {
           shared.revision++; data = structuredClone(shared);
         }
       }
-      return {ok:status===200,status,json:async()=>status===200?data:{error:'Request rejected; refresh and retry.'}};
+      return {ok:status===200,status,json:async()=>status===200?data:{error:'Request rejected; refresh and retry.',auth_required:authRequired}};
     },
     escapeHtml:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))});
   vm.runInContext(source,context);
@@ -75,6 +76,10 @@ function device() {
   phone.element('manual-node-number').value='45678';await phone.context.saveFavoriteNode();
   assert.equal(writes.length,writeCount,'outage cannot create an unsynced local favorite');
   failure=0;await phone.context.loadSharedFavorites();
+  failure=403;authRequired=true;
+  await phone.context.loadSharedFavorites();
+  assert.match(phone.element('saved-nodes-help').textContent,/Sign in/,'gateway-compatible login response is recognized');
+  failure=0;authRequired=false;await phone.context.loadSharedFavorites();
   assert.equal(commands.length,0,'favorite edits never send radio commands');
   phone.context.connectSavedNode('34567',{});
   assert.equal(commands[0][0],'node-connect');assert.equal(commands[0][2],'34567');

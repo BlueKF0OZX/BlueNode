@@ -2655,7 +2655,8 @@
         const data = await response.json();
         if (scope !== savedNodeScope || request !== sharedFavoritesRequest) return;
         if (!response.ok) {
-          sharedFavoritesState = response.status === 401 ? 'signed-out' : 'unavailable';
+          sharedFavoritesState = response.status === 401 || (response.status === 403 && data.auth_required === true)
+            ? 'signed-out' : 'unavailable';
           throw new Error(data.error || 'Shared favorites unavailable.');
         }
         applySharedFavorites(data, scope);
@@ -2694,7 +2695,7 @@
         if (scope !== savedNodeScope || request !== sharedFavoritesRequest) return;
         if (!response.ok) {
           refresh = true;
-          if (response.status === 401) showControlLogin();
+          if (response.status === 401 || (response.status === 403 && data.auth_required === true)) showControlLogin();
           throw new Error(data.error || 'Favorite change failed.');
         }
         applySharedFavorites(data, scope);

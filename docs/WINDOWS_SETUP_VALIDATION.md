@@ -3,6 +3,31 @@
 Release candidate: **0.1.3-alpha.1**, checked 2026-09-25. This is an early-testing
 alpha, not a claim of universal hardware compatibility.
 
+## 0.1.6-alpha.1 release validation (September 26, 2026)
+
+- Rebuilt the self-contained Windows x64 executable and passed its embedded
+  package/runtime check. Every payload file matches release source, including
+  shared favorites and the authentication-required gateway fix.
+- Repeated actual Windows session tests against an isolated Debian 12 ASL3 VM:
+  key login, password login with password-required sudo, rejected password and
+  untrusted host, opening an existing installation, and fresh installation with
+  a deliberately disconnected/reconnected client. The private tunnel and station
+  identity passed. Asterisk process/configuration stayed unchanged.
+- Repeated actual guided update, injected installer failure with healthy rollback,
+  occupied-port refusal, failed fresh-install cleanup, successful fresh install,
+  and refusal to overwrite an existing installation. Radio identity/configuration
+  stayed unchanged through every phase.
+- All 268 Python tests passed in the isolated Linux fixture; the workstation run
+  passed with six platform skips. All three namespace-isolated deployment
+  scenarios, all 14 JavaScript suites, Windows deployment checks, and the
+  tracked-source privacy check passed.
+- Shared-favorites checks include two independent browser contexts and an
+  operator-confirmed phone/PC check on a reviewed customized installation. See
+  [the favorites validation record](SHARED_FAVORITES_VALIDATION.md).
+
+These checks support publishing an alpha for external testing. They do not
+establish universal compatibility or replace wider hardware/endurance testing.
+
 ## 0.1.5-alpha.1 package refresh
 
 The 0.1.5-alpha.1 Windows executable passed a new self-contained build and
