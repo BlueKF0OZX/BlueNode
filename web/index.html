@@ -1161,6 +1161,7 @@
         <h3>Favorites &amp; Recent Nodes</h3>
         <p id="saved-nodes-help" class="sub">Saved in this browser, separately for each local node.</p>
         <div id="saved-node-favorites" class="saved-node-list">Waiting for node identity.</div>
+        <button id="import-browser-favorites" class="control-button" hidden onclick="importBrowserFavorites()">Import this browser's favorites</button>
         <div id="saved-node-recents" class="saved-node-list"></div>
         <div id="saved-nodes-message" role="status" class="sub"></div>
       </div>
@@ -2555,6 +2556,12 @@
     let savedNodeData = {favorites:[], recent:[]};
     let savedNodeNames = {};
     let savedNodeStorageAvailable = true;
+    let browserFavorites = [];
+    let sharedFavoritesRevision = null;
+    let sharedFavoritesState = 'loading';
+    let sharedFavoritesRequest = 0;
+    let sharedFavoritesLoading = false;
+    let sharedFavoritesWriting = false;
     const validSavedNode = value => typeof value === 'string' && /^[0-9]{1,10}$/.test(value);
 
     function cleanSavedNodes(value, local, now = Date.now()) {
@@ -2579,7 +2586,8 @@
     function persistSavedNodes() {
       if (!savedNodeScope) return;
       try {
-        localStorage.setItem('bluenode:nodes:v1:' + savedNodeScope, JSON.stringify(savedNodeData));
+        localStorage.setItem('bluenode:nodes:v1:' + savedNodeScope,
+          JSON.stringify({favorites:browserFavorites, recent:savedNodeData.recent}));
         savedNodeStorageAvailable = true;
       }
       catch (_) { savedNodeStorageAvailable = false; }
@@ -2601,6 +2609,11 @@
       if (!validSavedNode(local)) return;
       savedNodeNames = names && typeof names === 'object' ? names : {};
       if (savedNodeScope !== local) {
+        sharedFavoritesRequest++;
+        sharedFavoritesLoading = false;
+        sharedFavoritesWriting = false;
+        sharedFavoritesRevision = null;
+        sharedFavoritesState = 'loading';
         savedNodeScope = local;
         const autoDisconnect = document.getElementById('auto-disconnect-current');
         autoDisconnect.checked = false;
@@ -2611,14 +2624,111 @@
           const raw = localStorage.getItem('bluenode:nodes:v1:' + local);
           if (raw && raw.length <= 32768) savedNodeData = cleanSavedNodes(JSON.parse(raw), local);
         } catch (_) { savedNodeStorageAvailable = false; }
+        browserFavorites = savedNodeData.favorites.map(item=>({...item}));
       }
+      renderSavedNodes();
+      return loadSharedFavorites();
+    }
+
+    function applySharedFavorites(data, scope) {
+      if (data?.ok !== true || data.local_node !== scope || !Number.isSafeInteger(data.revision) ||
+          data.revision < 0 || !Array.isArray(data.favorites) || data.favorites.length > 20 ||
+          data.favorites.some(item=>!validSavedNode(item?.node) || item.node === scope ||
+            typeof item.label !== 'string' || item.label.length > 48) ||
+          new Set(data.favorites.map(item=>item.node)).size !== data.favorites.length) {
+        throw new Error('Invalid shared favorites response.');
+      }
+      sharedFavoritesRevision = data.revision;
+      savedNodeData.favorites = data.favorites.map(item=>({...item}));
+      sharedFavoritesState = 'ready';
       renderSavedNodes();
     }
 
+    async function loadSharedFavorites() {
+      if (!savedNodeScope || sharedFavoritesLoading || sharedFavoritesWriting) return;
+      const scope = savedNodeScope, request = ++sharedFavoritesRequest;
+      sharedFavoritesLoading = true;
+      const controller = new AbortController();
+      const deadline = setTimeout(()=>controller.abort(), 8000);
+      try {
+        const response = await fetch('/api/favorites', {cache:'no-store', signal:controller.signal});
+        const data = await response.json();
+        if (scope !== savedNodeScope || request !== sharedFavoritesRequest) return;
+        if (!response.ok) {
+          sharedFavoritesState = response.status === 401 ? 'signed-out' : 'unavailable';
+          throw new Error(data.error || 'Shared favorites unavailable.');
+        }
+        applySharedFavorites(data, scope);
+      } catch (_) {
+        if (scope === savedNodeScope && request === sharedFavoritesRequest) {
+          if (sharedFavoritesState !== 'signed-out') sharedFavoritesState = 'unavailable';
+          renderSavedNodes();
+        }
+      } finally {
+        clearTimeout(deadline);
+        if (scope === savedNodeScope && request === sharedFavoritesRequest) sharedFavoritesLoading = false;
+      }
+    }
+
+    async function changeSharedFavorites(change) {
+      const output = document.getElementById('saved-nodes-message');
+      if (sharedFavoritesWriting) { output.textContent = 'Wait for the favorite change to finish.'; return; }
+      if (sharedFavoritesState !== 'ready') {
+        output.textContent = sharedFavoritesState === 'signed-out'
+          ? 'Sign in, then retry the favorite change.' : 'Wait for shared favorites to load, then retry.';
+        if (sharedFavoritesState === 'signed-out') showControlLogin();
+        return;
+      }
+      const scope = savedNodeScope, request = ++sharedFavoritesRequest;
+      sharedFavoritesLoading = false;
+      sharedFavoritesWriting = true;
+      output.textContent = 'Saving shared favorites…';
+      const controller = new AbortController();
+      const deadline = setTimeout(()=>controller.abort(), 8000);
+      let refresh = false;
+      try {
+        const response = await fetch('/api/favorites', {method:'POST', signal:controller.signal,
+          headers:adminHeaders({'Content-Type':'application/json'}),
+          body:JSON.stringify({local_node:scope, revision:sharedFavoritesRevision, ...change})});
+        const data = await response.json();
+        if (scope !== savedNodeScope || request !== sharedFavoritesRequest) return;
+        if (!response.ok) {
+          refresh = true;
+          if (response.status === 401) showControlLogin();
+          throw new Error(data.error || 'Favorite change failed.');
+        }
+        applySharedFavorites(data, scope);
+        if (change.operation === 'import') browserFavorites = [];
+        if (change.operation === 'remove') browserFavorites = browserFavorites.filter(item=>item.node !== change.node);
+        persistSavedNodes();
+        output.textContent = 'Favorites saved on this node. Your other devices update automatically.';
+      } catch (error) {
+        if (scope === savedNodeScope && request === sharedFavoritesRequest) {
+          output.textContent = error.name === 'AbortError'
+            ? 'Save response timed out. Check the refreshed list before retrying.' : error.message;
+          refresh = true;
+        }
+      } finally {
+        clearTimeout(deadline);
+        if (scope === savedNodeScope && request === sharedFavoritesRequest) {
+          sharedFavoritesWriting = false;
+          if (refresh) await loadSharedFavorites();
+        }
+      }
+    }
+
+    function importBrowserFavorites() {
+      return changeSharedFavorites({operation:'import', items:browserFavorites});
+    }
+
     function renderSavedNodes() {
-      document.getElementById('saved-nodes-help').textContent = savedNodeStorageAvailable
-        ? 'Saved in this browser, separately for each local node. Connect adds a link; it does not disconnect other nodes.'
-        : 'Browser storage unavailable; changes last for this page only. Connect adds a link.';
+      document.getElementById('saved-nodes-help').textContent = sharedFavoritesState === 'ready'
+        ? 'Favorites are shared by this node across phone and PC. Recent nodes and Auto-switch remain browser preferences.'
+        : sharedFavoritesState === 'signed-out'
+          ? 'Sign in to load shared favorites. Any displayed list may be out of date.'
+          : 'Shared favorites are unavailable or loading. Any displayed list may be out of date; changes are paused.';
+      document.getElementById('import-browser-favorites').hidden = sharedFavoritesState !== 'ready' ||
+        !browserFavorites.some(item=>!savedNodeData.favorites.some(shared=>shared.node === item.node));
       const row = (item, favorite) => {
         const label = item.label || (typeof savedNodeNames[item.node] === 'string' ? savedNodeNames[item.node].slice(0,48) : '') || 'Node ' + item.node;
         return `<div class="saved-node-row"><span>${escapeHtml(label)}${label === 'Node ' + item.node ? '' : ' (' + item.node + ')'}</span>
@@ -2641,12 +2751,7 @@
       if (!savedNodeScope) { output.textContent = 'Wait for the local node identity before saving favorites.'; return; }
       if (!validSavedNode(node) || node === savedNodeScope) { output.textContent = 'Enter a valid remote node number.'; return; }
       const label = document.getElementById('favorite-node-label').value.trim().slice(0,48);
-      const old = savedNodeData.favorites.find(item=>item.node === node);
-      if (old) old.label = label;
-      else if (savedNodeData.favorites.length < 20) savedNodeData.favorites.push({node,label});
-      else { output.textContent = 'Favorites is full. Remove a node before adding another.'; return; }
-      persistSavedNodes();
-      output.textContent = 'Favorite saved' + (savedNodeStorageAvailable ? '.' : ' for this page only.');
+      return changeSharedFavorites({operation:'save', item:{node,label}});
     }
 
     function editFavoriteNode(node) {
@@ -2655,15 +2760,12 @@
       if (!favorite) return;
       const name = prompt('Name for favorite node ' + node + ' (optional, up to 48 characters):', favorite.label);
       if (name === null) return;
-      favorite.label = name.trim().slice(0,48);
-      persistSavedNodes();
-      document.getElementById('saved-nodes-message').textContent = 'Favorite name updated' + (savedNodeStorageAvailable ? '.' : ' for this page only.');
+      return changeSharedFavorites({operation:'save', item:{node, label:name.trim().slice(0,48)}});
     }
 
     function removeFavoriteNode(node) {
-      savedNodeData.favorites = savedNodeData.favorites.filter(item=>item.node !== node);
-      persistSavedNodes();
-      document.getElementById('saved-nodes-message').textContent = 'Favorite removed.';
+      if (!savedNodeScope || !validSavedNode(node) || node === savedNodeScope) return;
+      return changeSharedFavorites({operation:'remove', node});
     }
 
     function rememberNodeControl(action, result, controlScope = savedNodeScope) {

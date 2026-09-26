@@ -19,7 +19,11 @@ Start here after installation, or return whenever a label is unfamiliar. Some op
 - **Recent Nodes:** shortcuts from verified connections and observed connection history. They are not a list of nodes currently connected. Connect adds a link; Disconnect leaves that particular link.
 - **Favorite name:** an optional label to help you recognize a saved number. Saving the same number again updates its label.
 
-Favorites are stored in this browser, separately for each local node. Another browser, device, or dashboard address can have a different list. Clearing browser data can remove them. If storage is blocked, the dashboard explains that changes last only for that page.
+Favorites and their names are saved on the node. Phone and PC dashboards connected to that same node show the same list and refresh it automatically while open. If Remote Admin is enabled, sign in on each device to read or change shared favorites. Recent Nodes and Auto-switch remain browser preferences.
+
+After upgrading from browser-only favorites, use **Import this browser's favorites** on each browser with shortcuts you want to keep. Import adds missing numbers and keeps names already saved on the node. It does not connect to a node. A full list rejects the whole import; remove unwanted entries and retry. Old browser copies remain available until a successful import, so upgrading does not silently discard them.
+
+If another device changes the list before you save, BlueNode refreshes it and asks you to review and retry. During connection or storage problems, any displayed list may be out of date and changes are paused. A timed-out save may have reached the node: check the refreshed list before retrying. Shared favorites survive browser-data clearing and service restarts; include the node's state/favorites.json in application backups. Replacing the node or restoring an older backup can change that list.
 
 **Which number gets saved?** The main number beside Connect and Disconnect. The automatic-disconnect option does not change which number is saved.
 
@@ -93,6 +97,6 @@ History starts when BlueNode observes your node. A new installation can have an 
 
 ## Coming back later
 
-Open your usual dashboard address. With Windows Setup's private connection, reopen the app, sign in, click Open dashboard, and keep the app open. That temporary address can change between visits, which can also affect browser-stored favorites.
+Open your usual dashboard address. With Windows Setup's private connection, reopen the app, sign in, click Open dashboard, and keep the app open. That temporary address can change between visits. Shared favorites still come from the same node; browser-local Recent Nodes and Auto-switch preferences may differ at a new address.
 
 Use **Dashboard guide** at the top of the dashboard to return here. Optional features can wait until the basic station and connection controls make sense.

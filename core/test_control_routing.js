@@ -15,12 +15,18 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       const posts = [];
       let emergency = false;
       const authenticated = mode === 'authenticated';
+      const favorites = {ok:true,local_node:'99999',revision:1,favorites:[{node:'12345',label:'Example favorite'}]};
+      await page.addInitScript(()=>localStorage.setItem('bluenode:nodes:v1:99999',JSON.stringify({favorites:[{node:'12345',label:'Example favorite'}],recent:[]})));
       await page.route('**/*', async route => {
         const request = route.request();
         const url = new URL(request.url());
         let status = 200;
         let body = {};
         if (url.pathname === '/web/') return route.fulfill({contentType:'text/html',body:html});
+        if (url.pathname === '/api/favorites') {
+          return route.fulfill({status:mode==='signed-out'?401:200,contentType:'application/json',
+            body:JSON.stringify(mode==='signed-out'?{error:'Sign in required'}:favorites)});
+        }
         if (request.method() === 'POST') {
           posts.push({path:url.pathname, headers:request.headers(), body:request.postData()});
           // bf91361 protects ordinary controls too when Remote Admin is enabled.
@@ -54,8 +60,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
       await page.locator('#manual-node-number').fill('12345');
       await page.evaluate(()=>configureSavedNodes('99999',{}));
       await page.locator('#favorite-node-label').fill('Example favorite');
-      await page.getByRole('button',{name:'Save node as favorite',exact:true}).click();
-      assert.equal(posts.length,0,'saving a favorite must never send a radio control');
+      assert.equal(posts.length,0,'loading favorites must never send a radio control');
       allowConfirmation = false;
       const cancelledCount = posts.length;
       await page.locator('#emergency-enter').click();

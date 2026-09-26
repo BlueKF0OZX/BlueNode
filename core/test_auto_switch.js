@@ -8,10 +8,15 @@ const html = fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
  const browser=await chromium.launch({headless:true,...(process.env.BLUENODE_BROWSER_PATH?{executablePath:process.env.BLUENODE_BROWSER_PATH}:{})});
  try {
   const page=await browser.newPage(); const posts=[]; let multiple=false, choice='11111';
+  let favorites=[];
   page.on('dialog',d=>choice===null?d.dismiss():d.accept(choice));
   await page.route('**/*',async route=>{
    const req=route.request(),url=new URL(req.url());
    if(url.pathname==='/web/') return route.fulfill({contentType:'text/html',body:html});
+   if(url.pathname==='/api/favorites') {
+    if(req.method()==='POST') favorites=[req.postDataJSON().item];
+    return route.fulfill({json:{ok:true,local_node:'99999',revision:1,favorites}});
+   }
    let body={},status=200;
    if(req.method()==='POST'){
     const payload=JSON.parse(req.postData()); posts.push({path:url.pathname,payload});

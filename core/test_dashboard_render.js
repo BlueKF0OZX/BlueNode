@@ -62,11 +62,20 @@ function fixture(detailed) {
       let invalidConnectionState = false;
       let injection = false;
       let eventFixture = null;
+      let favorites = {ok:true,local_node:'12345',revision:0,favorites:[]};
       const hostile = '<img src=x onerror=alert(1)>';
       let releaseIntelligence;
       const intelligenceGate = new Promise(resolve => { releaseIntelligence = resolve; });
       await page.route('**/*', async route=>{
         const url = new URL(route.request().url());
+        if (url.pathname === '/api/favorites') {
+          if (route.request().method() === 'POST') {
+            const change = route.request().postDataJSON();
+            assert.equal(change.operation,'save');
+            favorites = {...favorites, revision:favorites.revision+1, favorites:[change.item]};
+          }
+          return route.fulfill({contentType:'application/json',body:JSON.stringify(favorites)});
+        }
         assert.equal(route.request().method(), 'GET', 'Render checks must never invoke controls');
         if (url.pathname === '/web/') return route.fulfill({contentType:'text/html',body:html});
         if (url.pathname === '/logs/events.log') return route.fulfill({contentType:'text/plain',body:eventFixture ??
@@ -173,6 +182,7 @@ function fixture(detailed) {
       await page.locator('#manual-node-number').fill('23456');
       await page.locator('#favorite-node-label').fill('Example favorite');
       await page.getByRole('button',{name:'Save node as favorite',exact:true}).click();
+      await page.waitForFunction(()=>document.getElementById('saved-node-favorites').textContent.includes('Example favorite'));
       assert.match(await page.locator('#saved-node-favorites').innerText(),/Example favorite/);
       assert.match(await page.locator('#saved-node-recents').innerText(),/34567/);
       await page.evaluate(()=>loadStatus());

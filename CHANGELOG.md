@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Store favorites and their names on the node so phone and PC dashboards share the same list.
+- Import existing browser favorites explicitly, preserving names already saved on the node.
+- Reject conflicting edits from stale browsers, preserve data on storage errors, and protect shared favorites with the existing Remote Admin sign-in policy.
+- Add contributor/security guidance, private vulnerability reporting, and a pull-request checklist.
+
 ## [0.1.5-alpha.1] - 2026-09-25
 
 - Bundle the latest dashboard in Windows and terminal installations.
