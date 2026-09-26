@@ -1,10 +1,10 @@
 # Shared favorites validation
 
-The development dashboard saves up to 20 favorites in the node's
+Starting with 0.1.6-alpha.1, the dashboard saves up to 20 favorites in the node's
 `state/favorites.json`. Names and numbers are shared between devices connected to
 that node. Recent Nodes and Auto-switch remain browser preferences. This change
-is after the published 0.1.5-alpha.1 release; existing release installers do not
-contain it.
+requires the matching backend and dashboard. Installers from 0.1.5-alpha.1 and
+earlier do not contain it.
 
 ## Verified on September 26, 2026
 
@@ -21,9 +21,16 @@ contain it.
   fixtures. No operating node is contacted.
 - Frontend checks cover conflicting edits, unavailable service, blocked browser
   storage, escaping, canceled rename, recent-node rules, and delayed responses
-  for a different node identity.
+  for a different node identity. Protected gateways that return HTTP 403 with
+  `auth_required` also display the sign-in action.
 - The complete workstation run passed 268 Python tests with six platform skips,
   and all 14 JavaScript suites, including five-width dashboard rendering.
+- A reviewed four-file overlay was deployed to an existing customized node,
+  with a backup and a tested rollback path. Served file hashes and sign-in
+  enforcement passed; configuration hashes and the Asterisk process were
+  unchanged. The operator confirmed favorites matched on their actual phone
+  and PC after refreshing. This is one installation's acceptance, not coverage
+  of every gateway or hardware combination.
 
 ## Deployment and operator acceptance
 
