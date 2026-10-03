@@ -1,5 +1,14 @@
 # Changelog
 
+## Development update - 2026-10-03
+
+- Bound dashboard sign-in/control requests and ignore outdated authentication responses; timed-out commands are never automatically replayed.
+- Refresh dashboard observations, favorites, authentication, and events when returning to the page or reconnecting the browser.
+- Add Recent Events text/node search, pair overlapping activity separately by source, and clear retained summaries when event history becomes unavailable.
+- Add authenticated DTMF-style connect/disconnect shortcuts with the last 20 attempts stored per node in the browser. Selecting history fills the input without sending.
+- Display dashboard timestamps in 24-hour format, including midnight as 00:00.
+- This is an incremental development update, not a new packaged release. Find Activity and audio-analysis experiments remain outside this update.
+
 ## [0.1.6-alpha.1] - 2026-09-26
 
 - Store favorites and their names on the node so phone and PC dashboards share the same list.

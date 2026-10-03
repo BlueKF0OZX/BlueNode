@@ -88,7 +88,7 @@ for (const handler of ["runControl('dodropin-connect', this)",
   assert.ok(html.includes('onclick="' + handler + '"'),
     'Control handler must remain wired: ' + handler);
 }
-assert.match(html, /fetch\('\/api\/control\/' \+ action/,
+assert.match(html, /dashboardRequest\('\/api\/control\/' \+ action/,
   'Control API endpoint must remain unchanged');
 assert.match(html, /requestOrdinaryControl\('maintenance-/,
   'Maintenance Mode must use the protected control API');
@@ -101,6 +101,7 @@ assert.match(html, /@media \(max-width: 480px\)[\s\S]*?\.controls-grid\s*,[\s\S]
 const elements = {};
 function element(id) {
   return elements[id] ||= {textContent:'', className:'', dataset:{}, style:{},
+    querySelectorAll(){return [];},
     classList:{add(){}, remove(){}}};
 }
 const context = vm.createContext({Date, Number, Object, Error,
@@ -210,9 +211,10 @@ const context = vm.createContext({Date, Number, Object, Error,
   assert.equal(calls,2,'Refresh guard must reset after failure');
   resolveFetch({json:async()=>{throw new Error('Fixture failure');}});
   await next;
-  const eventStart = html.indexOf('    let eventsLoading');
+  const eventStart = html.indexOf('    let eventsExpanded');
   const eventEnd = html.indexOf('    if (isLocalDashboardFile)', eventStart);
   context.AbortController = AbortController;
+  context.emergencyModeState = {active:false};
   let expire, cleared = 0;
   context.setTimeout = (callback, delay) => { assert.equal(delay, 10000); expire = callback; return 77; };
   context.clearTimeout = id => { assert.equal(id, 77); cleared++; };
