@@ -1222,6 +1222,20 @@
 
 
 
+      <details class="manual-node-control" id="dtmf-panel">
+        <summary>DTMF quick commands &amp; history</summary>
+        <p class="sub">Use *3 followed by a node to connect, or *1 followed by a node to disconnect.
+          These shortcuts use BlueNode's verified link controls. Other DTMF functions are not supported here.</p>
+        <div class="manual-node-row">
+          <input id="dtmf-command" class="admin-field" aria-label="DTMF command" maxlength="12" placeholder="*3 + node number" autocomplete="off">
+          <button class="control-button" id="dtmf-send" onclick="runDtmfCommand(this)">Send command</button>
+        </div>
+        <p id="dtmf-result" role="status" class="sub"></p>
+        <p class="sub">Last 20 attempts in this browser, separate for each local node. Selecting one only fills the command box.</p>
+        <div id="dtmf-history"></div>
+        <button class="control-button" onclick="clearDtmfHistory()">Clear command history</button>
+      </details>
+
       <div class="favorite-save-row">
         <input id="favorite-node-label" class="admin-field" type="text" maxlength="48" placeholder="Favorite name (optional)" aria-label="Favorite name (optional)">
         <button class="control-button" onclick="saveFavoriteNode()">Save node as favorite</button>
@@ -1424,6 +1438,7 @@
         <button type="button" class="control-button" id="events-filter-system" aria-pressed="false" onclick="setEventFilter('system')">System</button>
       </div>
       <label class="event-raw-toggle"><input id="events-raw" type="checkbox" onchange="renderEvents()"> Show individual raw events</label>
+      <input id="events-search" class="admin-field" type="search" maxlength="120" aria-label="Filter events by node or text" placeholder="Filter by node or text" oninput="eventsExpanded=false;renderEvents()">
       <div id="events-scope" class="sub"></div>
 
       <div id="events">Loading events...</div>
@@ -1595,12 +1610,25 @@
       if (pending) pending.reject(new Error(message));
       document.getElementById('admin-login-result').textContent = message;
     }
+    // Bound both headers and body; a timed-out control is never retried automatically.
+    async function dashboardRequest(url, options = {}, timeout = 15000) {
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), timeout);
+      try {
+        const response = await fetch(url, {...options, signal:controller.signal});
+        await response.clone().arrayBuffer();
+        return response;
+      } catch (error) {
+        if (error.name === 'AbortError') throw new Error('Request timed out. Check current state before trying again; the command may have reached the node.');
+        throw error;
+      } finally { clearTimeout(deadline); }
+    }
     async function postOrdinaryControl(action, payload) {
       validateControl(action, payload);
-      if (pendingAdminActions.has(action)) return fetch('/api/admin/action', {method:'POST',
-        headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify({action:action.slice(6), ...payload})});
-      const response = await fetch('/api/control/' + action, {method:'POST',
-        headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)});
+      if (pendingAdminActions.has(action)) return dashboardRequest('/api/admin/action', {method:'POST',
+        headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify({action:action.slice(6), ...payload})}, 90000);
+      const response = await dashboardRequest('/api/control/' + action, {method:'POST',
+        headers:adminHeaders({'Content-Type':'application/json'}), body:JSON.stringify(payload)}, 90000);
       if (response.status === 503) {
         const failure = await response.clone().json().catch(() => ({}));
         if (failure.state === 'CONFIG_ERROR') await loadAdminSession();
@@ -1625,11 +1653,14 @@
       } finally { controlRequestBusy = false; }
     }
 
+    let adminSessionRequest = 0;
     async function loadAdminSession() {
+      const request = ++adminSessionRequest;
       try {
-        const response = await fetch('/api/admin/session', {cache:'no-store'});
+        const response = await dashboardRequest('/api/admin/session', {cache:'no-store'}, 8000);
         if (!response.ok) throw new Error('Authentication state unavailable');
         const state = await response.json();
+        if (request !== adminSessionRequest) return;
         const configError = state.state === 'CONFIG_ERROR';
         if (configError) cancelPendingControl('Remote Admin configuration error; controls locked until configuration is corrected.');
         document.getElementById('remote-admin-panel').style.display = state.enabled ? 'block' : 'none';
@@ -1641,13 +1672,13 @@
         document.getElementById('admin-login-view').style.display = state.authenticated ? 'none' : 'block';
         document.getElementById('admin-auth-view').style.display = state.authenticated ? 'block' : 'none';
         if (state.authenticated) {
-          await loadAdminStatus();
-          await loadSoftRadioState();
+          Promise.allSettled([loadAdminStatus(), loadSoftRadioState()]);
         } else {
           stopSoftRadio();
           document.getElementById('soft-radio-panel').style.display = 'none';
         }
       } catch (_) {
+        if (request !== adminSessionRequest) return;
         adminCsrfToken = null;
         document.getElementById('control-auth-status').textContent = 'Control authentication unavailable';
         stopSoftRadio();
@@ -1658,12 +1689,13 @@
     async function adminLogin(button) {
       if (adminLoginBusy) return;
       adminLoginBusy = true;
+      ++adminSessionRequest;
       const loginPending = pendingControl;
       button.disabled = true;
       try {
         const credentials = {username:document.getElementById('admin-username').value};
         credentials['pass' + 'word'] = document.getElementById('admin-password').value;
-        const response = await fetch('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'},
+        const response = await dashboardRequest('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'},
           body:JSON.stringify(credentials)});
         const result = await response.json();
         document.getElementById('admin-password').value = '';
@@ -1694,10 +1726,11 @@
       }
     }
     async function adminLogout() {
+      ++adminSessionRequest;
       cancelPendingControl('Pending control cleared by sign out.');
       stopSoftRadio();
       try {
-        const response = await fetch('/api/admin/logout', {method:'POST', headers:adminHeaders()});
+        const response = await dashboardRequest('/api/admin/logout', {method:'POST', headers:adminHeaders()});
         if (!response.ok && response.status !== 401) throw new Error('Sign out failed; session may still be active.');
         adminCsrfToken = null; await loadAdminSession();
       } catch (error) { document.getElementById('control-auth-status').textContent = error.message; }
@@ -1815,6 +1848,60 @@
       if (pendingControl) cancelPendingControl('Pending control cleared on leaving the page.');
       stopSoftRadio();
     });
+
+    function dtmfHistory(scope = savedNodeScope) {
+      if (!validSavedNode(scope)) return [];
+      try {
+        const raw = localStorage.getItem('bluenode:dtmf:v1:' + scope);
+        if (!raw || raw.length > 16000) return [];
+        const rows = JSON.parse(raw);
+        return Array.isArray(rows) ? rows.filter(row => row && /^\*[13][0-9]{1,10}$/.test(row.command) &&
+          typeof row.command === 'string' && Number.isFinite(row.at) &&
+          ['verified', 'unconfirmed'].includes(row.outcome)).slice(0,20) : [];
+      } catch (_) { return []; }
+    }
+    function renderDtmfHistory() {
+      const output = document.getElementById('dtmf-history');
+      if (!output) return;
+      output.innerHTML = dtmfHistory().map(row => `<div class="event-row"><button class="control-button"
+        onclick="document.getElementById('dtmf-command').value='${row.command}'">${row.command}</button>
+        <span>${escapeHtml(new Date(row.at).toLocaleString(undefined, {hourCycle:'h23'}))} · ${row.outcome === 'verified' ? 'Verified' : 'Not confirmed'}</span></div>`).join('') ||
+        '<p class="sub">No command history for this node.</p>';
+    }
+    function clearDtmfHistory() {
+      try { localStorage.removeItem('bluenode:dtmf:v1:' + savedNodeScope); }
+      catch (_) { document.getElementById('dtmf-result').textContent = 'Browser storage is unavailable.'; }
+      renderDtmfHistory();
+    }
+    async function runDtmfCommand(button) {
+      const command = document.getElementById('dtmf-command').value.trim();
+      const match = /^\*([13])([0-9]{1,10})$/.exec(command);
+      const output = document.getElementById('dtmf-result');
+      const scope = savedNodeScope;
+      if (!match || !validSavedNode(scope) || match[2] === scope) {
+        output.textContent = 'Enter *3 or *1 followed by a remote node number.'; return;
+      }
+      if (controlRequestBusy) { output.textContent = 'Finish or cancel the current control first.'; return; }
+      button.disabled = true;
+      output.textContent = 'Waiting for confirmation…';
+      let outcome = 'unconfirmed';
+      try {
+        const action = match[1] === '3' ? 'node-connect' : 'node-disconnect';
+        const response = await requestOrdinaryControl(action, {node:match[2]});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || 'Command was not confirmed.');
+        outcome = result.outcome === 'verified' || result.outcome === 'already_satisfied' ? 'verified' : 'unconfirmed';
+        output.textContent = result.message || 'Check current connection state.';
+        rememberNodeControl(action, result, scope);
+        loadStatus();
+      } catch (error) { output.textContent = error.message; }
+      finally {
+        const rows = [{command, at:Date.now(), outcome}, ...dtmfHistory(scope)].slice(0,20);
+        try { localStorage.setItem('bluenode:dtmf:v1:' + scope, JSON.stringify(rows)); }
+        catch (_) { output.textContent += ' History could not be saved in this browser.'; }
+        renderDtmfHistory(); button.disabled = false;
+      }
+    }
 
     async function runControl(action, button) {
       const controlNodeScope = savedNodeScope;
@@ -2179,11 +2266,11 @@
       const detailStatus = optionalMessage || {current: 'Up to date', stale: 'Information may be outdated', unavailable: 'Weather information unavailable'}[status];
       document.getElementById('weather-overview').textContent = detailStatus;
       document.getElementById('weather-freshness').textContent =
-        Number.isFinite(s.last_success) ? 'Last updated: ' + new Date(s.last_success * 1000).toLocaleString() : '';
+        Number.isFinite(s.last_success) ? 'Last updated: ' + new Date(s.last_success * 1000).toLocaleString(undefined, {hourCycle:'h23'}) : '';
       const markup = alerts.length ? events.map(event =>
         `<article class="weather-alert ${significant(event) ? 'weather-important' : ''}"><h3>${esc(event)}</h3>` +
         alerts.filter(a => a.event === event).map(a => `<p>Area: ${esc(a.area || a.county_code)} (${esc(a.county_code)}) &middot; SkywarnPlus severity: ${esc(a.severity)}/4</p>` +
-          `<p>Ends: ${esc(new Date(a.end_time * 1000).toLocaleString())}</p>` +
+          `<p>Ends: ${esc(new Date(a.end_time * 1000).toLocaleString(undefined, {hourCycle:'h23'}))}</p>` +
           (a.description ? `<details><summary>Description</summary><div class="weather-description">${esc(a.description)}</div></details>` : '')).join('') + '</article>'
       ).join('') : esc(status === 'current' ? message : detailStatus);
       if (markup !== weatherMarkup) {
@@ -2267,7 +2354,7 @@
         'Operation elapsed: ' + formatEmergencyDuration(
           Number(emergencyModeState.elapsed_seconds || 0) + extra
         ) + (emergencyModeState.activated_at
-          ? ' \u00b7 Activated ' + new Date(emergencyModeState.activated_at).toLocaleString()
+          ? ' \u00b7 Activated ' + new Date(emergencyModeState.activated_at).toLocaleString(undefined, {hourCycle:'h23'})
           : '');
     }
 
@@ -2372,7 +2459,7 @@
         Number.isFinite(state.recovery_attempts_today) ? String(state.recovery_attempts_today) : 'Unknown';
       const until = state.backoff_until_iso || state.cooldown_until_iso;
       document.getElementById('automation-backoff').textContent =
-        until ? 'Backoff/cooldown until: ' + new Date(until).toLocaleString() :
+        until ? 'Backoff/cooldown until: ' + new Date(until).toLocaleString(undefined, {hourCycle:'h23'}) :
           Object.hasOwn(state, 'cooldown_until_iso') ? 'Cooldown: None' : 'Cooldown: Unknown';
       document.getElementById('automation-action').textContent =
         state.operator_attention_required ? 'Operator attention recommended' :
@@ -2627,6 +2714,7 @@
         browserFavorites = savedNodeData.favorites.map(item=>({...item}));
       }
       renderSavedNodes();
+      if (typeof renderDtmfHistory === 'function') renderDtmfHistory();
       return loadSharedFavorites();
     }
 
@@ -3085,7 +3173,7 @@
 
                   if (!Number.isNaN(parsed.getTime())) {
 
-                    timeText = parsed.toLocaleString();
+                    timeText = parsed.toLocaleString(undefined, {hourCycle:'h23'});
 
                   }
 
@@ -3287,7 +3375,7 @@
                 const parsed = new Date(session.disconnected_at);
 
                 if (!Number.isNaN(parsed.getTime())) {
-                  ended = parsed.toLocaleString();
+                  ended = parsed.toLocaleString(undefined, {hourCycle:'h23'});
                 }
               }
 
@@ -3459,7 +3547,7 @@
         {
           const d = new Date(data.last_health_check);
           const datePart = d.toLocaleDateString();
-          const timePart = d.toLocaleTimeString();
+          const timePart = d.toLocaleTimeString(undefined, {hourCycle:'h23'});
           document.getElementById('lastcheck').innerHTML =
             datePart + '<br>' + timePart;
         }
@@ -3527,7 +3615,7 @@
 
     function eventRecords(text, rawOnly = false) {
       const records = [];
-      let pending = null;
+      const pending = new Map();
       for (const line of text.split('\n').filter(line => line.trim())) {
         const parts = line.replace(/\r$/, '').split(' | ');
         const timestamp = parts[0] || '';
@@ -3547,22 +3635,23 @@
         if (source && Number.isFinite(time)) record.source = source;
         if (!rawOnly && source && Number.isFinite(time)) {
           if (transition[2] === 'START') {
-            pending = {record, source, time, index:records.length};
+            pending.set(source, {record, source, time, index:records.length});
           } else {
-            if (pending && pending.source === source && time >= pending.time) {
-              records[pending.index] = null;
+            const start = pending.get(source);
+            if (start && time >= start.time) {
+              records[start.index] = null;
               record.event = 'RADIO.TRANSMISSION';
-              record.intervalSeconds = (time - pending.time) / 1000;
-              record.message = source + ' · ' + Math.round((time - pending.time) / 1000) + ' sec recorded interval' +
+              record.intervalSeconds = (time - start.time) / 1000;
+              record.message = source + ' · ' + Math.round((time - start.time) / 1000) + ' sec recorded interval' +
                 (transition[1] === 'REMOTE_TX' ? ' · original source unknown' : '');
-              record.raw = [...pending.record.raw, line];
-              record.key = pending.record.key + '|' + timestamp;
+              record.raw = [...start.record.raw, line];
+              record.key = start.record.key + '|' + timestamp;
             }
-            pending = null;
+            pending.delete(source);
           }
         } else if (category === 'radio' || /STARTED|STOPPED|RESTART|DISCONNECT/.test(event)) {
           // Never bridge collector interruptions, restarts, or ambiguous sources.
-          pending = null;
+          pending.clear();
         }
         records.push(record);
       }
@@ -3592,7 +3681,7 @@
       element.innerHTML = rows.slice(0,20).map(row => `<div class="event-row"><div class="event-content">
         <strong>${escapeHtml(row.source)}</strong><div class="event-message">${row.intervals} complete intervals · ${Math.round(row.seconds)} sec recorded
         ${row.incomplete ? ' · ' + row.incomplete + ' unmatched records' : ''}</div>
-        <div class="sub">Last record: ${escapeHtml(new Date(row.last).toLocaleString())}</div></div></div>`).join('') +
+        <div class="sub">Last record: ${escapeHtml(new Date(row.last).toLocaleString(undefined, {hourCycle:'h23'}))}</div></div></div>`).join('') +
         (rows.length > 20 ? '<p class="sub">Showing the 20 most recently observed sources.</p>' : '');
     }
 
@@ -3604,7 +3693,9 @@
       const emergencyPattern = /EMERGENCY|ASTERISK|CONNECT|DISCONNECT|INTERNET|DNS|GATEWAY|ALLSTAR|SKYWARN|INCIDENT|RECOVERY|AUTOMATION|CONTROL/i;
       const rawOnly = document.getElementById('events-raw').checked;
       const records = eventRecords(eventText, rawOnly);
+      const search = (document.getElementById('events-search')?.value || '').trim().toLowerCase();
       const filtered = records.filter(record =>
+        (!search || [record.event, record.message, ...record.raw].join(' ').toLowerCase().includes(search)) &&
         (eventFilter === 'all' || record.category === eventFilter) &&
         (!emergencyModeState.active || eventFilter !== 'all' || emergencyPattern.test(record.event)));
       document.getElementById('events-scope').textContent = emergencyModeState.active && eventFilter === 'all'
@@ -3621,7 +3712,7 @@
         else if (/\.(SUCCESS|HEALTHY|NORMAL|ONLINE|ENABLED)/.test(record.event)) eventClass = 'event-success';
         const time = new Date(record.timestamp);
         const displayTime = Number.isNaN(time.getTime()) ? record.timestamp : time.toLocaleString([], {
-          month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+          month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'});
         const rawText = `<pre>${escapeHtml(record.raw.join('\n'))}</pre>`;
         const raw = rawOnly ? rawText : `<details data-event-key="${escapeHtml(record.key)}" ${openKeys.has(record.key) ? 'open' : ''}>
           <summary>View raw ${record.raw.length > 1 ? 'records' : 'record'}</summary>${rawText}</details>`;
@@ -3651,7 +3742,7 @@
         if (response.status === 404) {
           eventText = '';
           eventHistoryError = '';
-          document.getElementById('events').textContent = 'No event history yet.';
+          renderEvents();
           return;
         }
         if (!response.ok) throw new Error('Event history unavailable');
@@ -3664,9 +3755,7 @@
 
         eventText = '';
         eventHistoryError = 'Unable to load event history.';
-        document.getElementById('events').textContent =
-
-          'Unable to load event history.';
+        renderEvents();
 
       } finally { clearTimeout(deadline); eventsLoading = false; }
 
@@ -3686,6 +3775,13 @@
 
 
 
+    function refreshAfterResume() {
+      if (document.visibilityState === 'hidden') return;
+      loadStatus(); loadLiveActivity(); loadAdminSession(); loadSharedFavorites(); loadEvents();
+    }
+    document.addEventListener('visibilitychange', refreshAfterResume);
+    window.addEventListener('pageshow', refreshAfterResume);
+    window.addEventListener('online', refreshAfterResume);
     setInterval(loadStatus, 2000);
     setInterval(loadLiveActivity, 2000);
     setInterval(renderLiveActivity, 1000);

@@ -6,6 +6,13 @@ BlueNode is an open-source monitoring, control, intelligence, and automatic-reco
 See [validation status](docs/VALIDATION_STATUS.md) for completed lab checks and
 remaining limits before choosing a version to evaluate.
 
+**Development update — October 3, 2026:** Dashboard work is continuing with
+more reliable sign-in and resume handling, searchable Recent Events, verified
+DTMF connect/disconnect shortcuts with local history, and 24-hour timestamps.
+These improvements are in the current source; the latest packaged release
+remains 0.1.6-alpha.1. Find Activity conversation-detection experiments are still
+being evaluated and are not included in this update. See the [changelog](CHANGELOG.md).
+
 ## QSO page
 
 [Open **On Air**](https://qso.onair-radio.workers.dev/) to browse short-lived invitations and find someone to talk with over AllStar.

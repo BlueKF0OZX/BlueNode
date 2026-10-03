@@ -1,5 +1,21 @@
 # Validation status
 
+## October 3 dashboard development update
+
+The isolated public-source update passed all 15 JavaScript/dashboard suites,
+including five viewport widths, real HTTP shared favorites across two browser
+contexts, command-history persistence without replay, stale authentication
+responses, and unavailable event-history cleanup. All 17 focused Python web
+administration and favorites tests passed. Repository privacy and whitespace
+checks passed. Midnight/noon/afternoon formatting was checked with a 12-hour
+locale; dashboard timestamps use the 00–23 hour cycle.
+
+The broader Windows Python run did not complete and was stopped; a full core
+regression pass is not claimed for this update. Backend code and installation
+configuration are unchanged. Browser tests use synthetic observations, not RF
+acceptance. Find Activity and voice-analysis experiments are excluded. This
+source update does not create a new release tag or installer package.
+
 Latest release checks (2026-09-25): [Windows setup 0.1.3-alpha.1](WINDOWS_SETUP_VALIDATION.md)
 and [guided setup](GUIDED_SETUP_VALIDATION.md). BlueNode remains an early-testing
 alpha. The dated record below describes the earlier baseline, not the latest

@@ -147,7 +147,8 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
     assert.equal(executed.length, before, 'failed session verification must prevent resume');
     sessionUnavailable = false;
     await page.evaluate(() => loadAdminSession());
-    const requestCount = requests.length;
+    const controlRequests = () => requests.filter(p=>p.startsWith('/api/control/') || p==='/api/admin/action').length;
+    const requestCount = controlRequests();
     await page.evaluate(async () => {
       for (const [action,payload] of [['../admin/action',{}],['node-connect',{node:'123;bad'}],['skywarn-enable',{extra:true}],['admin-restart-asterisk',{}],['admin-restart-asterisk',{confirmation:'wrong'}],['admin-shell',{}]]) {
         let rejected = false;
@@ -155,7 +156,7 @@ const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
         if (!rejected) throw new Error('Malformed control accepted');
       }
     });
-    assert.equal(requests.length, requestCount);
+    assert.equal(controlRequests(), requestCount, 'malformed controls must issue no control request');
     for (const action of ['refresh-diagnostics','restart-monitor','restart-asterisk']) {
       authenticated = false;
       const before = executed.length;
