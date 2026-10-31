@@ -12,6 +12,26 @@ import health
 
 
 class ConnectionStateTests(unittest.TestCase):
+    def test_unchanged_links_keep_radio_heartbeat_without_rewriting_sessions(self):
+        self.path.write_text(json.dumps({'links': ['50241'], 'connected_since': {'50241': self.started}}))
+        sample = {'local_rx': False, 'local_tx': False,
+                  'links': [{'node': '50241', 'mode': 'T', 'keyed': False}]}
+        with patch.object(allstar_status, 'get_telemetry', return_value=sample), \
+             patch.object(allstar_status.radio_activity, 'update') as heartbeat, \
+             patch.object(allstar_status, 'save_state') as save:
+            allstar_status.check_changes()
+            allstar_status.check_changes()
+        self.assertEqual(heartbeat.call_count, 2)
+        save.assert_not_called()
+
+    def test_corrupt_empty_state_is_repaired_even_without_a_link_change(self):
+        self.path.write_text('[]')
+        sample = {'local_rx': False, 'local_tx': False, 'links': []}
+        with patch.object(allstar_status, 'get_telemetry', return_value=sample), \
+             patch.object(allstar_status.radio_activity, 'update'):
+            allstar_status.check_changes()
+        self.assertTrue(connection_state.load(self.path)['state_available'])
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

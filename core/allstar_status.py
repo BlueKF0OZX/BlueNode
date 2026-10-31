@@ -212,6 +212,7 @@ def check_changes():
     previous = set(state["links"])
 
     connected_since = state["connected_since"]
+    previous_since = dict(connected_since)
 
 
 
@@ -281,7 +282,11 @@ def check_changes():
 
 
 
-    save_state(current, connected_since)
+    # radio_activity.update above publishes the two-second heartbeat. This
+    # connection/session file has no heartbeat; avoid an fsync when unchanged.
+    if (not state.get("state_available", False) or current != previous
+            or connected_since != previous_since):
+        save_state(current, connected_since)
 
 
 
