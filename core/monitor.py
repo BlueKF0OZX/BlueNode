@@ -15,6 +15,7 @@ import node_behavior
 
 
 POLL_INTERVAL_SECONDS = 2
+HEALTH_INTERVAL_SECONDS = 10
 
 
 class RecoveryCoordinator:
@@ -103,7 +104,8 @@ def main():
     threads = [
         threading.Thread(
             target=run_periodic,
-            args=("health", lambda: run_health_cycle(recovery), stop_event),
+            args=("health", lambda: run_health_cycle(recovery), stop_event,
+                  HEALTH_INTERVAL_SECONDS),
             name="nodesmart-health",
         ),
         threading.Thread(
