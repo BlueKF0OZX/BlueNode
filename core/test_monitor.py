@@ -19,6 +19,22 @@ class HeldThread(ImmediateThread):
 
 
 class MonitorTests(unittest.TestCase):
+    def test_health_schedule_does_not_slow_radio_telemetry(self):
+        workers = {}
+
+        def thread(**kwargs):
+            workers[kwargs['name']] = kwargs['args']
+            return Mock(is_alive=Mock(return_value=False))
+
+        with patch.object(monitor.threading, 'Thread', side_effect=thread), \
+             patch.object(monitor.connectivity, 'update'):
+            monitor.main()
+
+        self.assertEqual(workers['nodesmart-health'][3], 10)
+        self.assertEqual(workers['nodesmart-allstar'][1], monitor.check_changes)
+        self.assertEqual(len(workers['nodesmart-allstar']), 3)
+        self.assertEqual(monitor.run_periodic.__defaults__, (2,))
+
     def test_health_is_saved_before_intelligence_and_recovery(self):
         state = {"asterisk": "offline"}
         recovery = Mock()
