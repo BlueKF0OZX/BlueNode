@@ -28,6 +28,17 @@ for (const value of [null, {}, {...sample(),last_update:stamp(-7)},
   assert.equal(view(value).state,'unknown');
   assert.equal(view(value).warning,'');
 }
+const keying = value => Array.from(context.radioKeyingView(value, now));
+for (const rx of [false, true]) for (const tx of [false, true]) {
+  assert.deepEqual(keying({...sample(),local_rx:rx,local_tx:tx}),
+    [rx ? 'active' : 'idle', tx ? 'active' : 'idle']);
+}
+for (const value of [null, {}, {...sample(),last_update:stamp(-7)},
+  {...sample(),last_update:stamp(1)}, {...sample(),telemetry_available:false},
+  {...sample(),stale:true}, {...sample(),last_update:'broken'},
+  {...sample(),local_rx:1,local_tx:'false'}]) {
+  assert.deepEqual(keying(value), ['unknown','unknown']);
+}
 const idle = {...sample(),status:'idle',last_active_at:stamp(-42),tx_origin:{active:false,source_type:'none'}};
 assert.equal(view(idle).label,'IDLE');
 assert.match(view(idle).detail,/42s ago/);
@@ -69,10 +80,16 @@ assert.equal(view(corrupt).state,'unknown');
   context.fetch = async()=>({ok:true,json:async()=>sample()});
   await context.loadLiveActivity();
   assert.match(element('live-activity-label').textContent,/RECEIVING/);
+  context.fetch = async()=>({ok:true,json:async()=>({...sample(),local_rx:true,local_tx:true})});
+  await context.loadLiveActivity();
+  assert.equal(element('radio-rx').textContent,'Local RX · Active');
+  assert.equal(element('radio-tx').dataset.state,'active');
   assert.match(element('activity-refresh-status').textContent,/ms.*not audio delay/);
   context.fetch = async()=>{throw new Error('offline');};
   await context.loadLiveActivity();
   assert.equal(element('live-activity-label').textContent,'Activity unavailable');
+  assert.equal(element('radio-rx').textContent,'Local RX · Unknown');
+  assert.equal(element('radio-tx').dataset.state,'unknown');
   assert.match(element('activity-refresh-status').textContent,/unavailable/);
   let release;
   let requests=0;

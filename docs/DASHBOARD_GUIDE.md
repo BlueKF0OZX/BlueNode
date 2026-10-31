@@ -100,3 +100,13 @@ History starts when BlueNode observes your node. A new installation can have an 
 Open your usual dashboard address. With Windows Setup's private connection, reopen the app, sign in, click Open dashboard, and keep the app open. That temporary address can change between visits. Shared favorites still come from the same node; browser-local Recent Nodes and Auto-switch preferences may differ at a new address.
 
 Use **Dashboard guide** at the top of the dashboard to return here. Optional features can wait until the basic station and connection controls make sense.
+# Local RX/TX indicators
+
+Above Observed activity history, Local RX and Local TX show the node's separate
+receiver and transmitter keying observations. Both can be active together. Active
+uses a green highlight and a text label; Idle means a fresh false observation.
+Unknown means missing, invalid, expired, or unavailable telemetry. These indicators
+use the existing activity polling and do not key the radio or send control commands.
+They describe local radio keying, not an identified remote operator or proof of audio.
+CPU temperature and CPU utilization remain in the system cards.
+
