@@ -1038,6 +1038,8 @@
         <div class="label">CPU Temperature</div>
 
         <div id="cputemp" class="value">Waiting for observation</div>
+        <div class="label">CPU Utilization</div>
+        <div id="cpuusage" class="value" aria-live="off">Waiting for observation</div>
 
       </div>
 
@@ -1470,6 +1472,7 @@
         'This is a snapshot of cached observations, not a live diagnostic test.', '',
         'Overall health: ' + status(state.status), 'Asterisk: ' + status(state.asterisk),
         'Internet: ' + status(state.internet), 'CPU temperature (C): ' + numeric(state.cpu_temp_c),
+        'CPU utilization (%): ' + numeric(state.cpu_percent),
         'Memory used (%): ' + numeric(state.memory_percent), 'Disk used (%): ' + numeric(state.disk_percent),
         'Uptime (seconds): ' + numeric(state.uptime_seconds), '', 'Connectivity checks:'];
       for (const key of ['interface', 'gateway', 'dns', 'internet', 'allstar']) {
@@ -3506,6 +3509,10 @@
 
 
 
+        document.getElementById('cpuusage').textContent =
+          Number.isFinite(data.cpu_percent) && data.cpu_percent >= 0 && data.cpu_percent <= 100
+            ? data.cpu_percent.toFixed(1) + '%' : 'N/A';
+
         document.getElementById('memory').textContent =
 
           data.memory_percent != null ? data.memory_percent.toFixed(1) + '%' : 'N/A';
@@ -3564,7 +3571,7 @@
           'Waiting for BlueNode monitoring data. If this persists, check nodesmart.service.';
         for (const id of ['status', 'asterisk', 'internet', 'skywarn']) setValue(id, 'unavailable');
         document.getElementById('asterisk-detail').textContent = 'Service observation unavailable';
-        for (const id of ['lastcheck','cputemp','uptime','memory','disk']) document.getElementById(id).textContent = 'Unavailable';
+        for (const id of ['lastcheck','cputemp','cpuusage','uptime','memory','disk']) document.getElementById(id).textContent = 'Unavailable';
         unavailableConnections();
         renderWeather(null);
         renderConnectivity(null);

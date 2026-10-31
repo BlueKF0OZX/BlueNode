@@ -1,3 +1,4 @@
+from cpu_usage import get_cpu_usage
 import connection_state
 
 import json
@@ -470,6 +471,7 @@ def build_state():
         "weather_alerts": weather_alerts.public_state(skywarn),
 
         "cpu_temp_c": cpu_temp,
+        "cpu_percent": get_cpu_usage(),
 
         "uptime_seconds": uptime_seconds,
 
